@@ -50,25 +50,23 @@ jobs:
           gclient config --name=src https://github.com/youtube/cobalt.git
           # Fetch with no-history to save time and space
           gclient sync --no-history -j 4
-          # The source will be placed in the 'src' directory by gclient
-          mv src/* .
           
       - name: Apply VacuumTube Patches
         run: |
-          cd cobalt-src
+          cd cobalt-src/src
           echo "Applying Adblock and SponsorBlock patches..."
-          for patch in ../patches/*.patch; do
+          for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
               patch -p1 < "$patch" || echo "Failed to apply $patch"
             fi
           done
           
           # Copy injected JS files
-          cp -r ../scripts/injection cobalt/browser/
+          cp -r ../../scripts/injection cobalt/browser/
 
       - name: Configure Build (Size Optimized)
         run: |
-          cd cobalt-src
+          cd cobalt-src/src
           
           # Create size-optimized args to ensure APK is < 15MB
           # - is_debug = false (Release build)
@@ -88,7 +86,7 @@ jobs:
 
       - name: Build APK (RAM Limited)
         run: |
-          cd cobalt-src
+          cd cobalt-src/src
           # We limit ninja to 2 jobs (-j 2) to prevent OOM kills on standard 7GB GitHub runners
           ninja -C out/android-arm64_gold -j 2 cobalt_apk
           
@@ -96,4 +94,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Fast-Tube-APK
-          path: cobalt-src/out/android-arm64_gold/apks/*.apk
+          path: cobalt-src/src/out/android-arm64_gold/apks/*.apk
