@@ -79,6 +79,7 @@ jobs:
           # Inject size-optimized args and explicitly disable remote execution by replacing defaults
           sed -i 's/use_remoteexec = true/use_remoteexec = false/g' out/android-arm64_gold/args.gn || true
           sed -i 's/use_goma = true/use_goma = false/g' out/android-arm64_gold/args.gn || true
+          sed -i 's/use_siso = true/use_siso = false/g' out/android-arm64_gold/args.gn || true
           
           # Append our size optimizations
           cat <<EOF >> out/android-arm64_gold/args.gn
@@ -87,6 +88,7 @@ jobs:
           symbol_level = 0
           cc_wrapper = "ccache"
           strip_absolute_paths_from_debug_symbols = true
+          use_siso = false
           EOF
           
           # Regenerate ninja files with our injected arguments
@@ -95,8 +97,8 @@ jobs:
       - name: Build APK (RAM Limited)
         run: |
           cd cobalt-src/src
-          # We limit ninja to 2 jobs (-j 2) to prevent OOM kills on standard 7GB GitHub runners
-          autoninja -C out/android-arm64_gold -j 2 cobalt_apk
+          # We explicitly use ninja-linux64 with -j 1 to completely bypass depot_tools wrappers and prevent OOM
+          ninja-linux64 -C out/android-arm64_gold -j 1 cobalt_apk
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
