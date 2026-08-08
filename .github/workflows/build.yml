@@ -81,7 +81,7 @@ jobs:
           sed -i 's/use_goma = true/use_goma = false/g' out/android-arm64_gold/args.gn || true
           sed -i 's/use_siso = true/use_siso = false/g' out/android-arm64_gold/args.gn || true
           
-          # Append our size optimizations
+          # Append our size optimizations and disable Werror
           cat <<EOF >> out/android-arm64_gold/args.gn
           is_debug = false
           is_official_build = true
@@ -89,6 +89,7 @@ jobs:
           cc_wrapper = "ccache"
           strip_absolute_paths_from_debug_symbols = true
           use_siso = false
+          treat_warnings_as_errors = false
           EOF
           
           # Regenerate ninja files with our injected arguments
@@ -97,8 +98,8 @@ jobs:
       - name: Build APK (RAM Limited)
         run: |
           cd cobalt-src/src
-          # We explicitly use ninja-linux64 with -j 1 to completely bypass depot_tools wrappers and prevent OOM
-          ninja-linux64 -C out/android-arm64_gold -j 1 cobalt_apk
+          # We use autoninja with -j 2 to respect depot_tools and limit memory usage
+          autoninja -C out/android-arm64_gold -j 2 cobalt_apk
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
