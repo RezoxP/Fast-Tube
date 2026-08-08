@@ -48,6 +48,7 @@ jobs:
         run: |
           mkdir cobalt-src && cd cobalt-src
           gclient config --name=src https://github.com/youtube/cobalt.git
+          echo 'target_os = ["android"]' >> .gclient
           # Fetch with no-history to save time and space
           gclient sync --no-history -j 4
           
