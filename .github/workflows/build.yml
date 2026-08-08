@@ -76,16 +76,17 @@ jobs:
           # Generate ninja files for Android ARM64, 'gold' config is the highest optimization level in Cobalt
           python3 cobalt/build/gn.py -p android-arm64 -c gold
           
-          # Inject size-optimized args and explicitly disable remote execution
+          # Inject size-optimized args and explicitly disable remote execution by replacing defaults
+          sed -i 's/use_remoteexec = true/use_remoteexec = false/g' out/android-arm64_gold/args.gn || true
+          sed -i 's/use_goma = true/use_goma = false/g' out/android-arm64_gold/args.gn || true
+          
+          # Append our size optimizations
           cat <<EOF >> out/android-arm64_gold/args.gn
           is_debug = false
           is_official_build = true
           symbol_level = 0
           cc_wrapper = "ccache"
-          enable_proguard = true
           strip_absolute_paths_from_debug_symbols = true
-          use_remoteexec = false
-          use_goma = false
           EOF
           
           # Regenerate ninja files with our injected arguments
@@ -95,7 +96,7 @@ jobs:
         run: |
           cd cobalt-src/src
           # We limit ninja to 2 jobs (-j 2) to prevent OOM kills on standard 7GB GitHub runners
-          ninja -C out/android-arm64_gold -j 2 cobalt_apk
+          autoninja -C out/android-arm64_gold -j 2 cobalt_apk
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
