@@ -1,0 +1,26 @@
+--- a/cobalt/browser/web_module.cc
++++ b/cobalt/browser/web_module.cc
+@@ -200,6 +200,23 @@
+   if (!window_) {
+     return;
+   }
++  
++  // INJECT FAST-TUBE / VACUUMTUBE PATCHES
++  // This executes the JavaScript that handles adblocking and SponsorBlock.
++  std::string adblock_script = 
++    "var script = document.createElement('script');"
++    "script.src = 'file:///android_asset/vacuumtube_adblock.js';"
++    "document.head.appendChild(script);";
++    
++  base::MessageLoop::current()->task_runner()->PostTask(
++      FROM_HERE,
++      base::Bind(
++          [](base::WeakPtr<WebModule> web_module, std::string script) {
++            if (web_module) {
++              web_module->ExecuteJavascript(script, base::SourceLocation("adblock.js", 1, 1));
++            }
++          },
++          weak_ptr_factory_.GetWeakPtr(), adblock_script));
+ 
+   window_->document()->DispatchEvent(
+       new dom::Event(base::Tokens::load()));

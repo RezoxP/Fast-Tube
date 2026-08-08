@@ -1,0 +1,99 @@
+name: Build Fast-Tube (Cobalt TV)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Cobalt APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          
+      - name: Configure Android SDK and NDK paths
+        run: |
+          # ubuntu-latest comes with Android SDK and NDK pre-installed
+          # Cobalt requires STARBOARD_TOOLCHAINS_DIR and ANDROID_NDK_HOME
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          echo "STARBOARD_TOOLCHAINS_DIR=$ANDROID_HOME/ndk" >> $GITHUB_ENV
+          
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ccache ninja-build python3 xz-utils curl git pkg-config
+          
+      - name: Cache ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-ccache-
+
+      - name: Setup depot_tools
+        run: |
+          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+
+      - name: Fetch Cobalt Source (gclient)
+        run: |
+          mkdir cobalt-src && cd cobalt-src
+          gclient config --name=src https://github.com/youtube/cobalt.git
+          # Fetch with no-history to save time and space
+          gclient sync --no-history -j 4
+          # The source will be placed in the 'src' directory by gclient
+          mv src/* .
+          
+      - name: Apply VacuumTube Patches
+        run: |
+          cd cobalt-src
+          echo "Applying Adblock and SponsorBlock patches..."
+          for patch in ../patches/*.patch; do
+            if [ -f "$patch" ]; then
+              patch -p1 < "$patch" || echo "Failed to apply $patch"
+            fi
+          done
+          
+          # Copy injected JS files
+          cp -r ../scripts/injection cobalt/browser/
+
+      - name: Configure Build (Size Optimized)
+        run: |
+          cd cobalt-src
+          
+          # Create size-optimized args to ensure APK is < 15MB
+          # - is_debug = false (Release build)
+          # - is_official_build = true (Max optimizations)
+          # - symbol_level = 0 (Strip symbols)
+          cat <<EOF > args.gn
+          is_debug = false
+          is_official_build = true
+          symbol_level = 0
+          cc_wrapper = "ccache"
+          enable_proguard = true
+          strip_absolute_paths_from_debug_symbols = true
+          EOF
+          
+          # Generate ninja files for Android ARM64, 'gold' config is the highest optimization level in Cobalt
+          python3 cobalt/build/gn.py -p android-arm64 -c gold
+
+      - name: Build APK (RAM Limited)
+        run: |
+          cd cobalt-src
+          # We limit ninja to 2 jobs (-j 2) to prevent OOM kills on standard 7GB GitHub runners
+          ninja -C out/android-arm64_gold -j 2 cobalt_apk
+          
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Fast-Tube-APK
+          path: cobalt-src/out/android-arm64_gold/apks/*.apk
