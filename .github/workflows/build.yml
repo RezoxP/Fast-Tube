@@ -80,6 +80,7 @@ jobs:
           cc_wrapper = "ccache"
           enable_proguard = true
           strip_absolute_paths_from_debug_symbols = true
+          use_remoteexec = false
           EOF
           
           # Generate ninja files for Android ARM64, 'gold' config is the highest optimization level in Cobalt
