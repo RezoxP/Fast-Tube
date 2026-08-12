@@ -13,8 +13,6 @@ export PATH=$PATH:$PWD/depot_tools
 # 2. Setup Dummy Android Home for testing
 export ANDROID_HOME=/tmp/dummy-android-home
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
-export STARBOARD_TOOLCHAINS_DIR=$ANDROID_HOME/ndk
-export _STARBOARD_TOOLCHAINS_DIR_KEY=$ANDROID_HOME/ndk
 mkdir -p $ANDROID_NDK_HOME
 
 # 3. Clone minimal Cobalt
@@ -24,6 +22,7 @@ if [ ! -d "src" ]; then
     gclient config --name=src https://github.com/youtube/cobalt.git
     echo 'target_os = ["android"]' >> .gclient
     gclient sync --revision src@25.lts.1+ --no-history -j 4
+    bash src/starboard/tools/download_clang.sh
     # By passing specific revision/depth, we could speed this up, 
     # but gclient sync usually takes a while.
     # To make this FAST on this machine just for testing, we will stop here.

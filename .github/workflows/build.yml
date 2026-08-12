@@ -22,10 +22,8 @@ jobs:
       - name: Configure Android SDK and NDK paths
         run: |
           # ubuntu-latest comes with Android SDK and NDK pre-installed
-          # Cobalt requires STARBOARD_TOOLCHAINS_DIR and ANDROID_NDK_HOME
+          # The runner sets ANDROID_HOME. Cobalt will find the NDK there automatically.
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
-          echo "STARBOARD_TOOLCHAINS_DIR=$ANDROID_HOME/ndk" >> $GITHUB_ENV
-          echo "_STARBOARD_TOOLCHAINS_DIR_KEY=$ANDROID_HOME/ndk" >> $GITHUB_ENV
           
       - name: Install dependencies
         run: |
@@ -52,6 +50,9 @@ jobs:
           echo 'target_os = ["android"]' >> .gclient
           # Fetch with no-history to save time and space
           gclient sync --revision src@25.lts.1+ --no-history -j 4
+          
+          # Explicitly run the clang downloader because CI environments disable it by default
+          bash src/starboard/tools/download_clang.sh
           
       - name: Apply VacuumTube Patches
         run: |
