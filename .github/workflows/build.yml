@@ -116,4 +116,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Fast-Tube-APK
-          path: cobalt-src/src/out/android-arm64_gold/apks/*.apk
+          path: |
+            cobalt-src/src/out/android-arm64_gold/*.apk
+            cobalt-src/src/out/android-arm64_gold/**/*.apk
