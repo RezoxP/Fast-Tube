@@ -25,6 +25,7 @@ jobs:
           # Cobalt requires STARBOARD_TOOLCHAINS_DIR and ANDROID_NDK_HOME
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
           echo "STARBOARD_TOOLCHAINS_DIR=$ANDROID_HOME/ndk" >> $GITHUB_ENV
+          echo "_STARBOARD_TOOLCHAINS_DIR_KEY=$ANDROID_HOME/ndk" >> $GITHUB_ENV
           
       - name: Install dependencies
         run: |

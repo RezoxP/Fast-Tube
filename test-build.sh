@@ -14,6 +14,7 @@ export PATH=$PATH:$PWD/depot_tools
 export ANDROID_HOME=/tmp/dummy-android-home
 export ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653
 export STARBOARD_TOOLCHAINS_DIR=$ANDROID_HOME/ndk
+export _STARBOARD_TOOLCHAINS_DIR_KEY=$ANDROID_HOME/ndk
 mkdir -p $ANDROID_NDK_HOME
 
 # 3. Clone minimal Cobalt
