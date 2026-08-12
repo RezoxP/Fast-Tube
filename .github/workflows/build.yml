@@ -99,7 +99,7 @@ jobs:
         run: |
           cd cobalt-src/src
           # We use autoninja without artificial limits to maximize speed
-          autoninja -C out/android-arm64_gold cobalt_apk
+          autoninja -C out/android-arm64_gold cobalt.apk
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
