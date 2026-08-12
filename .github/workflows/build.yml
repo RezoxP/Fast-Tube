@@ -101,6 +101,7 @@ jobs:
       - name: Build APK (Speed Optimized)
         run: |
           cd cobalt-src/src
+          export PYTHONPATH="$PWD"
           # We use autoninja without artificial limits to maximize speed
           autoninja -C out/android-arm64_gold cobalt.apk
           
