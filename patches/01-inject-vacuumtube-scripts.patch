@@ -1,26 +1,18 @@
+diff --git a/cobalt/browser/web_module.cc b/cobalt/browser/web_module.cc
+index 9edc8e199..75fbd538d 100644
 --- a/cobalt/browser/web_module.cc
 +++ b/cobalt/browser/web_module.cc
-@@ -200,6 +200,23 @@
-   if (!window_) {
-     return;
+@@ -345,6 +345,13 @@ class WebModule::Impl {
+             window_->performance(), load_timing_info);
+       }
+     }
++
++    // Inject Fast-Tube / VacuumTube adblock & SponsorBlock script
++    std::string adblock_script =
++        "var script = document.createElement('script');"
++        "script.src = 'file:///android_asset/vacuumtube_adblock.js';"
++        "if (document.head) { document.head.appendChild(script); } else if (document.documentElement) { document.documentElement.appendChild(script); }";
++    ExecuteJavascript(adblock_script, base::SourceLocation("adblock.js", 1, 1), nullptr, nullptr);
    }
-+  
-+  // INJECT FAST-TUBE / VACUUMTUBE PATCHES
-+  // This executes the JavaScript that handles adblocking and SponsorBlock.
-+  std::string adblock_script = 
-+    "var script = document.createElement('script');"
-+    "script.src = 'file:///android_asset/vacuumtube_adblock.js';"
-+    "document.head.appendChild(script);";
-+    
-+  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
-+      FROM_HERE,
-+      base::Bind(
-+          [](base::WeakPtr<WebModule> web_module, std::string script) {
-+            if (web_module) {
-+              web_module->ExecuteJavascript(script, base::SourceLocation("adblock.js", 1, 1));
-+            }
-+          },
-+          weak_ptr_factory_.GetWeakPtr(), adblock_script));
  
-   window_->document()->DispatchEvent(
-       new dom::Event(base::Tokens::load()));
+   // Inject the DOM event object into the window or the element.

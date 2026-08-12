@@ -68,6 +68,8 @@ jobs:
           
           # Copy injected JS files
           cp -r ../../scripts/injection cobalt/browser/
+          mkdir -p starboard/android/apk/app/src/app/assets
+          cp -r ../../scripts/injection/* starboard/android/apk/app/src/app/assets/
 
       - name: Configure Build (Size Optimized)
         run: |
