@@ -93,7 +93,7 @@ jobs:
           EOF
           
           # Regenerate ninja files with our injected arguments
-          gn gen out/android-arm64_gold
+          PYTHONPATH=$PWD gn gen out/android-arm64_gold
 
       - name: Build APK (Speed Optimized)
         run: |
