@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache ninja-build python3 xz-utils curl git pkg-config gperf
+          sudo apt-get install -y ccache ninja-build python3 xz-utils curl git pkg-config gperf generate-ninja
           
       - name: Cache ccache
         uses: actions/cache@v4
