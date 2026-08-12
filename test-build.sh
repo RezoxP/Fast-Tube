@@ -37,6 +37,6 @@ for patch in ../patches/*.patch; do
 done
 
 echo "Simulating GN configuration..."
-echo "PYTHONPATH=. python3 cobalt/build/gn.py -p android-arm64 -c gold"
+echo "PYTHONPATH=\$PWD python3 cobalt/build/gn.py -p android-arm64 -c gold"
 
 echo "Local testing logic complete! Script logic is sound."
