@@ -12,7 +12,7 @@
 +    "script.src = 'file:///android_asset/vacuumtube_adblock.js';"
 +    "document.head.appendChild(script);";
 +    
-+  base::MessageLoop::current()->task_runner()->PostTask(
++  base::SequencedTaskRunner::GetCurrentDefault()->PostTask(
 +      FROM_HERE,
 +      base::Bind(
 +          [](base::WeakPtr<WebModule> web_module, std::string script) {
