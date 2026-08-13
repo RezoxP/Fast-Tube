@@ -74,7 +74,9 @@ jobs:
           # Copy injected JS files
           cp -r ../../scripts/injection cobalt/browser/
           mkdir -p starboard/android/apk/app/src/app/assets
+          mkdir -p starboard/android/apk/app/src/app/assets/web
           cp -r ../../scripts/injection/* starboard/android/apk/app/src/app/assets/
+          cp -r ../../scripts/injection/* starboard/android/apk/app/src/app/assets/web/
 
       - name: Configure Build (Size Optimized)
         run: |
@@ -84,7 +86,7 @@ jobs:
           # - is_debug = false (Release build)
           # - is_official_build = true (Max optimizations)
           # - symbol_level = 0 (Strip symbols)
-          # Generate ninja files for Android ARM64, 'gold' config is the highest optimization level in Cobalt
+          # - optimize_for_size = true (Opt for size in compiler)
           PYTHONPATH=$PWD python3 cobalt/build/gn.py -p android-arm64 -c gold
           
           # Inject size-optimized args and explicitly disable remote execution by replacing defaults
@@ -97,6 +99,7 @@ jobs:
           is_debug = false
           is_official_build = true
           symbol_level = 0
+          optimize_for_size = true
           strip_absolute_paths_from_debug_symbols = true
           use_siso = false
           treat_warnings_as_errors = false
@@ -105,12 +108,22 @@ jobs:
           # Regenerate ninja files with our injected arguments
           PYTHONPATH=$PWD gn gen out/android-arm64_gold
 
-      - name: Build APK (Speed Optimized)
+      - name: Build APK (Speed & Size Optimized)
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
           # We use autoninja without artificial limits to maximize speed
           autoninja -C out/android-arm64_gold cobalt.apk
+          
+          # Strip unneeded debug symbols from native libraries
+          STRIP_TOOL="$ANDROID_HOME/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
+          if [ -f "$STRIP_TOOL" ]; then
+            echo "Stripping native libraries..."
+            find out/android-arm64_gold -name "*.so" -exec $STRIP_TOOL --strip-unneeded {} + || true
+          fi
+
+          echo "APK size summary:"
+          ls -lh out/android-arm64_gold/*.apk out/android-arm64_gold/**/*.apk || true
           
       - name: Upload Artifact
         uses: actions/upload-artifact@v4

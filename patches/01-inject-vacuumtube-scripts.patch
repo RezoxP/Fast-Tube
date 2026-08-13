@@ -1,18 +1,119 @@
 diff --git a/cobalt/browser/web_module.cc b/cobalt/browser/web_module.cc
-index 9edc8e199..75fbd538d 100644
+index 9edc8e199..9287b8f1c 100644
 --- a/cobalt/browser/web_module.cc
 +++ b/cobalt/browser/web_module.cc
-@@ -345,6 +345,13 @@ class WebModule::Impl {
+@@ -20,6 +20,10 @@
+ 
+ #include "base/bind.h"
+ #include "base/callback.h"
++#include "base/files/file_util.h"
++#include "base/path_service.h"
++#include "cobalt/base/cobalt_paths.h"
++#include "starboard/system.h"
+ #include "base/command_line.h"
+ #include "base/logging.h"
+ #include "base/memory/weak_ptr.h"
+@@ -345,6 +349,103 @@ class WebModule::Impl {
              window_->performance(), load_timing_info);
        }
      }
 +
 +    // Inject Fast-Tube / VacuumTube adblock & SponsorBlock script
-+    std::string adblock_script =
-+        "var script = document.createElement('script');"
-+        "script.src = 'file:///android_asset/vacuumtube_adblock.js';"
-+        "if (document.head) { document.head.appendChild(script); } else if (document.documentElement) { document.documentElement.appendChild(script); }";
-+    ExecuteJavascript(adblock_script, base::SourceLocation("adblock.js", 1, 1), nullptr, nullptr);
++    std::string adblock_script;
++    base::FilePath web_root;
++    if (base::PathService::Get(cobalt::paths::DIR_COBALT_WEB_ROOT, &web_root)) {
++      base::ReadFileToString(web_root.Append("vacuumtube_adblock.js"), &adblock_script);
++    }
++    if (adblock_script.empty()) {
++      char content_dir[512] = {0};
++      if (SbSystemGetPath(kSbSystemPathContentDirectory, content_dir, sizeof(content_dir))) {
++        base::ReadFileToString(base::FilePath(content_dir).Append("vacuumtube_adblock.js"), &adblock_script);
++        if (adblock_script.empty()) {
++          base::ReadFileToString(base::FilePath(content_dir).Append("web").Append("vacuumtube_adblock.js"), &adblock_script);
++        }
++      }
++    }
++    if (adblock_script.empty()) {
++      adblock_script = R"JS(
++(function() {
++    if (window.__fast_tube_injected__) return;
++    window.__fast_tube_injected__ = true;
++    const originalFetch = window.fetch;
++    window.fetch = async function(...args) {
++        let url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
++        if (url.includes('/api/stats/ads') || url.includes('/ptracking') || url.includes('/pagead/') || url.includes('googleads.g.doubleclick.net') || url.includes('/youtubei/v1/att/get')) {
++            return new Response(JSON.stringify({}), { status: 200, statusText: "OK", headers: { 'Content-Type': 'application/json' } });
++        }
++        if (url.includes('/youtubei/v1/player')) {
++            try {
++                if (args[1] && args[1].body) {
++                    try {
++                        const reqData = JSON.parse(args[1].body);
++                        if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
++                    } catch(e) {}
++                }
++                const response = await originalFetch.apply(this, args);
++                const clone = response.clone();
++                const data = await clone.json();
++                if (data && data.videoDetails && data.videoDetails.videoId) checkSponsorBlock(data.videoDetails.videoId);
++                if (data) {
++                    delete data.adPlacements;
++                    delete data.playerAds;
++                    delete data.adSlots;
++                    delete data.adBreakParams;
++                }
++                return new Response(JSON.stringify(data), { status: response.status, statusText: response.statusText, headers: response.headers });
++            } catch (e) {
++                return originalFetch.apply(this, args);
++            }
++        }
++        return originalFetch.apply(this, args);
++    };
++    const origOpen = XMLHttpRequest.prototype.open;
++    const origSend = XMLHttpRequest.prototype.send;
++    XMLHttpRequest.prototype.open = function(method, url, ...rest) { this._url = url; return origOpen.call(this, method, url, ...rest); };
++    XMLHttpRequest.prototype.send = function(body) {
++        if (this._url && (this._url.includes('/api/stats/ads') || this._url.includes('/ptracking') || this._url.includes('/pagead/'))) return;
++        return origSend.call(this, body);
++    };
++    let currentVideoId = null;
++    let sponsorSegments = [];
++    function checkSponsorBlock(videoId) {
++        if (!videoId || videoId === currentVideoId) return;
++        currentVideoId = videoId;
++        originalFetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=["sponsor","interaction","intro","outro","selfpromo","music_offtopic"]`)
++            .then(res => res.ok ? res.json() : [])
++            .then(data => { if (Array.isArray(data)) sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1] })); else sponsorSegments = []; })
++            .catch(() => { sponsorSegments = []; });
++    }
++    setInterval(() => {
++        const video = document.querySelector('video');
++        if (!video) return;
++        const hash = window.location.hash;
++        if (hash && hash.includes('v=')) {
++            const vMatch = hash.match(/v=([a-zA-Z0-9_-]{11})/);
++            if (vMatch && vMatch[1]) checkSponsorBlock(vMatch[1]);
++        }
++        const adContainer = document.querySelector('.ad-interrupting, .ytp-ad-self-ad-badge, .ytp-ad-text');
++        if (adContainer && video.duration && !isNaN(video.duration)) video.currentTime = video.duration;
++        if (sponsorSegments.length > 0 && !video.paused && video.currentTime) {
++            for (const segment of sponsorSegments) {
++                if (video.currentTime >= segment.start && video.currentTime < (segment.end - 0.2)) video.currentTime = segment.end;
++            }
++        }
++    }, 400);
++    const injectStyles = () => {
++        if (document.getElementById('fast-tube-styles')) return;
++        const style = document.createElement('style');
++        style.id = 'fast-tube-styles';
++        style.innerHTML = 'ytd-ad-slot-renderer,ytd-promoted-sparkles-web-renderer,.ytd-display-ad-renderer,.ytp-ad-overlay-container,.ytp-ad-message-container,.ytp-ad-skip-button-container,yt-mealbar-promo-renderer,ytd-statement-banner-renderer,.badge-style-type-ad{display:none !important;}';
++        (document.head || document.documentElement).appendChild(style);
++    };
++    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectStyles); else injectStyles();
++})();
++)JS";
++    }
++    ExecuteJavascript(adblock_script, base::SourceLocation("vacuumtube_adblock.js", 1, 1), nullptr, nullptr);
    }
  
    // Inject the DOM event object into the window or the element.
