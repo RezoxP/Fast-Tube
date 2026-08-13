@@ -5,6 +5,11 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_COMPRESS: 1
+  CCACHE_MAXSIZE: 10G
+
 jobs:
   build:
     name: Build Cobalt APK
@@ -21,50 +26,68 @@ jobs:
           
       - name: Configure Android SDK and NDK paths
         run: |
-          # ubuntu-latest comes with Android SDK and NDK pre-installed
-          # The runner sets ANDROID_HOME. Cobalt will find the NDK there automatically.
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
       - name: Generate Android Debug Keystore
         run: |
           mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          
-      - name: Install dependencies
+          if [ ! -f ~/.android/debug.keystore ]; then
+            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Install build tools
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache ninja-build python3 python-is-python3 xz-utils curl git pkg-config gperf generate-ninja
-          ls -l $ANDROID_HOME/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/ || true
-          
-      - name: Cache ccache
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ccache ninja-build python3 python-is-python3 xz-utils curl git pkg-config gperf
+
+      - name: Cache ccache directory
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          path: .ccache
+          key: ccache-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-ccache-
+            ccache-${{ runner.os }}-${{ github.ref }}-
+            ccache-${{ runner.os }}-
 
-      - name: Setup depot_tools
+      - name: Zero ccache stats
+        run: |
+          ccache -z || true
+          ccache -s || true
+
+      - name: Cache Cobalt Source Code & Depot Tools
+        id: cache-cobalt
+        uses: actions/cache@v4
+        with:
+          path: |
+            cobalt-src
+            depot_tools
+          key: cobalt-src-25.lts.1+-v2
+
+      - name: Setup depot_tools (if not cached)
+        if: steps.cache-cobalt.outputs.cache-hit != 'true'
         run: |
           git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
 
-      - name: Fetch Cobalt Source (gclient)
+      - name: Add depot_tools to PATH
         run: |
-          mkdir cobalt-src && cd cobalt-src
+          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
+
+      - name: Fetch Cobalt Source (gclient)
+        if: steps.cache-cobalt.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p cobalt-src && cd cobalt-src
           gclient config --name=src https://github.com/youtube/cobalt.git
           echo 'target_os = ["android"]' >> .gclient
-          # Fetch with no-history to save time and space
-          gclient sync --revision src@25.lts.1+ --no-history -j 4
-          
-          # Explicitly run the clang downloader because CI environments disable it by default
+          gclient sync --revision src@25.lts.1+ --no-history -j 8
           bash src/starboard/tools/download_clang.sh
-          
-      - name: Apply VacuumTube Patches
+
+      - name: Apply VacuumTube Patches & Inject Scripts
         run: |
           cd cobalt-src/src
-          echo "Applying Adblock and SponsorBlock patches..."
+          echo "Resetting & applying Adblock and SponsorBlock patches..."
+          git checkout cobalt/browser/web_module.cc || true
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
               patch -p1 < "$patch" || { echo "Failed to apply $patch"; exit 1; }
@@ -78,24 +101,21 @@ jobs:
           cp -r ../../scripts/injection/* starboard/android/apk/app/src/app/assets/
           cp -r ../../scripts/injection/* starboard/android/apk/app/src/app/assets/web/
 
-      - name: Configure Build (Size Optimized)
+      - name: Configure Build (Size & Speed Optimized)
         run: |
           cd cobalt-src/src
           
-          # Create size-optimized args to ensure APK is < 15MB
-          # - is_debug = false (Release build)
-          # - is_official_build = true (Max optimizations)
-          # - symbol_level = 0 (Strip symbols)
-          # - optimize_for_size = true (Opt for size in compiler)
+          # Generate GN build config for Android ARM64 gold release
           PYTHONPATH=$PWD python3 cobalt/build/gn.py -p android-arm64 -c gold
           
-          # Inject size-optimized args and explicitly disable remote execution by replacing defaults
+          # Disable remote exec/goma/siso defaults
           sed -i 's/use_remoteexec = true/use_remoteexec = false/g' out/android-arm64_gold/args.gn || true
           sed -i 's/use_goma = true/use_goma = false/g' out/android-arm64_gold/args.gn || true
           sed -i 's/use_siso = true/use_siso = false/g' out/android-arm64_gold/args.gn || true
           
-          # Append our size optimizations and disable Werror
+          # Append ccache and performance/size optimizations
           cat <<EOF >> out/android-arm64_gold/args.gn
+          cc_wrapper = "ccache"
           is_debug = false
           is_official_build = true
           symbol_level = 0
@@ -105,14 +125,13 @@ jobs:
           treat_warnings_as_errors = false
           EOF
           
-          # Regenerate ninja files with our injected arguments
+          # Regenerate ninja files
           PYTHONPATH=$PWD gn gen out/android-arm64_gold
 
-      - name: Build APK (Speed & Size Optimized)
+      - name: Build APK (Fast Parallel Build)
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
-          # We use autoninja without artificial limits to maximize speed
           autoninja -C out/android-arm64_gold cobalt.apk
           
           # Strip unneeded debug symbols from native libraries
@@ -124,7 +143,11 @@ jobs:
 
           echo "APK size summary:"
           ls -lh out/android-arm64_gold/*.apk out/android-arm64_gold/**/*.apk || true
-          
+
+      - name: Show ccache Statistics
+        run: |
+          ccache -s || true
+
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
