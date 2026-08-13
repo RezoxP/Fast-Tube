@@ -113,7 +113,7 @@ jobs:
           sed -i 's/use_goma = true/use_goma = false/g' out/android-arm64_gold/args.gn || true
           sed -i 's/use_siso = true/use_siso = false/g' out/android-arm64_gold/args.gn || true
           
-          # Append ccache and performance/size optimizations & component stripping
+          # Append ccache and performance/size optimizations
           cat <<EOF >> out/android-arm64_gold/args.gn
           cc_wrapper = "ccache"
           is_debug = false
@@ -123,10 +123,9 @@ jobs:
           strip_absolute_paths_from_debug_symbols = true
           use_siso = false
           treat_warnings_as_errors = false
-          cobalt_font_package = "android_system"
-          enable_in_app_dial = false
+          enable_in_app_dial = true
+          v8_enable_webassembly = true
           sb_enable_benchmark = false
-          v8_enable_webassembly = false
           enable_base_tracing = false
           EOF
           
