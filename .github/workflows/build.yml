@@ -21,6 +21,8 @@ jobs:
           
       - name: Configure Android SDK and NDK paths
         run: |
+          # ubuntu-latest comes with Android SDK and NDK pre-installed
+          # The runner sets ANDROID_HOME. Cobalt will find the NDK there automatically.
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
@@ -34,7 +36,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y ccache ninja-build python3 python-is-python3 xz-utils curl git pkg-config gperf
+          sudo apt-get install -y ccache ninja-build python3 python-is-python3 xz-utils curl git pkg-config gperf generate-ninja
 
       - name: Cache ccache
         uses: actions/cache@v4
