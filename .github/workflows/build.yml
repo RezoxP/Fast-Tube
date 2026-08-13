@@ -5,11 +5,6 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
-env:
-  CCACHE_DIR: ${{ github.workspace }}/.ccache
-  CCACHE_COMPRESS: 1
-  CCACHE_MAXSIZE: 10G
-
 jobs:
   build:
     name: Build Cobalt APK
@@ -36,46 +31,25 @@ jobs:
             keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           fi
 
-      - name: Install build tools
+      - name: Install dependencies
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ccache ninja-build python3 python-is-python3 xz-utils curl git pkg-config gperf
+          sudo apt-get update
+          sudo apt-get install -y ccache ninja-build python3 python-is-python3 xz-utils curl git pkg-config gperf
 
-      - name: Cache ccache directory
+      - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: .ccache
-          key: ccache-${{ runner.os }}-${{ github.ref }}-${{ github.sha }}
+          path: ~/.ccache
+          key: ${{ runner.os }}-ccache-${{ github.sha }}
           restore-keys: |
-            ccache-${{ runner.os }}-${{ github.ref }}-
-            ccache-${{ runner.os }}-
+            ${{ runner.os }}-ccache-
 
-      - name: Zero ccache stats
-        run: |
-          ccache -z || true
-          ccache -s || true
-
-      - name: Cache Cobalt Source Code & Depot Tools
-        id: cache-cobalt
-        uses: actions/cache@v4
-        with:
-          path: |
-            cobalt-src
-            depot_tools
-          key: cobalt-src-25.lts.1+-v2
-
-      - name: Setup depot_tools (if not cached)
-        if: steps.cache-cobalt.outputs.cache-hit != 'true'
+      - name: Setup depot_tools
         run: |
           git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
 
-      - name: Add depot_tools to PATH
-        run: |
-          echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
-
       - name: Fetch Cobalt Source (gclient)
-        if: steps.cache-cobalt.outputs.cache-hit != 'true'
         run: |
           mkdir -p cobalt-src && cd cobalt-src
           gclient config --name=src https://github.com/youtube/cobalt.git
@@ -83,11 +57,10 @@ jobs:
           gclient sync --revision src@25.lts.1+ --no-history -j 8
           bash src/starboard/tools/download_clang.sh
 
-      - name: Apply VacuumTube Patches & Inject Scripts
+      - name: Apply VacuumTube Patches
         run: |
           cd cobalt-src/src
-          echo "Resetting & applying Adblock and SponsorBlock patches..."
-          git checkout cobalt/browser/web_module.cc || true
+          echo "Applying Adblock and SponsorBlock patches..."
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
               patch -p1 < "$patch" || { echo "Failed to apply $patch"; exit 1; }
@@ -132,7 +105,7 @@ jobs:
           # Regenerate ninja files
           PYTHONPATH=$PWD gn gen out/android-arm64_gold
 
-      - name: Build APK (Fast Parallel Build)
+      - name: Build APK (Speed & Size Optimized)
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
@@ -147,10 +120,6 @@ jobs:
 
           echo "APK size summary:"
           ls -lh out/android-arm64_gold/*.apk out/android-arm64_gold/**/*.apk || true
-
-      - name: Show ccache Statistics
-        run: |
-          ccache -s || true
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
