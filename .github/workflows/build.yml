@@ -5,6 +5,12 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+env:
+  CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_COMPRESS: 1
+  CCACHE_MAXSIZE: 10G
+  CCACHE_SLOPPINESS: time_macros,include_file_mtime,file_macro
+
 jobs:
   build:
     name: Build Cobalt APK
@@ -88,12 +94,13 @@ jobs:
           sed -i 's/use_goma = true/use_goma = false/g' out/android-arm64_gold/args.gn || true
           sed -i 's/use_siso = true/use_siso = false/g' out/android-arm64_gold/args.gn || true
           
-          # Append ccache and performance/size optimizations
+          # Append fast release optimizations
           cat <<EOF >> out/android-arm64_gold/args.gn
           cc_wrapper = "ccache"
           is_debug = false
           is_official_build = true
           symbol_level = 0
+          cobalt_fastbuild = true
           optimize_for_size = true
           strip_absolute_paths_from_debug_symbols = true
           use_siso = false
