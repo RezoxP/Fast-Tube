@@ -13,8 +13,21 @@ env:
 
 jobs:
   build:
-    name: Build Cobalt APK
+    name: Build ${{ matrix.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: android-arm64
+            arch: arm64
+            abi: arm64-v8a
+            name: "Fast-Tube ARM64 (64-bit TV)"
+          - platform: android-arm
+            arch: arm
+            abi: armeabi-v7a
+            name: "Fast-Tube ARM32 (32-bit TV)"
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -27,8 +40,6 @@ jobs:
           
       - name: Configure Android SDK and NDK paths
         run: |
-          # ubuntu-latest comes with Android SDK and NDK pre-installed
-          # The runner sets ANDROID_HOME. Cobalt will find the NDK there automatically.
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --install "ndk;25.2.9519653"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
 
@@ -48,8 +59,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.ccache
-          key: ${{ runner.os }}-ccache-${{ github.sha }}
+          key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.platform }}-
             ${{ runner.os }}-ccache-
 
       - name: Setup depot_tools
@@ -65,12 +77,13 @@ jobs:
           gclient sync --revision src@25.lts.1+ --no-history -j 8
           bash src/starboard/tools/download_clang.sh
 
-      - name: Apply VacuumTube Patches
+      - name: Apply VacuumTube & Size Optimization Patches
         run: |
           cd cobalt-src/src
-          echo "Applying Adblock and SponsorBlock patches..."
+          echo "Applying Adblock, SponsorBlock, and Size Optimization patches..."
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
+              echo "Applying $patch..."
               patch -p1 < "$patch" || { echo "Failed to apply $patch"; exit 1; }
             fi
           done
@@ -86,54 +99,91 @@ jobs:
         run: |
           cd cobalt-src/src
           
-          # Generate GN build config for Android ARM64 gold release
-          PYTHONPATH=$PWD python3 cobalt/build/gn.py -p android-arm64 -c gold
+          # Generate GN build config for target platform gold release
+          PYTHONPATH=$PWD python3 cobalt/build/gn.py -p ${{ matrix.platform }} -c gold
           
           # Disable remote exec/goma/siso defaults
-          sed -i 's/use_remoteexec = true/use_remoteexec = false/g' out/android-arm64_gold/args.gn || true
-          sed -i 's/use_goma = true/use_goma = false/g' out/android-arm64_gold/args.gn || true
-          sed -i 's/use_siso = true/use_siso = false/g' out/android-arm64_gold/args.gn || true
+          sed -i 's/use_remoteexec = true/use_remoteexec = false/g' out/${{ matrix.platform }}_gold/args.gn || true
+          sed -i 's/use_goma = true/use_goma = false/g' out/${{ matrix.platform }}_gold/args.gn || true
+          sed -i 's/use_siso = true/use_siso = false/g' out/${{ matrix.platform }}_gold/args.gn || true
           
-          # Append fast release optimizations
-          cat <<EOF >> out/android-arm64_gold/args.gn
+          # Append size and speed optimizations
+          cat <<EOF >> out/${{ matrix.platform }}_gold/args.gn
           cc_wrapper = "ccache"
           is_debug = false
           is_official_build = true
           symbol_level = 0
           cobalt_fastbuild = true
           optimize_for_size = true
+          use_thin_lto = true
           strip_absolute_paths_from_debug_symbols = true
           use_siso = false
           treat_warnings_as_errors = false
           enable_in_app_dial = true
-          v8_enable_webassembly = true
+          v8_enable_webassembly = false
           sb_enable_benchmark = false
           enable_base_tracing = false
           EOF
           
           # Regenerate ninja files
-          PYTHONPATH=$PWD gn gen out/android-arm64_gold
+          PYTHONPATH=$PWD gn gen out/${{ matrix.platform }}_gold
 
-      - name: Build APK (Speed & Size Optimized)
+      - name: Build Native Library & Pre-Strip
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
-          autoninja -C out/android-arm64_gold cobalt.apk
           
-          # Strip unneeded debug symbols from native libraries
+          # Build the native library first with controlled parallelism to avoid OOM
+          autoninja -C out/${{ matrix.platform }}_gold -j 2 cobalt
+          
+          # Pre-strip unneeded debug and unused symbols from the compiled library
           STRIP_TOOL="$ANDROID_HOME/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
           if [ -f "$STRIP_TOOL" ]; then
-            echo "Stripping native libraries..."
-            find out/android-arm64_gold -name "*.so" -exec $STRIP_TOOL --strip-unneeded {} + || true
+            echo "Pre-stripping native library before APK packaging..."
+            $STRIP_TOOL --strip-unneeded out/${{ matrix.platform }}_gold/libcobalt.so || true
           fi
 
-          echo "APK size summary:"
-          ls -lh out/android-arm64_gold/*.apk out/android-arm64_gold/**/*.apk || true
+      - name: Build APK (Compressed & Minified)
+        run: |
+          cd cobalt-src/src
+          export PYTHONPATH="$PWD"
+          autoninja -C out/${{ matrix.platform }}_gold -j 2 cobalt.apk
+          
+          # Collect and standardize APK output name
+          mkdir -p ${{ github.workspace }}/release-apks
+          APK_FILE=$(find out/${{ matrix.platform }}_gold -name "*.apk" -type f | head -n 1)
+          if [ -f "$APK_FILE" ]; then
+            TARGET_APK="${{ github.workspace }}/release-apks/Fast-Tube-${{ matrix.abi }}-release.apk"
+            cp "$APK_FILE" "$TARGET_APK"
+            echo "Successfully created $TARGET_APK"
+          else
+            echo "Error: No APK found in out/${{ matrix.platform }}_gold"
+            exit 1
+          fi
+
+      - name: Verify Size & Content (< 17MB Limit)
+        run: |
+          cd ${{ github.workspace }}/release-apks
+          TARGET_APK="Fast-Tube-${{ matrix.abi }}-release.apk"
+          
+          echo "=== APK File Summary ==="
+          ls -lh "$TARGET_APK"
+          
+          FILE_SIZE=$(stat -c%s "$TARGET_APK")
+          MAX_SIZE=17825792 # 17 MB in bytes
+          
+          echo "Size in bytes: $FILE_SIZE / $MAX_SIZE max limit (17MB)"
+          if [ "$FILE_SIZE" -gt "$MAX_SIZE" ]; then
+            echo "::error::Output APK size exceeds 17MB limit ($FILE_SIZE bytes > $MAX_SIZE bytes)"
+            exit 1
+          fi
+          echo "::notice::APK size is within limit: $(numfmt --to=iec-i --suffix=B $FILE_SIZE) (< 17MB)"
+          
+          echo "=== APK Zip Structure ==="
+          unzip -l "$TARGET_APK" | head -n 25
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Fast-Tube-APK
-          path: |
-            cobalt-src/src/out/android-arm64_gold/*.apk
-            cobalt-src/src/out/android-arm64_gold/**/*.apk
+          name: Fast-Tube-${{ matrix.abi }}-APK
+          path: release-apks/Fast-Tube-${{ matrix.abi }}-release.apk

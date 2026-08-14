@@ -1,37 +1,31 @@
 // Fast-Tube Injection Script
-// Derived from the principles of VacuumTube
-// Implements ad-blocking and SponsorBlock integration for YouTube TV on Cobalt
-
-console.log("Fast-Tube: Initializing VacuumTube patches...");
+// High-performance, event-driven ad-blocking and SponsorBlock integration for YouTube TV on Cobalt
 
 (function() {
     if (window.__fast_tube_injected__) return;
     window.__fast_tube_injected__ = true;
 
-    // --- Network Request Interception ---
+    // --- High-Performance Network Request Interception ---
     const originalFetch = window.fetch;
+    const AD_URL_PATTERNS = ['/api/stats/ads', '/ptracking', '/pagead/', 'googleads.g.doubleclick.net', '/youtubei/v1/att/get'];
+
     window.fetch = async function(...args) {
-        let url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
+        const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
         
-        // Block typical YouTube ad domains and stats endpoints
-        if (url.includes('/api/stats/ads') || 
-            url.includes('/ptracking') || 
-            url.includes('/pagead/') ||
-            url.includes('googleads.g.doubleclick.net') ||
-            url.includes('/youtubei/v1/att/get')) {
-            console.log("Fast-Tube: Blocked Ad Request -> " + url);
-            return new Response(JSON.stringify({}), { status: 200, statusText: "OK", headers: { 'Content-Type': 'application/json' } });
+        // Fast URL filter for ads & tracking
+        for (let i = 0; i < AD_URL_PATTERNS.length; i++) {
+            if (url.includes(AD_URL_PATTERNS[i])) {
+                return new Response(JSON.stringify({}), { status: 200, statusText: "OK", headers: { 'Content-Type': 'application/json' } });
+            }
         }
-        
-        // Intercept player requests to strip ads & get video ID
+
+        // Intercept player responses to strip ad payloads & extract video ID
         if (url.includes('/youtubei/v1/player')) {
             try {
                 if (args[1] && args[1].body) {
                     try {
-                        const reqData = JSON.parse(args[1].body);
-                        if (reqData && reqData.videoId) {
-                            checkSponsorBlock(reqData.videoId);
-                        }
+                        const reqData = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
+                        if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
                     } catch(e) {}
                 }
 
@@ -52,7 +46,6 @@ console.log("Fast-Tube: Initializing VacuumTube patches...");
                         delete data.playbackTracking.atrUrl;
                         delete data.playbackTracking.cpnUrl;
                     }
-                    console.log("Fast-Tube: Removed ads from player response");
                 }
                 
                 return new Response(JSON.stringify(data), {
@@ -68,7 +61,7 @@ console.log("Fast-Tube: Initializing VacuumTube patches...");
         return originalFetch.apply(this, args);
     };
 
-    // Override XMLHttpRequest for legacy or background network requests
+    // Override XMLHttpRequest with fast bypass
     const origOpen = XMLHttpRequest.prototype.open;
     const origSend = XMLHttpRequest.prototype.send;
     XMLHttpRequest.prototype.open = function(method, url, ...rest) {
@@ -76,92 +69,100 @@ console.log("Fast-Tube: Initializing VacuumTube patches...");
         return origOpen.call(this, method, url, ...rest);
     };
     XMLHttpRequest.prototype.send = function(body) {
-        if (this._url && (this._url.includes('/api/stats/ads') || this._url.includes('/ptracking') || this._url.includes('/pagead/'))) {
-            console.log("Fast-Tube: Blocked XHR Ad Request -> " + this._url);
-            return;
+        if (this._url) {
+            for (let i = 0; i < AD_URL_PATTERNS.length; i++) {
+                if (this._url.includes(AD_URL_PATTERNS[i])) return;
+            }
         }
         return origSend.call(this, body);
     };
 
-    // --- SponsorBlock Integration ---
+    // --- SponsorBlock Integration (Cached & Event-Driven) ---
     let currentVideoId = null;
     let sponsorSegments = [];
+    const segmentCache = new Map();
 
     function checkSponsorBlock(videoId) {
         if (!videoId || videoId === currentVideoId) return;
         currentVideoId = videoId;
         
-        console.log("Fast-Tube: Fetching SponsorBlock segments for " + videoId);
+        if (segmentCache.has(videoId)) {
+            sponsorSegments = segmentCache.get(videoId);
+            return;
+        }
+
         originalFetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=["sponsor","interaction","intro","outro","selfpromo","music_offtopic"]`)
             .then(res => res.ok ? res.json() : [])
             .then(data => {
                 if (Array.isArray(data)) {
                     sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1] }));
-                    console.log("Fast-Tube: Loaded segments", sponsorSegments);
+                    segmentCache.set(videoId, sponsorSegments);
+                    if (segmentCache.size > 50) {
+                        const firstKey = segmentCache.keys().next().value;
+                        segmentCache.delete(firstKey);
+                    }
                 } else {
                     sponsorSegments = [];
                 }
             })
-            .catch(err => {
+            .catch(() => {
                 sponsorSegments = [];
             });
     }
 
-    // Monitor HTML5 video element for SponsorBlock skipping & Ad fast-forwarding
+    // --- Event-Driven Video Element Hooking ---
+    let trackedVideo = null;
+
+    function onTimeUpdate() {
+        if (!trackedVideo || trackedVideo.paused || !sponsorSegments.length) return;
+        const ct = trackedVideo.currentTime;
+        for (let i = 0; i < sponsorSegments.length; i++) {
+            const seg = sponsorSegments[i];
+            if (ct >= seg.start && ct < (seg.end - 0.2)) {
+                trackedVideo.currentTime = seg.end;
+                break;
+            }
+        }
+    }
+
+    function hookVideoElement(video) {
+        if (!video || video === trackedVideo) return;
+        if (trackedVideo) {
+            trackedVideo.removeEventListener('timeupdate', onTimeUpdate);
+        }
+        trackedVideo = video;
+        trackedVideo.addEventListener('timeupdate', onTimeUpdate, { passive: true });
+    }
+
+    // Lightweight Watchdog (Runs at low frequency 1s only to detect new video instances)
     setInterval(() => {
         const video = document.querySelector('video');
-        if (!video) return;
-        
-        const hash = window.location.hash;
+        if (video) {
+            hookVideoElement(video);
+            const adContainer = document.querySelector('.ad-interrupting, .ytp-ad-self-ad-badge, .ytp-ad-text');
+            if (adContainer && video.duration && !isNaN(video.duration)) {
+                video.currentTime = video.duration;
+            }
+        }
+        const hash = (window.location && window.location.hash) ? window.location.hash : '';
         if (hash && hash.includes('v=')) {
             const vMatch = hash.match(/v=([a-zA-Z0-9_-]{11})/);
-            if (vMatch && vMatch[1]) {
-                checkSponsorBlock(vMatch[1]);
-            }
+            if (vMatch && vMatch[1]) checkSponsorBlock(vMatch[1]);
         }
+    }, 1000);
 
-        const adContainer = document.querySelector('.ad-interrupting, .ytp-ad-self-ad-badge, .ytp-ad-text');
-        if (adContainer && video.duration && !isNaN(video.duration)) {
-            console.log("Fast-Tube: Fast-forwarding ad video");
-            video.currentTime = video.duration;
-        }
-
-        if (sponsorSegments.length > 0 && !video.paused && video.currentTime) {
-            for (const segment of sponsorSegments) {
-                if (video.currentTime >= segment.start && video.currentTime < (segment.end - 0.2)) {
-                    console.log(`Fast-Tube: Skipping sponsor segment ${segment.start} - ${segment.end}`);
-                    video.currentTime = segment.end;
-                }
-            }
-        }
-    }, 400);
-
-    // Inject CSS to hide ad banners & YouTube Premium promo elements
+    // CSS Rule injection (runs once)
     const injectStyles = () => {
         if (document.getElementById('fast-tube-styles')) return;
         const style = document.createElement('style');
         style.id = 'fast-tube-styles';
-        style.innerHTML = `
-            ytd-ad-slot-renderer,
-            ytd-promoted-sparkles-web-renderer,
-            .ytd-display-ad-renderer,
-            .ytp-ad-overlay-container,
-            .ytp-ad-message-container,
-            .ytp-ad-skip-button-container,
-            yt-mealbar-promo-renderer,
-            ytd-statement-banner-renderer,
-            .badge-style-type-ad {
-                display: none !important;
-            }
-        `;
+        style.textContent = 'ytd-ad-slot-renderer,ytd-promoted-sparkles-web-renderer,.ytd-display-ad-renderer,.ytp-ad-overlay-container,.ytp-ad-message-container,.ytp-ad-skip-button-container,yt-mealbar-promo-renderer,ytd-statement-banner-renderer,.badge-style-type-ad{display:none !important;}';
         (document.head || document.documentElement).appendChild(style);
     };
 
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', injectStyles);
+        document.addEventListener('DOMContentLoaded', injectStyles, { once: true });
     } else {
         injectStyles();
     }
-
-    console.log("Fast-Tube: VacuumTube patches active.");
 })();

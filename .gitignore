@@ -1,0 +1,8 @@
+# Build outputs & dependencies
+cobalt-src/
+depot_tools/
+out/
+.ccache/
+release-apks/
+actionlint
+*.log

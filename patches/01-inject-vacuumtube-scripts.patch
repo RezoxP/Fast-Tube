@@ -1,5 +1,5 @@
 diff --git a/cobalt/browser/web_module.cc b/cobalt/browser/web_module.cc
-index 9edc8e199..9287b8f1c 100644
+index 9edc8e199..3388f4449 100644
 --- a/cobalt/browser/web_module.cc
 +++ b/cobalt/browser/web_module.cc
 @@ -20,6 +20,10 @@
@@ -13,7 +13,7 @@ index 9edc8e199..9287b8f1c 100644
  #include "base/command_line.h"
  #include "base/logging.h"
  #include "base/memory/weak_ptr.h"
-@@ -345,6 +349,103 @@ class WebModule::Impl {
+@@ -345,6 +349,142 @@ class WebModule::Impl {
              window_->performance(), load_timing_info);
        }
      }
@@ -39,16 +39,19 @@ index 9edc8e199..9287b8f1c 100644
 +    if (window.__fast_tube_injected__) return;
 +    window.__fast_tube_injected__ = true;
 +    const originalFetch = window.fetch;
++    const AD_URL_PATTERNS = ['/api/stats/ads', '/ptracking', '/pagead/', 'googleads.g.doubleclick.net', '/youtubei/v1/att/get'];
 +    window.fetch = async function(...args) {
-+        let url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
-+        if (url.includes('/api/stats/ads') || url.includes('/ptracking') || url.includes('/pagead/') || url.includes('googleads.g.doubleclick.net') || url.includes('/youtubei/v1/att/get')) {
-+            return new Response(JSON.stringify({}), { status: 200, statusText: "OK", headers: { 'Content-Type': 'application/json' } });
++        const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
++        for (let i = 0; i < AD_URL_PATTERNS.length; i++) {
++            if (url.includes(AD_URL_PATTERNS[i])) {
++                return new Response(JSON.stringify({}), { status: 200, statusText: "OK", headers: { 'Content-Type': 'application/json' } });
++            }
 +        }
 +        if (url.includes('/youtubei/v1/player')) {
 +            try {
 +                if (args[1] && args[1].body) {
 +                    try {
-+                        const reqData = JSON.parse(args[1].body);
++                        const reqData = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
 +                        if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
 +                    } catch(e) {}
 +                }
@@ -61,6 +64,10 @@ index 9edc8e199..9287b8f1c 100644
 +                    delete data.playerAds;
 +                    delete data.adSlots;
 +                    delete data.adBreakParams;
++                    if (data.playbackTracking) {
++                        delete data.playbackTracking.atrUrl;
++                        delete data.playbackTracking.cpnUrl;
++                    }
 +                }
 +                return new Response(JSON.stringify(data), { status: response.status, statusText: response.statusText, headers: response.headers });
 +            } catch (e) {
@@ -73,43 +80,75 @@ index 9edc8e199..9287b8f1c 100644
 +    const origSend = XMLHttpRequest.prototype.send;
 +    XMLHttpRequest.prototype.open = function(method, url, ...rest) { this._url = url; return origOpen.call(this, method, url, ...rest); };
 +    XMLHttpRequest.prototype.send = function(body) {
-+        if (this._url && (this._url.includes('/api/stats/ads') || this._url.includes('/ptracking') || this._url.includes('/pagead/'))) return;
++        if (this._url) {
++            for (let i = 0; i < AD_URL_PATTERNS.length; i++) {
++                if (this._url.includes(AD_URL_PATTERNS[i])) return;
++            }
++        }
 +        return origSend.call(this, body);
 +    };
 +    let currentVideoId = null;
 +    let sponsorSegments = [];
++    const segmentCache = new Map();
 +    function checkSponsorBlock(videoId) {
 +        if (!videoId || videoId === currentVideoId) return;
 +        currentVideoId = videoId;
++        if (segmentCache.has(videoId)) {
++            sponsorSegments = segmentCache.get(videoId);
++            return;
++        }
 +        originalFetch(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=["sponsor","interaction","intro","outro","selfpromo","music_offtopic"]`)
 +            .then(res => res.ok ? res.json() : [])
-+            .then(data => { if (Array.isArray(data)) sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1] })); else sponsorSegments = []; })
++            .then(data => {
++                if (Array.isArray(data)) {
++                    sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1] }));
++                    segmentCache.set(videoId, sponsorSegments);
++                    if (segmentCache.size > 50) segmentCache.delete(segmentCache.keys().next().value);
++                } else {
++                    sponsorSegments = [];
++                }
++            })
 +            .catch(() => { sponsorSegments = []; });
++    }
++    let trackedVideo = null;
++    function onTimeUpdate() {
++        if (!trackedVideo || trackedVideo.paused || !sponsorSegments.length) return;
++        const ct = trackedVideo.currentTime;
++        for (let i = 0; i < sponsorSegments.length; i++) {
++            const seg = sponsorSegments[i];
++            if (ct >= seg.start && ct < (seg.end - 0.2)) {
++                trackedVideo.currentTime = seg.end;
++                break;
++            }
++        }
++    }
++    function hookVideoElement(video) {
++        if (!video || video === trackedVideo) return;
++        if (trackedVideo) trackedVideo.removeEventListener('timeupdate', onTimeUpdate);
++        trackedVideo = video;
++        trackedVideo.addEventListener('timeupdate', onTimeUpdate, { passive: true });
 +    }
 +    setInterval(() => {
 +        const video = document.querySelector('video');
-+        if (!video) return;
-+        const hash = window.location.hash;
++        if (video) {
++            hookVideoElement(video);
++            const adContainer = document.querySelector('.ad-interrupting, .ytp-ad-self-ad-badge, .ytp-ad-text');
++            if (adContainer && video.duration && !isNaN(video.duration)) video.currentTime = video.duration;
++        }
++        const hash = (window.location && window.location.hash) ? window.location.hash : '';
 +        if (hash && hash.includes('v=')) {
 +            const vMatch = hash.match(/v=([a-zA-Z0-9_-]{11})/);
 +            if (vMatch && vMatch[1]) checkSponsorBlock(vMatch[1]);
 +        }
-+        const adContainer = document.querySelector('.ad-interrupting, .ytp-ad-self-ad-badge, .ytp-ad-text');
-+        if (adContainer && video.duration && !isNaN(video.duration)) video.currentTime = video.duration;
-+        if (sponsorSegments.length > 0 && !video.paused && video.currentTime) {
-+            for (const segment of sponsorSegments) {
-+                if (video.currentTime >= segment.start && video.currentTime < (segment.end - 0.2)) video.currentTime = segment.end;
-+            }
-+        }
-+    }, 400);
++    }, 1000);
 +    const injectStyles = () => {
 +        if (document.getElementById('fast-tube-styles')) return;
 +        const style = document.createElement('style');
 +        style.id = 'fast-tube-styles';
-+        style.innerHTML = 'ytd-ad-slot-renderer,ytd-promoted-sparkles-web-renderer,.ytd-display-ad-renderer,.ytp-ad-overlay-container,.ytp-ad-message-container,.ytp-ad-skip-button-container,yt-mealbar-promo-renderer,ytd-statement-banner-renderer,.badge-style-type-ad{display:none !important;}';
++        style.textContent = 'ytd-ad-slot-renderer,ytd-promoted-sparkles-web-renderer,.ytd-display-ad-renderer,.ytp-ad-overlay-container,.ytp-ad-message-container,.ytp-ad-skip-button-container,yt-mealbar-promo-renderer,ytd-statement-banner-renderer,.badge-style-type-ad{display:none !important;}';
 +        (document.head || document.documentElement).appendChild(style);
 +    };
-+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectStyles); else injectStyles();
++    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectStyles, { once: true }); else injectStyles();
 +})();
 +)JS";
 +    }

@@ -1,0 +1,191 @@
+diff --git a/starboard/android/apk/app/build.gradle b/starboard/android/apk/app/build.gradle
+index 55ba2b964..f5839846f 100644
+--- a/starboard/android/apk/app/build.gradle
++++ b/starboard/android/apk/app/build.gradle
+@@ -83,8 +83,8 @@ android {
+         versionCode 1
+         versionName "${buildId}"
+         manifestPlaceholders = [
+-            applicationName: "CoAT: ${cobaltTarget}",
+-            evergreenCompatible: "${evergreenCompatible}"
++            applicationName: "Fast-Tube",
++            evergreenCompatible: "true"
+         ]
+         externalNativeBuild {
+             cmake {
+@@ -179,10 +179,16 @@ android {
+     }
+     packagingOptions {
+         jniLibs {
+-            // extractNativeLibs, which we set, based on evergreenCompatible, in the manifest file,
+-            // is deprecated. Gradle asks that useLegacyPackaging be set if extractNativeLibs is
+-            // set, and complains if they have different values. To be safe, both are set for now.
+-            useLegacyPackaging "${evergreenCompatible}" == "true" ? true : false
++            useLegacyPackaging true
++        }
++        resources {
++            excludes += [
++                'META-INF/*.version',
++                'META-INF/androidx.*',
++                'META-INF/DEPENDENCIES',
++                'META-INF/LICENSE',
++                'META-INF/NOTICE'
++            ]
+         }
+     }
+ }
+diff --git a/starboard/android/apk/app/proguard-rules.pro b/starboard/android/apk/app/proguard-rules.pro
+index a4b8a549a..abf7f1781 100644
+--- a/starboard/android/apk/app/proguard-rules.pro
++++ b/starboard/android/apk/app/proguard-rules.pro
+@@ -14,17 +14,20 @@
+ 
+ # Proguard flags needed for the Android Starboard Java implementation to work
+ # properly with its JNI native library.
+-#
+-# For more details, see
+-#   http://developer.android.com/guide/developing/tools/proguard.html
+ 
+-# JNI is an entry point that's hard to keep track of, so the @UsedByNative
+-# annotation marks fields and methods used by native code.
++# Annotations & JNI metadata attributes
++-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
++
++# Keep all Cobalt and Starboard JNI classes, methods, and fields
++-keep class dev.cobalt.** { *; }
++-dontwarn dev.cobalt.**
+ 
+-# Annotations are implemented as attributes, so we have to explicitly keep them.
+--keepattributes *Annotation*
++# Keep all native methods and their declaring classes
++-keepclasseswithmembernames class * {
++    native <methods>;
++}
+ 
+-# Keep classes, methods, and fields that are accessed with JNI.
++# Keep classes, methods, and fields that are accessed with JNI annotations
+ -keep @interface dev.cobalt.util.UsedByNative
+ -keep @dev.cobalt.util.UsedByNative class *
+ -keepclasseswithmembers class * {
+@@ -33,3 +36,9 @@
+ -keepclasseswithmembers class * {
+   @dev.cobalt.util.UsedByNative <fields>;
+ }
++
++# Keep Android TV Leanback and Core UI components
++-keep class androidx.leanback.** { *; }
++-keep class androidx.appcompat.** { *; }
++-keep class androidx.core.** { *; }
++-dontwarn androidx.**
+diff --git a/starboard/android/apk/app/src/app/AndroidManifest.xml b/starboard/android/apk/app/src/app/AndroidManifest.xml
+index 5fd31967b..237e766c5 100644
+--- a/starboard/android/apk/app/src/app/AndroidManifest.xml
++++ b/starboard/android/apk/app/src/app/AndroidManifest.xml
+@@ -38,7 +38,7 @@
+     android:icon="@mipmap/ic_app"
+     android:banner="@drawable/app_banner"
+     android:label="${applicationName}"
+-    android:extractNativeLibs="${evergreenCompatible}">
++    android:extractNativeLibs="true">
+ 
+     <activity android:name="dev.cobalt.app.MainActivity"
+       android:exported="true"
+diff --git a/starboard/android/apk/app/src/app/res/values/strings.xml b/starboard/android/apk/app/src/app/res/values/strings.xml
+index 4b54b94d9..c48edf62c 100644
+--- a/starboard/android/apk/app/src/app/res/values/strings.xml
++++ b/starboard/android/apk/app/src/app/res/values/strings.xml
+@@ -16,5 +16,5 @@
+ -->
+ 
+ <resources>
+-  <string name="app_name">Cobalt On Android TV</string>
++  <string name="app_name">Fast-Tube</string>
+ </resources>
+diff --git a/starboard/android/arm/toolchain/BUILD.gn b/starboard/android/arm/toolchain/BUILD.gn
+index 6b167d172..7c55e451f 100644
+--- a/starboard/android/arm/toolchain/BUILD.gn
++++ b/starboard/android/arm/toolchain/BUILD.gn
+@@ -21,8 +21,10 @@ gcc_toolchain("target") {
+   cc = "$prefix/armv7a-linux-androideabi${android_ndk_api_level}-clang"
+   cxx = "$prefix/armv7a-linux-androideabi${android_ndk_api_level}-clang++"
+   ld = cxx
+-  ar = "ar"
+-  nm = "nm"
++  readelf = "llvm-readelf"
++  ar = "llvm-ar"
++  nm = "llvm-nm"
++  strip = "$prefix/llvm-strip"
+ 
+   toolchain_args = {
+     is_clang = true
+@@ -34,8 +36,10 @@ gcc_toolchain("native_target") {
+   cc = "$prefix/armv7a-linux-androideabi${android_ndk_api_level}-clang"
+   cxx = "$prefix/armv7a-linux-androideabi${android_ndk_api_level}-clang++"
+   ld = cxx
+-  ar = "ar"
+-  nm = "nm"
++  readelf = "llvm-readelf"
++  ar = "llvm-ar"
++  nm = "llvm-nm"
++  strip = "$prefix/llvm-strip"
+ 
+   toolchain_args = {
+     is_starboard = false
+diff --git a/starboard/android/arm64/toolchain/BUILD.gn b/starboard/android/arm64/toolchain/BUILD.gn
+index 96ccf4540..c33660566 100644
+--- a/starboard/android/arm64/toolchain/BUILD.gn
++++ b/starboard/android/arm64/toolchain/BUILD.gn
+@@ -21,9 +21,10 @@ gcc_toolchain("target") {
+   cc = "$prefix/aarch64-linux-android${android_ndk_api_level}-clang"
+   cxx = "$prefix/aarch64-linux-android${android_ndk_api_level}-clang++"
+   ld = cxx
+-  readelf = "readelf"
+-  ar = "ar"
+-  nm = "nm"
++  readelf = "llvm-readelf"
++  ar = "llvm-ar"
++  nm = "llvm-nm"
++  strip = "$prefix/llvm-strip"
+ 
+   toolchain_args = {
+     is_clang = true
+@@ -35,9 +36,10 @@ gcc_toolchain("native_target") {
+   cc = "$prefix/aarch64-linux-android${android_ndk_api_level}-clang"
+   cxx = "$prefix/aarch64-linux-android${android_ndk_api_level}-clang++"
+   ld = cxx
+-  readelf = "readelf"
+-  ar = "ar"
+-  nm = "nm"
++  readelf = "llvm-readelf"
++  ar = "llvm-ar"
++  nm = "llvm-nm"
++  strip = "$prefix/llvm-strip"
+ 
+   toolchain_args = {
+     is_starboard = false
+diff --git a/starboard/android/shared/platform_configuration/BUILD.gn b/starboard/android/shared/platform_configuration/BUILD.gn
+index f63891448..0351d7c60 100644
+--- a/starboard/android/shared/platform_configuration/BUILD.gn
++++ b/starboard/android/shared/platform_configuration/BUILD.gn
+@@ -160,6 +160,8 @@ config("platform_configuration") {
+     "-Wl,--warn-shared-textrel",
+     "-Wl,--fatal-warnings",
+     "-Wl,--gc-sections",
++    "-Wl,--icf=all",
++    "-Wl,-O3",
+     "-Wl,-z,nocopyreloc",
+ 
+     # Wrapper synchronizes punch-out video bounds with the UI frame.
+@@ -178,7 +180,11 @@ config("platform_configuration") {
+ }
+ 
+ config("size") {
+-  cflags = [ "-Os" ]
++  cflags = [
++    "-Os",
++    "-fno-asynchronous-unwind-tables",
++    "-fno-unwind-tables",
++  ]
+ }
+ 
+ config("speed") {
