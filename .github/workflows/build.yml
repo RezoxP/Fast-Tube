@@ -8,8 +8,11 @@ on:
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_COMPRESS: 1
+  CCACHE_COMPRESSLEVEL: 5
   CCACHE_MAXSIZE: 10G
   CCACHE_SLOPPINESS: time_macros,include_file_mtime,file_macro
+  CCACHE_BASEDIR: ${{ github.workspace }}
+  NINJA_STATUS: "[%f/%t %e] "
 
 jobs:
   build:
@@ -58,7 +61,7 @@ jobs:
       - name: Cache ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          path: ${{ github.workspace }}/.ccache
           key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-ccache-${{ matrix.platform }}-
@@ -74,7 +77,7 @@ jobs:
           mkdir -p cobalt-src && cd cobalt-src
           gclient config --name=src https://github.com/youtube/cobalt.git
           echo 'target_os = ["android"]' >> .gclient
-          gclient sync --revision src@25.lts.1+ --no-history -j 8
+          gclient sync --revision src@25.lts.1+ --no-history --shallow -j 8
           bash src/starboard/tools/download_clang.sh
 
       - name: Apply VacuumTube & Size Optimization Patches
@@ -107,7 +110,7 @@ jobs:
           sed -i 's/use_goma = true/use_goma = false/g' out/${{ matrix.platform }}_gold/args.gn || true
           sed -i 's/use_siso = true/use_siso = false/g' out/${{ matrix.platform }}_gold/args.gn || true
           
-          # Append size and speed optimizations
+          # Append size and speed optimizations (Fast compile with -Os and no ThinLTO link bottleneck)
           cat <<EOF >> out/${{ matrix.platform }}_gold/args.gn
           cc_wrapper = "ccache"
           is_debug = false
@@ -115,7 +118,7 @@ jobs:
           symbol_level = 0
           cobalt_fastbuild = true
           optimize_for_size = true
-          use_thin_lto = true
+          use_thin_lto = false
           strip_absolute_paths_from_debug_symbols = true
           use_siso = false
           treat_warnings_as_errors = false
@@ -133,8 +136,11 @@ jobs:
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
           
-          # Build the native library first with controlled parallelism to avoid OOM
-          autoninja -C out/${{ matrix.platform }}_gold -j 2 cobalt
+          echo "=== Ccache Status Before Build ==="
+          ccache -s || true
+          
+          # Build native library using available CPU cores
+          autoninja -C out/${{ matrix.platform }}_gold cobalt
           
           # Pre-strip unneeded debug and unused symbols from the compiled library
           STRIP_TOOL="$ANDROID_HOME/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
@@ -142,12 +148,16 @@ jobs:
             echo "Pre-stripping native library before APK packaging..."
             $STRIP_TOOL --strip-unneeded out/${{ matrix.platform }}_gold/libcobalt.so || true
           fi
+          
+          echo "=== Ccache Status After Native Build ==="
+          ccache -s || true
 
       - name: Build APK (Compressed & Minified)
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
-          autoninja -C out/${{ matrix.platform }}_gold -j 2 cobalt.apk
+          export GRADLE_OPTS="-Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.jvmargs='-Xmx2048m -XX:+UseParallelGC'"
+          autoninja -C out/${{ matrix.platform }}_gold cobalt.apk
           
           # Collect and standardize APK output name
           mkdir -p ${{ github.workspace }}/release-apks
