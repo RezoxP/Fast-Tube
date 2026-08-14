@@ -102,7 +102,7 @@ index 4b54b94d9..c48edf62c 100644
 +  <string name="app_name">Fast-Tube</string>
  </resources>
 diff --git a/starboard/android/arm/toolchain/BUILD.gn b/starboard/android/arm/toolchain/BUILD.gn
-index 6b167d172..7c55e451f 100644
+index 6b167d172..5dc5844d8 100644
 --- a/starboard/android/arm/toolchain/BUILD.gn
 +++ b/starboard/android/arm/toolchain/BUILD.gn
 @@ -21,8 +21,10 @@ gcc_toolchain("target") {
@@ -111,9 +111,9 @@ index 6b167d172..7c55e451f 100644
    ld = cxx
 -  ar = "ar"
 -  nm = "nm"
-+  readelf = "llvm-readelf"
-+  ar = "llvm-ar"
-+  nm = "llvm-nm"
++  readelf = "$prefix/llvm-readelf"
++  ar = "$prefix/llvm-ar"
++  nm = "$prefix/llvm-nm"
 +  strip = "$prefix/llvm-strip"
  
    toolchain_args = {
@@ -124,15 +124,15 @@ index 6b167d172..7c55e451f 100644
    ld = cxx
 -  ar = "ar"
 -  nm = "nm"
-+  readelf = "llvm-readelf"
-+  ar = "llvm-ar"
-+  nm = "llvm-nm"
++  readelf = "$prefix/llvm-readelf"
++  ar = "$prefix/llvm-ar"
++  nm = "$prefix/llvm-nm"
 +  strip = "$prefix/llvm-strip"
  
    toolchain_args = {
      is_starboard = false
 diff --git a/starboard/android/arm64/toolchain/BUILD.gn b/starboard/android/arm64/toolchain/BUILD.gn
-index 96ccf4540..c33660566 100644
+index 96ccf4540..478ccb456 100644
 --- a/starboard/android/arm64/toolchain/BUILD.gn
 +++ b/starboard/android/arm64/toolchain/BUILD.gn
 @@ -21,9 +21,10 @@ gcc_toolchain("target") {
@@ -142,9 +142,9 @@ index 96ccf4540..c33660566 100644
 -  readelf = "readelf"
 -  ar = "ar"
 -  nm = "nm"
-+  readelf = "llvm-readelf"
-+  ar = "llvm-ar"
-+  nm = "llvm-nm"
++  readelf = "$prefix/llvm-readelf"
++  ar = "$prefix/llvm-ar"
++  nm = "$prefix/llvm-nm"
 +  strip = "$prefix/llvm-strip"
  
    toolchain_args = {
@@ -156,9 +156,9 @@ index 96ccf4540..c33660566 100644
 -  readelf = "readelf"
 -  ar = "ar"
 -  nm = "nm"
-+  readelf = "llvm-readelf"
-+  ar = "llvm-ar"
-+  nm = "llvm-nm"
++  readelf = "$prefix/llvm-readelf"
++  ar = "$prefix/llvm-ar"
++  nm = "$prefix/llvm-nm"
 +  strip = "$prefix/llvm-strip"
  
    toolchain_args = {
