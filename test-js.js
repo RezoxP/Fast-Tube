@@ -231,15 +231,18 @@ eval(code);
     const ftSBCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
     assert.strictEqual(ftSBCategory.categoryId, 'fast_tube_sb_category');
     assert.strictEqual(ftSBCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock');
-    assert.strictEqual(ftSBCategory.items.length, 7, "SponsorBlock category must have 7 granular toggles");
+    assert.strictEqual(ftSBCategory.items.length, 10, "SponsorBlock category must have 10 granular toggles");
     assert.strictEqual(ftSBCategory.items[0].settingBooleanRenderer.itemId, 'sponsorblock');
-    assert.strictEqual(ftSBCategory.items[1].settingBooleanRenderer.itemId, 'sb_sponsor');
-    assert.strictEqual(ftSBCategory.items[2].settingBooleanRenderer.itemId, 'sb_intro');
-    assert.strictEqual(ftSBCategory.items[3].settingBooleanRenderer.itemId, 'sb_outro');
-    assert.strictEqual(ftSBCategory.items[4].settingBooleanRenderer.itemId, 'sb_selfpromo');
-    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.itemId, 'sb_preview');
-    assert.strictEqual(ftSBCategory.items[6].settingBooleanRenderer.itemId, 'sb_music_offtopic');
-    console.log(" ✓ Injected interactive Fast-Tube General & SponsorBlock categories with 10 granular toggles");
+    assert.strictEqual(ftSBCategory.items[1].settingBooleanRenderer.itemId, 'sb_auto_skip');
+    assert.strictEqual(ftSBCategory.items[2].settingBooleanRenderer.itemId, 'sb_show_skip_button');
+    assert.strictEqual(ftSBCategory.items[3].settingBooleanRenderer.itemId, 'sb_show_toast');
+    assert.strictEqual(ftSBCategory.items[4].settingBooleanRenderer.itemId, 'sb_sponsor');
+    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.itemId, 'sb_intro');
+    assert.strictEqual(ftSBCategory.items[6].settingBooleanRenderer.itemId, 'sb_outro');
+    assert.strictEqual(ftSBCategory.items[7].settingBooleanRenderer.itemId, 'sb_selfpromo');
+    assert.strictEqual(ftSBCategory.items[8].settingBooleanRenderer.itemId, 'sb_preview');
+    assert.strictEqual(ftSBCategory.items[9].settingBooleanRenderer.itemId, 'sb_music_offtopic');
+    console.log(" ✓ Injected interactive Fast-Tube General & SponsorBlock categories with 13 total granular toggles");
 
     // Test toggle via resolveCommand
     // Simulate user toggling "Skip Previews & Recaps" to ON
@@ -248,7 +251,7 @@ eval(code);
         fastTubeValue: true
     };
     global._yttv.testModule.instance.resolveCommand(toggleCommand);
-    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.enabled, true, "sb_preview enabled state updated");
+    assert.strictEqual(ftSBCategory.items[8].settingBooleanRenderer.enabled, true, "sb_preview enabled state updated");
     assert(localStorage.getItem('fast_tube_config').includes('"sb_preview":true'), "Settings persisted to localStorage");
     console.log(" ✓ resolveCommand successfully handled granular SponsorBlock toggle & persisted to localStorage");
 
