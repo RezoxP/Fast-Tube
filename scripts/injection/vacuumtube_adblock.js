@@ -1,74 +1,134 @@
 // Fast-Tube Injection Script
-// Advanced ad-blocking, SponsorBlock, and Settings UI integration for YouTube TV on Cobalt
-// Derived from TizenTube and VacuumTube
+// High-performance ad-blocking, SponsorBlock, and Configurable Settings for YouTube TV on Cobalt
+// Based on VacuumTube and TizenTube architectures
 
 (function() {
     if (window.__fast_tube_injected__) return;
     window.__fast_tube_injected__ = true;
 
-    // --- 1. Settings Injection (Fast-Tube Settings in YouTube TV) ---
+    // --- 1. Config Management & Persistence ---
+    const DEFAULT_CONFIG = {
+        adblock: true,
+        sponsorblock: true,
+        autoskip: true,
+        hideShorts: false
+    };
+
+    let ftConfig = Object.assign({}, DEFAULT_CONFIG);
+    try {
+        const saved = localStorage.getItem('fast_tube_config');
+        if (saved) {
+            Object.assign(ftConfig, JSON.parse(saved));
+        }
+    } catch(e) {}
+
+    function saveConfig() {
+        try {
+            localStorage.setItem('fast_tube_config', JSON.stringify(ftConfig));
+        } catch(e) {}
+    }
+
+    // --- 2. Interactive Leanback Settings ---
+    function createSettingBooleanRenderer(title, summary, configKey, enabled) {
+        return {
+            settingBooleanRenderer: {
+                itemId: configKey,
+                enabled: !!enabled,
+                title: {
+                    runs: [{ text: title }]
+                },
+                summary: {
+                    runs: [{ text: summary }]
+                },
+                enableServiceEndpoint: {
+                    fastTubeOption: configKey,
+                    fastTubeValue: true
+                },
+                disableServiceEndpoint: {
+                    fastTubeOption: configKey,
+                    fastTubeValue: false
+                }
+            }
+        };
+    }
+
     function PatchSettings(settingsObject) {
         if (!settingsObject || !Array.isArray(settingsObject.items)) return;
         
-        // Avoid duplicate category
         for (let i = 0; i < settingsObject.items.length; i++) {
-            const cat = settingsObject.items[i]?.settingCategoryCollectionRenderer;
-            if (cat && cat.categoryId === 'fast_tube_category') return;
+            if (settingsObject.items[i]?.settingCategoryCollectionRenderer?.categoryId === 'fast_tube_category') {
+                return;
+            }
         }
 
-        const fastTubeAction = {
-            settingActionRenderer: {
-                title: {
-                    runs: [{ text: "Fast-Tube Settings" }]
-                },
-                actionLabel: {
-                    runs: [{ text: "Patches Active" }]
-                },
-                summary: {
-                    runs: [{ text: "Ad-Block, SponsorBlock & No-Ad Playback Active" }]
-                },
-                itemId: "fast_tube_status_item",
-                thumbnail: {
-                    thumbnails: [
-                        { url: "https://www.gstatic.com/ytlr/img/parent_code.png" }
-                    ]
-                },
-                trackingParams: "null"
-            }
-        };
-
-        const fastTubeCategory = {
+        const ftCategory = {
             settingCategoryCollectionRenderer: {
                 categoryId: "fast_tube_category",
                 title: {
                     runs: [{ text: "Fast-Tube" }]
                 },
-                items: [fastTubeAction],
+                items: [
+                    createSettingBooleanRenderer("Ad-Block", "Block video ads, banners, and promoted feed items", "adblock", ftConfig.adblock),
+                    createSettingBooleanRenderer("SponsorBlock", "Automatically skip sponsor segments in videos", "sponsorblock", ftConfig.sponsorblock),
+                    createSettingBooleanRenderer("Auto-Skip Watchdog", "Fast-forward & auto-click residual ad skip buttons", "autoskip", ftConfig.autoskip),
+                    createSettingBooleanRenderer("Hide Shorts", "Hide Shorts from home feeds and navigation bar", "hideShorts", ftConfig.hideShorts)
+                ],
                 focused: false,
                 trackingParams: "null"
             }
         };
 
-        // Remove "Get YouTube Premium" and promo categories from settings
+        window.__ftSettingsCategory = ftCategory.settingCategoryCollectionRenderer;
+
+        // Filter out "Get YouTube Premium" and promo categories from settings
         for (let i = settingsObject.items.length - 1; i >= 0; i--) {
             const item = settingsObject.items[i];
             const str = JSON.stringify(item);
-            if (str && (str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('SPunlimited') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
+            if (str && (str.indexOf('SPunlimited') !== -1 || str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
                 settingsObject.items.splice(i, 1);
             }
         }
 
         // Add Fast-Tube category to the top of settings
-        settingsObject.items.unshift(fastTubeCategory);
+        settingsObject.items.unshift(ftCategory);
     }
 
-    // --- 2. SponsorBlock Integration ---
+    function hookResolveCommand() {
+        if (typeof window._yttv !== 'object') return;
+        for (let key in window._yttv) {
+            const inst = window._yttv[key]?.instance;
+            if (inst && inst.resolveCommand && !inst.__ft_rc_hooked) {
+                inst.__ft_rc_hooked = true;
+                const origRC = inst.resolveCommand;
+                inst.resolveCommand = function(command) {
+                    if (command && command.fastTubeOption !== undefined) {
+                        const opt = command.fastTubeOption;
+                        const val = !!command.fastTubeValue;
+                        ftConfig[opt] = val;
+                        saveConfig();
+                        if (window.__ftSettingsCategory && window.__ftSettingsCategory.items) {
+                            for (let it of window.__ftSettingsCategory.items) {
+                                if (it?.settingBooleanRenderer?.itemId === opt) {
+                                    it.settingBooleanRenderer.enabled = val;
+                                }
+                            }
+                        }
+                        return true;
+                    }
+                    return origRC.apply(this, arguments);
+                };
+            }
+        }
+    }
+    hookResolveCommand();
+
+    // --- 3. SponsorBlock Integration ---
     let currentVideoId = null;
     let sponsorSegments = [];
     const segmentCache = new Map();
 
     function checkSponsorBlock(videoId) {
-        if (!videoId || typeof videoId !== 'string' || videoId === currentVideoId) return;
+        if (!ftConfig.sponsorblock || !videoId || typeof videoId !== 'string' || videoId === currentVideoId) return;
         currentVideoId = videoId;
         if (segmentCache.has(videoId)) {
             sponsorSegments = segmentCache.get(videoId);
@@ -91,36 +151,26 @@
         }
     }
 
-    // --- 3. Core JSON.parse Hook (TizenTube Ad-Block & Settings Hook) ---
+    // --- 4. Core JSON.parse Hook (VacuumTube Ad-Block & Settings) ---
     const origParse = JSON.parse;
     JSON.parse = function() {
         const r = origParse.apply(this, arguments);
         if (!r || typeof r !== 'object') return r;
         try {
-            // A. Remove video player ads
-            if (r.adPlacements) {
-                r.adPlacements = [];
-            }
-            if (r.playerAds) {
-                r.playerAds = false;
-            }
-            if (r.adSlots) {
-                r.adSlots = [];
-            }
-            if (r.adBreakParams) {
-                delete r.adBreakParams;
-            }
-            if (r.paidContentOverlay) {
-                r.paidContentOverlay = null;
-            }
-            if (r.playbackTracking) {
-                delete r.playbackTracking.atrUrl;
-                delete r.playbackTracking.cpnUrl;
-                delete r.playbackTracking.videostatsPlaybackUrl;
-                delete r.playbackTracking.videostatsDelayplayUrl;
-                delete r.playbackTracking.videostatsWatchtimeUrl;
-                delete r.playbackTracking.ptrackingUrl;
-                delete r.playbackTracking.qoeUrl;
+            // A. Video ads removal (Safe VacuumTube method)
+            if (ftConfig.adblock) {
+                if (r.adPlacements) {
+                    r.adPlacements = [];
+                }
+                if (r.playerAds) {
+                    r.playerAds = false;
+                }
+                if (r.adSlots) {
+                    r.adSlots = [];
+                }
+                if (r.paidContentOverlay) {
+                    r.paidContentOverlay = null;
+                }
             }
 
             // B. Extract videoId for SponsorBlock
@@ -128,35 +178,56 @@
                 checkSponsorBlock(r.videoDetails.videoId);
             }
 
-            // C. Remove home screen / browse masthead ads & nudges
-            if (r.contents && r.contents.tvBrowseRenderer && r.contents.tvBrowseRenderer.content && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents) {
-                const contents = r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents;
-                r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents = contents.filter(elm => !elm.adSlotRenderer && !elm.feedNudgeRenderer && !elm.statementBannerRenderer && !elm.premiumUpsellRenderer);
-                for (let i = 0; i < r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents.length; i++) {
-                    const shelf = r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents[i];
-                    if (shelf.shelfRenderer && shelf.shelfRenderer.content && shelf.shelfRenderer.content.horizontalListRenderer && shelf.shelfRenderer.content.horizontalListRenderer.items) {
-                        shelf.shelfRenderer.content.horizontalListRenderer.items = shelf.shelfRenderer.content.horizontalListRenderer.items.filter(item => !item.adSlotRenderer && !item.compactPromotedItemRenderer);
+            // C. Home feed ads & promos removal
+            if (ftConfig.adblock) {
+                let homeFeed = r.contents?.tvBrowseRenderer?.content?.tvSurfaceContentRenderer?.content?.sectionListRenderer;
+                if (homeFeed && homeFeed.contents) {
+                    homeFeed.contents = homeFeed.contents.filter(shelf => {
+                        if (shelf.adSlotRenderer || shelf.promoShelfRenderer || shelf.shelfRenderer?.tvhtml5Metadata?.hideLogo) {
+                            return false;
+                        }
+                        if (ftConfig.hideShorts && JSON.stringify(shelf).indexOf('reelWatchEndpoint') !== -1) {
+                            return false;
+                        }
+                        return true;
+                    });
+                    for (let feed of homeFeed.contents) {
+                        let horizontal = feed?.shelfRenderer?.content?.horizontalListRenderer;
+                        if (horizontal && horizontal.items) {
+                            horizontal.items = horizontal.items.filter(i => !i.adSlotRenderer && !i.compactPromotedItemRenderer);
+                        }
+                    }
+                }
+
+                // Search feed ads
+                let searchFeed = r.contents?.sectionListRenderer;
+                if (searchFeed && searchFeed.contents) {
+                    for (let feed of searchFeed.contents) {
+                        let horizontal = feed?.shelfRenderer?.content?.horizontalListRenderer;
+                        if (horizontal && horizontal.items) {
+                            horizontal.items = horizontal.items.filter(i => !i.adSlotRenderer && !i.compactPromotedItemRenderer);
+                        }
+                    }
+                }
+
+                // Shorts ads removal
+                if (!Array.isArray(r) && r.entries && Array.isArray(r.entries)) {
+                    r.entries = r.entries.filter(elm => !elm?.command?.reelWatchEndpoint?.adClientParams?.isAd);
+                }
+
+                // Remove "Get YouTube Premium" from guide items
+                if (r.items && Array.isArray(r.items)) {
+                    for (let i = r.items.length - 1; i >= 0; i--) {
+                        const item = r.items[i];
+                        const str = JSON.stringify(item);
+                        if (str && (str.indexOf('SPunlimited') !== -1 || str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
+                            r.items.splice(i, 1);
+                        }
                     }
                 }
             }
 
-            // D. Remove Shorts ads
-            if (!Array.isArray(r) && r.entries && Array.isArray(r.entries)) {
-                r.entries = r.entries.filter(elm => !elm?.command?.reelWatchEndpoint?.adClientParams?.isAd);
-            }
-
-            // E. Remove 'Get YouTube Premium' & SPunlimited from guide items
-            if (r.items && Array.isArray(r.items)) {
-                for (let i = r.items.length - 1; i >= 0; i--) {
-                    const item = r.items[i];
-                    const str = JSON.stringify(item);
-                    if (str && (str.indexOf('SPunlimited') !== -1 || str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
-                        r.items.splice(i, 1);
-                    }
-                }
-            }
-
-            // F. Patch Settings with Fast-Tube option
+            // D. Patch Settings with Fast-Tube option
             if (r.title && r.title.runs && Array.isArray(r.items)) {
                 PatchSettings(r);
             }
@@ -166,39 +237,22 @@
 
     window.JSON.parse = JSON.parse;
 
-    // --- 4. Core JSON.stringify Hook (Inline No-Ad Flag) ---
-    const origStringify = JSON.stringify;
-    JSON.stringify = function(value, replacer, space) {
-        if (value && typeof value === 'object' && value.playbackContext && value.playbackContext.contentPlaybackContext) {
-            try {
-                value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
-            } catch(e) {}
-        }
-        return origStringify.call(this, value, replacer, space);
-    };
-
-    window.JSON.stringify = JSON.stringify;
-
-    // Patch any existing internal _yttv references
     if (typeof window._yttv === 'object') {
         for (const key in window._yttv) {
             if (window._yttv[key] && window._yttv[key].JSON) {
                 window._yttv[key].JSON.parse = JSON.parse;
-                window._yttv[key].JSON.stringify = JSON.stringify;
             }
         }
     }
 
-    // --- 5. Network Level Ad Interception (Fetch & XMLHttpRequest) ---
+    // --- 5. Network Level Ad Interception ---
     const AD_URL_PATTERNS = [
         '/api/stats/ads',
         '/ptracking',
         '/pagead/',
         'googleads.g.doubleclick.net',
         'doubleclick.net',
-        '/youtubei/v1/att/get',
-        'adservice.google.com',
-        '/api/stats/qoe'
+        'adservice.google.com'
     ];
 
     function isAdUrl(url) {
@@ -213,20 +267,18 @@
     if (typeof originalFetch === 'function') {
         window.fetch = async function(...args) {
             const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
-            if (isAdUrl(url)) {
+            if (ftConfig.adblock && isAdUrl(url)) {
                 return new Response(JSON.stringify({}), {
                     status: 200,
                     statusText: "OK",
                     headers: { 'Content-Type': 'application/json' }
                 });
             }
-            if (url.indexOf('/youtubei/v1/player') !== -1 || url.indexOf('/youtubei/v1/reel/') !== -1) {
+            if (url.indexOf('/youtubei/v1/player') !== -1) {
                 try {
                     if (args[1] && args[1].body) {
-                        try {
-                            const reqData = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
-                            if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
-                        } catch(e) {}
+                        const reqData = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
+                        if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
                     }
                 } catch(e) {}
             }
@@ -246,7 +298,7 @@
 
         XMLHttpRequest.prototype.send = function(body) {
             const url = this.__url || '';
-            if (isAdUrl(url)) {
+            if (ftConfig.adblock && isAdUrl(url)) {
                 setTimeout(() => {
                     try {
                         Object.defineProperty(this, 'readyState', { value: 4, configurable: true });
@@ -276,7 +328,7 @@
     // --- 6. Video Element Hooking & SponsorBlock Skipper ---
     let trackedVideo = null;
     function onTimeUpdate() {
-        if (!trackedVideo || trackedVideo.paused || !sponsorSegments.length) return;
+        if (!ftConfig.sponsorblock || !trackedVideo || trackedVideo.paused || !sponsorSegments.length) return;
         const ct = trackedVideo.currentTime;
         for (let i = 0; i < sponsorSegments.length; i++) {
             const seg = sponsorSegments[i];
@@ -296,24 +348,27 @@
         try { trackedVideo.addEventListener('timeupdate', onTimeUpdate, { passive: true }); } catch(e) {}
     }
 
-    // Ad Watchdog & Fast-Forward Fallback
+    // Watchdog & Settings Hook Interval
     setInterval(() => {
         if (typeof document === 'undefined') return;
+        hookResolveCommand();
         const video = document.querySelector('video');
         if (video) {
             hookVideoElement(video);
             
-            const adShowing = document.querySelector('.ad-interrupting, .ad-showing, .ytp-ad-module, .ytp-ad-player-overlay, ytlr-ad-renderer, .ytp-ad-self-ad-badge, .ytp-ad-text');
-            if (adShowing) {
-                if (video.duration && !isNaN(video.duration) && video.currentTime < video.duration) {
-                    video.currentTime = video.duration;
+            if (ftConfig.autoskip) {
+                const adShowing = document.querySelector('.ad-interrupting, .ad-showing, .ytp-ad-module, .ytp-ad-player-overlay, ytlr-ad-renderer, .ytp-ad-self-ad-badge, .ytp-ad-text');
+                if (adShowing) {
+                    if (video.duration && !isNaN(video.duration) && video.currentTime < video.duration) {
+                        video.currentTime = video.duration;
+                    }
+                    video.playbackRate = 16.0;
                 }
-                video.playbackRate = 16.0;
-            }
-            
-            const skipButton = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, button.ytp-ad-skip-button');
-            if (skipButton && typeof skipButton.click === 'function') {
-                skipButton.click();
+                
+                const skipButton = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, button.ytp-ad-skip-button');
+                if (skipButton && typeof skipButton.click === 'function') {
+                    skipButton.click();
+                }
             }
         }
 

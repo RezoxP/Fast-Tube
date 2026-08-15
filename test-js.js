@@ -6,6 +6,13 @@ const fs = require('fs');
 console.log("=== 1. Setting up Mock Browser Environment ===");
 
 global.window = global;
+global.localStorage = {
+    _data: {},
+    getItem(k) { return this._data[k] || null; },
+    setItem(k, v) { this._data[k] = String(v); },
+    removeItem(k) { delete this._data[k]; }
+};
+
 global.Response = class {
     constructor(body, init = {}) {
         this._body = body;
@@ -106,17 +113,20 @@ global.fetch = async function(url, options) {
             { segment: [15.0, 30.0], category: 'sponsor' }
         ]));
     }
-    if (url.includes('/youtubei/v1/player')) {
-        return new global.Response(JSON.stringify({
-            videoDetails: { videoId: 'dQw4w9WgXcQ' },
-            adPlacements: [{ dummy: 1 }],
-            playerAds: [{ dummy: 2 }],
-            adSlots: [{ dummy: 3 }],
-            playbackTracking: { atrUrl: 'http://tracking', cpnUrl: 'http://tracking' },
-            streamingData: { formats: [] }
-        }));
-    }
     return new global.Response(JSON.stringify({ success: true }));
+};
+
+// Mock _yttv resolveCommand
+let resolveCommandCalledWith = null;
+global._yttv = {
+    testModule: {
+        instance: {
+            resolveCommand: function(cmd) {
+                resolveCommandCalledWith = cmd;
+                return true;
+            }
+        }
+    }
 };
 
 console.log("=== 2. Loading and Executing vacuumtube_adblock.js ===");
@@ -124,97 +134,131 @@ const code = fs.readFileSync('scripts/injection/vacuumtube_adblock.js', 'utf8');
 eval(code);
 
 (async () => {
-    console.log("=== 3. Testing Core JSON.parse and JSON.stringify Hooks ===");
+    console.log("=== 3. Testing Home Screen & Search Feed Ad Filtering ===");
 
-    // Test JSON.parse on player payload
+    // Test JSON.parse on home feed payload
+    const rawHomeFeedPayload = JSON.stringify({
+        contents: {
+            tvBrowseRenderer: {
+                content: {
+                    tvSurfaceContentRenderer: {
+                        content: {
+                            sectionListRenderer: {
+                                contents: [
+                                    { adSlotRenderer: { id: 'ad1' } },
+                                    { promoShelfRenderer: { id: 'promo1' } },
+                                    { shelfRenderer: { tvhtml5Metadata: { hideLogo: true }, title: 'Promo' } },
+                                    {
+                                        shelfRenderer: {
+                                            title: 'Recommended Videos',
+                                            content: {
+                                                horizontalListRenderer: {
+                                                    items: [
+                                                        { adSlotRenderer: { id: 'ad2' } },
+                                                        { compactPromotedItemRenderer: { id: 'promo2' } },
+                                                        { tileRenderer: { title: 'Great Video 1' } },
+                                                        { tileRenderer: { title: 'Great Video 2' } }
+                                                    ]
+                                                }
+                                            }
+                                        }
+                                    }
+                                ]
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    const parsedHome = JSON.parse(rawHomeFeedPayload);
+    const homeContents = parsedHome.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents;
+    assert.strictEqual(homeContents.length, 1, "Only legitimate video shelf must be retained in home feed");
+    assert.strictEqual(homeContents[0].shelfRenderer.title, 'Recommended Videos', "Recommended Videos shelf preserved");
+    const shelfItems = homeContents[0].shelfRenderer.content.horizontalListRenderer.items;
+    assert.strictEqual(shelfItems.length, 2, "Ad items stripped, 2 real video tiles preserved");
+    console.log(" ✓ Cleaned home feed ads without blanking video shelves");
+
+    console.log("=== 4. Testing Video Player Ad Stripping ===");
     const rawPlayerPayload = JSON.stringify({
         videoDetails: { videoId: 'dQw4w9WgXcQ' },
         adPlacements: [{ ad: 1 }],
         playerAds: [{ ad: 2 }],
         adSlots: [{ ad: 3 }],
-        adBreakParams: 'params',
         playbackTracking: { atrUrl: 'http://tracking', qoeUrl: 'http://qoe' }
     });
     const parsedPlayer = JSON.parse(rawPlayerPayload);
     assert.deepStrictEqual(parsedPlayer.adPlacements, [], "adPlacements must be empty array");
     assert.strictEqual(parsedPlayer.playerAds, false, "playerAds must be false");
     assert.deepStrictEqual(parsedPlayer.adSlots, [], "adSlots must be empty array");
-    assert.strictEqual(parsedPlayer.adBreakParams, undefined, "adBreakParams must be removed");
-    assert.strictEqual(parsedPlayer.playbackTracking.atrUrl, undefined, "tracking atrUrl removed");
-    console.log(" ✓ JSON.parse correctly sanitized player payload");
+    assert.strictEqual(parsedPlayer.playbackTracking.atrUrl, 'http://tracking', "playbackTracking safely preserved for Cobalt video engine");
+    console.log(" ✓ Video player ads cleanly stripped");
 
-    // Test JSON.parse on Settings payload (Fast-Tube Settings injection)
+    console.log("=== 5. Testing Configurable Fast-Tube Settings UI & Interactive Toggles ===");
     const rawSettingsPayload = JSON.stringify({
         title: { runs: [{ text: "Settings" }] },
         items: [
             {
                 settingCategoryCollectionRenderer: {
                     categoryId: "SETTINGS_CATEGORY_AUTOPLAY",
-                    title: { runs: [{ text: "Autoplay" }] }
+                    title: { runs: [{ text: "Autoplay" }] },
+                    items: []
                 }
             },
             {
                 settingCategoryCollectionRenderer: {
                     categoryId: "SPunlimited",
-                    title: { runs: [{ text: "Get YouTube Premium" }] }
+                    title: { runs: [{ text: "Get YouTube Premium" }] },
+                    items: []
                 }
             }
         ]
     });
     const parsedSettings = JSON.parse(rawSettingsPayload);
-    assert.strictEqual(parsedSettings.items.length, 2, "Must keep Fast-Tube and Autoplay, stripping Premium");
-    const firstCat = parsedSettings.items[0].settingCategoryCollectionRenderer;
-    assert.strictEqual(firstCat.categoryId, 'fast_tube_category', "First category must be Fast-Tube");
-    assert.strictEqual(firstCat.title.runs[0].text, 'Fast-Tube', "Category title must be Fast-Tube");
-    assert.strictEqual(firstCat.items[0].settingActionRenderer.title.runs[0].text, 'Fast-Tube Settings');
-    assert.strictEqual(firstCat.items[0].settingActionRenderer.actionLabel.runs[0].text, 'Patches Active');
-    console.log(" ✓ JSON.parse injected Fast-Tube Settings and stripped Premium promo");
-
-    // Test JSON.stringify on playbackContext (isInlinePlaybackNoAd flag)
-    const playbackReq = {
-        videoId: 'test1234',
-        playbackContext: {
-            contentPlaybackContext: {
-                html5Preference: 'HTML5_PREF_WANTS'
-            }
-        }
-    };
-    const stringifiedReq = JSON.stringify(playbackReq);
-    assert(stringifiedReq.includes('"isInlinePlaybackNoAd":true'), "JSON.stringify must set isInlinePlaybackNoAd to true");
-    console.log(" ✓ JSON.stringify injected isInlinePlaybackNoAd = true");
-
-    console.log("=== 4. Testing Network-Level Ad Blocking ===");
+    assert.strictEqual(parsedSettings.items.length, 2, "Fast-Tube added, Premium promo stripped");
+    const ftCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
+    assert.strictEqual(ftCategory.categoryId, 'fast_tube_category');
+    assert.strictEqual(ftCategory.title.runs[0].text, 'Fast-Tube');
+    assert.strictEqual(ftCategory.items.length, 4, "Must have 4 interactive boolean setting toggles");
     
-    // Ad endpoints blocked
+    // Verify items: Ad-Block, SponsorBlock, Auto-Skip, Hide Shorts
+    assert.strictEqual(ftCategory.items[0].settingBooleanRenderer.itemId, 'adblock');
+    assert.strictEqual(ftCategory.items[0].settingBooleanRenderer.enabled, true);
+    assert.strictEqual(ftCategory.items[1].settingBooleanRenderer.itemId, 'sponsorblock');
+    assert.strictEqual(ftCategory.items[1].settingBooleanRenderer.enabled, true);
+    assert.strictEqual(ftCategory.items[2].settingBooleanRenderer.itemId, 'autoskip');
+    assert.strictEqual(ftCategory.items[3].settingBooleanRenderer.itemId, 'hideShorts');
+    console.log(" ✓ Injected interactive Fast-Tube category with 4 configurable boolean toggles");
+
+    // Test toggle via resolveCommand
+    // Simulate user toggling "Hide Shorts" to ON
+    const toggleCommand = {
+        fastTubeOption: 'hideShorts',
+        fastTubeValue: true
+    };
+    global._yttv.testModule.instance.resolveCommand(toggleCommand);
+    assert.strictEqual(ftCategory.items[3].settingBooleanRenderer.enabled, true, "Hide Shorts enabled state updated");
+    assert(localStorage.getItem('fast_tube_config').includes('"hideShorts":true'), "Settings persisted to localStorage");
+    console.log(" ✓ resolveCommand successfully handled setting toggle & persisted to localStorage");
+
+    console.log("=== 6. Testing Network-Level Ad Blocking ===");
     const adRes = await window.fetch('https://www.youtube.com/api/stats/ads?ad_type=1');
     const adData = await adRes.json();
-    assert.deepStrictEqual(adData, {}, "Ad endpoint must be blocked with empty object");
+    assert.deepStrictEqual(adData, {}, "Ad endpoint blocked with empty object");
     console.log(" ✓ Blocked /api/stats/ads");
 
-    // XHR ad filtering
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', 'https://googleads.g.doubleclick.net/pagead/ads');
-    xhr.send('test');
-    assert.strictEqual(xhr.status, 0, "XHR ad request swallowed synchronously");
-    console.log(" ✓ Filtered XHR ad requests");
-
-    // SponsorBlock skipping test
-    console.log("=== 5. Testing SponsorBlock Timeupdate Event Skipping ===");
+    console.log("=== 7. Testing SponsorBlock Segment Skipping ===");
     await new Promise(r => setTimeout(r, 600));
-
-    assert(listeners['timeupdate'] !== undefined, "timeupdate listener must be attached to video");
-    
-    // Position inside sponsor segment (15.0 - 30.0)
+    assert(listeners['timeupdate'] !== undefined, "timeupdate listener attached");
     mockVideo.currentTime = 16.0;
     listeners['timeupdate']();
-    assert.strictEqual(mockVideo.currentTime, 30.0, "Video must jump to the end of sponsor segment (30.0)");
-    console.log(" ✓ Video successfully skipped from 16.0s to 30.0s via timeupdate");
+    assert.strictEqual(mockVideo.currentTime, 30.0, "Video skipped to 30.0s end of sponsor segment");
+    console.log(" ✓ Video successfully skipped from 16.0s to 30.0s via SponsorBlock");
 
-    // Verify CSS injection
-    assert(appendedStyles.includes('ytlr-ad-renderer'), "CSS must include ytlr-ad-renderer");
-    assert(appendedStyles.includes('Get YouTube Premium'), "CSS must include Get YouTube Premium");
-    console.log(" ✓ Verified Leanback & YouTube Premium CSS styling rules");
+    assert(appendedStyles.includes('ytlr-ad-renderer'), "CSS includes ytlr-ad-renderer");
+    console.log(" ✓ Verified Leanback CSS rules");
 
-    console.log("=== ALL AD-BLOCK, SPONSORBLOCK, SETTINGS UI, AND PREMIUM REMOVAL TESTS PASSED! ===");
+    console.log("=== ALL HOME SCREEN, VIDEO PLAYBACK, AND CONFIGURABLE SETTINGS TESTS PASSED! ===");
     process.exit(0);
 })();
