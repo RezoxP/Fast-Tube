@@ -1,5 +1,5 @@
 diff --git a/cobalt/browser/web_module.cc b/cobalt/browser/web_module.cc
-index 9edc8e199..7c1dfb88c 100644
+index 9edc8e199..5eb9929e3 100644
 --- a/cobalt/browser/web_module.cc
 +++ b/cobalt/browser/web_module.cc
 @@ -20,6 +20,10 @@
@@ -13,7 +13,7 @@ index 9edc8e199..7c1dfb88c 100644
  #include "base/command_line.h"
  #include "base/logging.h"
  #include "base/memory/weak_ptr.h"
-@@ -345,6 +349,278 @@ class WebModule::Impl {
+@@ -345,6 +349,294 @@ class WebModule::Impl {
              window_->performance(), load_timing_info);
        }
      }
@@ -42,86 +42,55 @@ index 9edc8e199..7c1dfb88c 100644
 +(function() {
 +    if (window.__fast_tube_injected__) return;
 +    window.__fast_tube_injected__ = true;
-+    const AD_URL_PATTERNS = ['/api/stats/ads', '/ptracking', '/pagead/', 'googleads.g.doubleclick.net', 'doubleclick.net', '/youtubei/v1/att/get', 'adservice.google.com', '/api/stats/qoe'];
-+    function isAdUrl(url) {
-+        if (!url || typeof url !== 'string') return false;
-+        for (let i = 0; i < AD_URL_PATTERNS.length; i++) {
-+            if (url.indexOf(AD_URL_PATTERNS[i]) !== -1) return true;
++
++    function PatchSettings(settingsObject) {
++        if (!settingsObject || !Array.isArray(settingsObject.items)) return;
++        for (let i = 0; i < settingsObject.items.length; i++) {
++            const cat = settingsObject.items[i]?.settingCategoryCollectionRenderer;
++            if (cat && cat.categoryId === 'fast_tube_category') return;
 +        }
-+        return false;
-+    }
-+    function sanitizePlayerResponse(data) {
-+        if (!data || typeof data !== 'object') return data;
-+        delete data.adPlacements;
-+        delete data.playerAds;
-+        delete data.adSlots;
-+        delete data.adBreakParams;
-+        if (data.playbackTracking) {
-+            delete data.playbackTracking.atrUrl;
-+            delete data.playbackTracking.cpnUrl;
-+            delete data.playbackTracking.videostatsPlaybackUrl;
-+            delete data.playbackTracking.videostatsDelayplayUrl;
-+            delete data.playbackTracking.videostatsWatchtimeUrl;
-+            delete data.playbackTracking.ptrackingUrl;
-+            delete data.playbackTracking.qoeUrl;
-+        }
-+        return data;
-+    }
-+    function sanitizeBrowseResponse(data) {
-+        if (!data || typeof data !== 'object') return data;
-+        function cleanNode(obj) {
-+            if (!obj || typeof obj !== 'object') return;
-+            if (Array.isArray(obj)) {
-+                for (let i = obj.length - 1; i >= 0; i--) {
-+                    const item = obj[i];
-+                    if (item) {
-+                        const keys = Object.keys(item);
-+                        let remove = false;
-+                        for (let k = 0; k < keys.length; k++) {
-+                            const key = keys[k];
-+                            if (key.indexOf('adPlacement') !== -1 || key.indexOf('promotedSparkles') !== -1 || key.indexOf('statementBanner') !== -1 || key.indexOf('premiumUpsell') !== -1 || key.indexOf('mealbarPromo') !== -1) {
-+                                remove = true;
-+                                break;
-+                            }
-+                        }
-+                        const str = JSON.stringify(item);
-+                        if (str.indexOf('SPunlimited') !== -1 || str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1) {
-+                            remove = true;
-+                        }
-+                        if (remove) obj.splice(i, 1); else cleanNode(item);
-+                    }
-+                }
-+            } else {
-+                delete obj.adPlacements;
-+                delete obj.playerAds;
-+                delete obj.adSlots;
-+                delete obj.adBreakParams;
-+                delete obj.statementBannerRenderer;
-+                delete obj.premiumUpsellRenderer;
-+                delete obj.mealbarPromoRenderer;
-+                const keys = Object.keys(obj);
-+                for (let i = 0; i < keys.length; i++) {
-+                    const key = keys[i];
-+                    if (typeof obj[key] === 'object' && obj[key] !== null) cleanNode(obj[key]);
-+                }
++        const fastTubeAction = {
++            settingActionRenderer: {
++                title: { runs: [{ text: "Fast-Tube Settings" }] },
++                actionLabel: { runs: [{ text: "Patches Active" }] },
++                summary: { runs: [{ text: "Ad-Block, SponsorBlock & No-Ad Playback Active" }] },
++                itemId: "fast_tube_status_item",
++                thumbnail: { thumbnails: [{ url: "https://www.gstatic.com/ytlr/img/parent_code.png" }] },
++                trackingParams: "null"
++            }
++        };
++        const fastTubeCategory = {
++            settingCategoryCollectionRenderer: {
++                categoryId: "fast_tube_category",
++                title: { runs: [{ text: "Fast-Tube" }] },
++                items: [fastTubeAction],
++                focused: false,
++                trackingParams: "null"
++            }
++        };
++        for (let i = settingsObject.items.length - 1; i >= 0; i--) {
++            const item = settingsObject.items[i];
++            const str = JSON.stringify(item);
++            if (str && (str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('SPunlimited') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
++                settingsObject.items.splice(i, 1);
 +            }
 +        }
-+        cleanNode(data);
-+        return data;
++        settingsObject.items.unshift(fastTubeCategory);
 +    }
++
 +    let currentVideoId = null;
 +    let sponsorSegments = [];
 +    const segmentCache = new Map();
 +    function checkSponsorBlock(videoId) {
-+        if (!videoId || videoId === currentVideoId) return;
++        if (!videoId || typeof videoId !== 'string' || videoId === currentVideoId) return;
 +        currentVideoId = videoId;
 +        if (segmentCache.has(videoId)) {
 +            sponsorSegments = segmentCache.get(videoId);
 +            return;
 +        }
-+        const fetchFunc = originalFetch || window.fetch;
++        const fetchFunc = window.fetch;
 +        if (typeof fetchFunc === 'function') {
-+            fetchFunc('https://sponsor.ajay.app/api/skipSegments?videoID=' + videoId + '&categories=["sponsor","interaction","intro","outro","selfpromo","preview","music_offtopic","filler"]')
++            fetchFunc('https://sponsor.ajay.app/api/skipSegments?videoID=' + encodeURIComponent(videoId) + '&categories=["sponsor","interaction","intro","outro","selfpromo","preview","music_offtopic","filler"]')
 +                .then(res => res.ok ? res.json() : [])
 +                .then(data => {
 +                    if (Array.isArray(data)) {
@@ -135,6 +104,88 @@ index 9edc8e199..7c1dfb88c 100644
 +                .catch(() => { sponsorSegments = []; });
 +        }
 +    }
++
++    const origParse = JSON.parse;
++    JSON.parse = function() {
++        const r = origParse.apply(this, arguments);
++        if (!r || typeof r !== 'object') return r;
++        try {
++            if (r.adPlacements) r.adPlacements = [];
++            if (r.playerAds) r.playerAds = false;
++            if (r.adSlots) r.adSlots = [];
++            if (r.adBreakParams) delete r.adBreakParams;
++            if (r.paidContentOverlay) r.paidContentOverlay = null;
++            if (r.playbackTracking) {
++                delete r.playbackTracking.atrUrl;
++                delete r.playbackTracking.cpnUrl;
++                delete r.playbackTracking.videostatsPlaybackUrl;
++                delete r.playbackTracking.videostatsDelayplayUrl;
++                delete r.playbackTracking.videostatsWatchtimeUrl;
++                delete r.playbackTracking.ptrackingUrl;
++                delete r.playbackTracking.qoeUrl;
++            }
++            if (r.videoDetails && r.videoDetails.videoId) {
++                checkSponsorBlock(r.videoDetails.videoId);
++            }
++            if (r.contents && r.contents.tvBrowseRenderer && r.contents.tvBrowseRenderer.content && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents) {
++                const contents = r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents;
++                r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents = contents.filter(elm => !elm.adSlotRenderer && !elm.feedNudgeRenderer && !elm.statementBannerRenderer && !elm.premiumUpsellRenderer);
++                for (let i = 0; i < r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents.length; i++) {
++                    const shelf = r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents[i];
++                    if (shelf.shelfRenderer && shelf.shelfRenderer.content && shelf.shelfRenderer.content.horizontalListRenderer && shelf.shelfRenderer.content.horizontalListRenderer.items) {
++                        shelf.shelfRenderer.content.horizontalListRenderer.items = shelf.shelfRenderer.content.horizontalListRenderer.items.filter(item => !item.adSlotRenderer && !item.compactPromotedItemRenderer);
++                    }
++                }
++            }
++            if (!Array.isArray(r) && r.entries && Array.isArray(r.entries)) {
++                r.entries = r.entries.filter(elm => !elm?.command?.reelWatchEndpoint?.adClientParams?.isAd);
++            }
++            if (r.items && Array.isArray(r.items)) {
++                for (let i = r.items.length - 1; i >= 0; i--) {
++                    const item = r.items[i];
++                    const str = JSON.stringify(item);
++                    if (str && (str.indexOf('SPunlimited') !== -1 || str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
++                        r.items.splice(i, 1);
++                    }
++                }
++            }
++            if (r.title && r.title.runs && Array.isArray(r.items)) {
++                PatchSettings(r);
++            }
++        } catch (e) {}
++        return r;
++    };
++    window.JSON.parse = JSON.parse;
++
++    const origStringify = JSON.stringify;
++    JSON.stringify = function(value, replacer, space) {
++        if (value && typeof value === 'object' && value.playbackContext && value.playbackContext.contentPlaybackContext) {
++            try {
++                value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
++            } catch(e) {}
++        }
++        return origStringify.call(this, value, replacer, space);
++    };
++    window.JSON.stringify = JSON.stringify;
++
++    if (typeof window._yttv === 'object') {
++        for (const key in window._yttv) {
++            if (window._yttv[key] && window._yttv[key].JSON) {
++                window._yttv[key].JSON.parse = JSON.parse;
++                window._yttv[key].JSON.stringify = JSON.stringify;
++            }
++        }
++    }
++
++    const AD_URL_PATTERNS = ['/api/stats/ads', '/ptracking', '/pagead/', 'googleads.g.doubleclick.net', 'doubleclick.net', '/youtubei/v1/att/get', 'adservice.google.com', '/api/stats/qoe'];
++    function isAdUrl(url) {
++        if (!url || typeof url !== 'string') return false;
++        for (let i = 0; i < AD_URL_PATTERNS.length; i++) {
++            if (url.indexOf(AD_URL_PATTERNS[i]) !== -1) return true;
++        }
++        return false;
++    }
++
 +    const originalFetch = window.fetch;
 +    if (typeof originalFetch === 'function') {
 +        window.fetch = async function(...args) {
@@ -150,30 +201,12 @@ index 9edc8e199..7c1dfb88c 100644
 +                            if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
 +                        } catch(e) {}
 +                    }
-+                    const response = await originalFetch.apply(this, args);
-+                    const clone = response.clone();
-+                    const data = await clone.json();
-+                    if (data && data.videoDetails && data.videoDetails.videoId) checkSponsorBlock(data.videoDetails.videoId);
-+                    sanitizePlayerResponse(data);
-+                    return new Response(JSON.stringify(data), { status: response.status, statusText: response.statusText, headers: response.headers });
-+                } catch (e) {
-+                    return originalFetch.apply(this, args);
-+                }
-+            }
-+            if (url.indexOf('/youtubei/v1/browse') !== -1 || url.indexOf('/youtubei/v1/guide') !== -1 || url.indexOf('/youtubei/v1/next') !== -1 || url.indexOf('/youtubei/v1/account/') !== -1) {
-+                try {
-+                    const response = await originalFetch.apply(this, args);
-+                    const clone = response.clone();
-+                    const data = await clone.json();
-+                    sanitizeBrowseResponse(data);
-+                    return new Response(JSON.stringify(data), { status: response.status, statusText: response.statusText, headers: response.headers });
-+                } catch (e) {
-+                    return originalFetch.apply(this, args);
-+                }
++                } catch(e) {}
 +            }
 +            return originalFetch.apply(this, args);
 +        };
 +    }
++
 +    if (typeof XMLHttpRequest !== 'undefined') {
 +        const origOpen = XMLHttpRequest.prototype.open;
 +        const origSend = XMLHttpRequest.prototype.send;
@@ -199,40 +232,16 @@ index 9edc8e199..7c1dfb88c 100644
 +                }, 0);
 +                return;
 +            }
-+            const isPlayer = url.indexOf('/youtubei/v1/player') !== -1 || url.indexOf('/youtubei/v1/reel/') !== -1;
-+            const isBrowse = url.indexOf('/youtubei/v1/browse') !== -1 || url.indexOf('/youtubei/v1/guide') !== -1 || url.indexOf('/youtubei/v1/next') !== -1 || url.indexOf('/youtubei/v1/account/') !== -1;
-+            if (isPlayer && body) {
++            if (url.indexOf('/youtubei/v1/player') !== -1 && body) {
 +                try {
 +                    const reqData = typeof body === 'string' ? JSON.parse(body) : body;
 +                    if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
 +                } catch(e) {}
 +            }
-+            if (isPlayer || isBrowse) {
-+                const self = this;
-+                const sanitizeXHR = function() {
-+                    try {
-+                        if (self.readyState === 4 && (self.status === 200 || self.status === 0) && self.responseText) {
-+                            let data = JSON.parse(self.responseText);
-+                            if (isPlayer) {
-+                                if (data && data.videoDetails && data.videoDetails.videoId) checkSponsorBlock(data.videoDetails.videoId);
-+                                data = sanitizePlayerResponse(data);
-+                            } else if (isBrowse) {
-+                                data = sanitizeBrowseResponse(data);
-+                            }
-+                            const sanitizedStr = JSON.stringify(data);
-+                            Object.defineProperty(self, 'responseText', { value: sanitizedStr, configurable: true });
-+                            Object.defineProperty(self, 'response', { value: (self.responseType === 'json' ? data : sanitizedStr), configurable: true });
-+                        }
-+                    } catch(e) {}
-+                };
-+                if (typeof this.addEventListener === 'function') {
-+                    this.addEventListener('readystatechange', sanitizeXHR, true);
-+                    this.addEventListener('load', sanitizeXHR, true);
-+                }
-+            }
 +            return origSend.call(this, body);
 +        };
 +    }
++
 +    let trackedVideo = null;
 +    function onTimeUpdate() {
 +        if (!trackedVideo || trackedVideo.paused || !sponsorSegments.length) return;
@@ -253,6 +262,7 @@ index 9edc8e199..7c1dfb88c 100644
 +        trackedVideo = video;
 +        try { trackedVideo.addEventListener('timeupdate', onTimeUpdate, { passive: true }); } catch(e) {}
 +    }
++
 +    setInterval(() => {
 +        if (typeof document === 'undefined') return;
 +        const video = document.querySelector('video');
@@ -274,6 +284,7 @@ index 9edc8e199..7c1dfb88c 100644
 +            if (vMatch && vMatch[1]) checkSponsorBlock(vMatch[1]);
 +        }
 +    }, 500);
++
 +    const injectStyles = () => {
 +        if (typeof document === 'undefined' || document.getElementById('fast-tube-styles')) return;
 +        const style = document.createElement('style');
@@ -283,16 +294,21 @@ index 9edc8e199..7c1dfb88c 100644
 +        if (target && typeof target.appendChild === 'function') target.appendChild(style);
 +    };
 +    if (typeof document !== 'undefined') {
-+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectStyles, { once: true }); else injectStyles();
++        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', injectStyles, { once: true });
++        else injectStyles();
 +    }
 +})();
 +)FASTTUBE_JS";
 +    }
-+    ExecuteJavascript(adblock_script, base::SourceLocation("vacuumtube_adblock.js", 1, 1), nullptr, nullptr);
++    if (!adblock_script.empty()) {
++      bool succeeded = false;
++      ExecuteJavascript(adblock_script, base::SourceLocation("vacuumtube_adblock.js", 1, 1), NULL, &succeeded);
++      LOG(INFO) << "[Fast-Tube] AdBlock & Settings script injection result: " << succeeded;
++    }
    }
  
    // Inject the DOM event object into the window or the element.
-@@ -747,6 +1023,9 @@ WebModule::Impl::Impl(web::Context* web_context, const ConstructionData& data)
+@@ -747,6 +1039,9 @@ WebModule::Impl::Impl(web::Context* web_context, const ConstructionData& data)
  
    web_context_->SetupFinished();
    is_running_ = true;
@@ -303,18 +319,17 @@ index 9edc8e199..7c1dfb88c 100644
  
  WebModule::Impl::~Impl() {
 diff --git a/cobalt/loader/net_fetcher.cc b/cobalt/loader/net_fetcher.cc
-index 525dadcfc..c1384f7ba 100644
+index 525dadcfc..f561025c0 100644
 --- a/cobalt/loader/net_fetcher.cc
 +++ b/cobalt/loader/net_fetcher.cc
-@@ -141,6 +141,17 @@ void NetFetcher::Start() {
+@@ -141,6 +141,16 @@ void NetFetcher::Start() {
                 original_url.spec());
    if (security_callback_.is_null() ||
        security_callback_.Run(original_url, false /* did not redirect */)) {
-+    std::string spec = original_url.spec();
++    const std::string& spec = original_url.spec();
 +    if (spec.find("/api/stats/ads") != std::string::npos ||
 +        spec.find("/ptracking") != std::string::npos ||
 +        spec.find("/pagead/") != std::string::npos ||
-+        spec.find("googleads.g.doubleclick.net") != std::string::npos ||
 +        spec.find("doubleclick.net") != std::string::npos ||
 +        spec.find("adservice.google.com") != std::string::npos ||
 +        spec.find("/youtubei/v1/att/get") != std::string::npos) {
@@ -325,18 +340,17 @@ index 525dadcfc..c1384f7ba 100644
        url_fetcher_->Start();
        return;
 diff --git a/cobalt/xhr/xml_http_request.cc b/cobalt/xhr/xml_http_request.cc
-index 667301b07..9ca990363 100644
+index 667301b07..6ed22b924 100644
 --- a/cobalt/xhr/xml_http_request.cc
 +++ b/cobalt/xhr/xml_http_request.cc
-@@ -518,6 +518,17 @@ void XMLHttpRequestImpl::Send(
+@@ -518,6 +518,16 @@ void XMLHttpRequestImpl::Send(
      const base::Optional<XMLHttpRequest::RequestBodyType>& request_body,
      script::ExceptionState* exception_state) {
    error_ = false;
-+  std::string spec = request_url_.spec();
++  const std::string& spec = request_url_.spec();
 +  if (spec.find("/api/stats/ads") != std::string::npos ||
 +      spec.find("/ptracking") != std::string::npos ||
 +      spec.find("/pagead/") != std::string::npos ||
-+      spec.find("googleads.g.doubleclick.net") != std::string::npos ||
 +      spec.find("doubleclick.net") != std::string::npos ||
 +      spec.find("adservice.google.com") != std::string::npos ||
 +      spec.find("/youtubei/v1/att/get") != std::string::npos) {

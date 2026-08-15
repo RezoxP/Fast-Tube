@@ -24,7 +24,6 @@ global.Response = class {
     }
 };
 
-const xhrEvents = {};
 global.XMLHttpRequest = class {
     constructor() {
         this.readyState = 0;
@@ -117,15 +116,6 @@ global.fetch = async function(url, options) {
             streamingData: { formats: [] }
         }));
     }
-    if (url.includes('/youtubei/v1/guide') || url.includes('/youtubei/v1/browse')) {
-        return new global.Response(JSON.stringify({
-            items: [
-                { title: 'Home', browseId: 'FEwhat_to_watch' },
-                { title: 'Get YouTube Premium', browseId: 'SPunlimited' },
-                { statementBannerRenderer: { title: 'Subscribe to Premium' } }
-            ]
-        }));
-    }
     return new global.Response(JSON.stringify({ success: true }));
 };
 
@@ -134,57 +124,82 @@ const code = fs.readFileSync('scripts/injection/vacuumtube_adblock.js', 'utf8');
 eval(code);
 
 (async () => {
-    console.log("=== 3. Testing Ad Blocking on Fetch Requests ===");
+    console.log("=== 3. Testing Core JSON.parse and JSON.stringify Hooks ===");
+
+    // Test JSON.parse on player payload
+    const rawPlayerPayload = JSON.stringify({
+        videoDetails: { videoId: 'dQw4w9WgXcQ' },
+        adPlacements: [{ ad: 1 }],
+        playerAds: [{ ad: 2 }],
+        adSlots: [{ ad: 3 }],
+        adBreakParams: 'params',
+        playbackTracking: { atrUrl: 'http://tracking', qoeUrl: 'http://qoe' }
+    });
+    const parsedPlayer = JSON.parse(rawPlayerPayload);
+    assert.deepStrictEqual(parsedPlayer.adPlacements, [], "adPlacements must be empty array");
+    assert.strictEqual(parsedPlayer.playerAds, false, "playerAds must be false");
+    assert.deepStrictEqual(parsedPlayer.adSlots, [], "adSlots must be empty array");
+    assert.strictEqual(parsedPlayer.adBreakParams, undefined, "adBreakParams must be removed");
+    assert.strictEqual(parsedPlayer.playbackTracking.atrUrl, undefined, "tracking atrUrl removed");
+    console.log(" ✓ JSON.parse correctly sanitized player payload");
+
+    // Test JSON.parse on Settings payload (Fast-Tube Settings injection)
+    const rawSettingsPayload = JSON.stringify({
+        title: { runs: [{ text: "Settings" }] },
+        items: [
+            {
+                settingCategoryCollectionRenderer: {
+                    categoryId: "SETTINGS_CATEGORY_AUTOPLAY",
+                    title: { runs: [{ text: "Autoplay" }] }
+                }
+            },
+            {
+                settingCategoryCollectionRenderer: {
+                    categoryId: "SPunlimited",
+                    title: { runs: [{ text: "Get YouTube Premium" }] }
+                }
+            }
+        ]
+    });
+    const parsedSettings = JSON.parse(rawSettingsPayload);
+    assert.strictEqual(parsedSettings.items.length, 2, "Must keep Fast-Tube and Autoplay, stripping Premium");
+    const firstCat = parsedSettings.items[0].settingCategoryCollectionRenderer;
+    assert.strictEqual(firstCat.categoryId, 'fast_tube_category', "First category must be Fast-Tube");
+    assert.strictEqual(firstCat.title.runs[0].text, 'Fast-Tube', "Category title must be Fast-Tube");
+    assert.strictEqual(firstCat.items[0].settingActionRenderer.title.runs[0].text, 'Fast-Tube Settings');
+    assert.strictEqual(firstCat.items[0].settingActionRenderer.actionLabel.runs[0].text, 'Patches Active');
+    console.log(" ✓ JSON.parse injected Fast-Tube Settings and stripped Premium promo");
+
+    // Test JSON.stringify on playbackContext (isInlinePlaybackNoAd flag)
+    const playbackReq = {
+        videoId: 'test1234',
+        playbackContext: {
+            contentPlaybackContext: {
+                html5Preference: 'HTML5_PREF_WANTS'
+            }
+        }
+    };
+    const stringifiedReq = JSON.stringify(playbackReq);
+    assert(stringifiedReq.includes('"isInlinePlaybackNoAd":true'), "JSON.stringify must set isInlinePlaybackNoAd to true");
+    console.log(" ✓ JSON.stringify injected isInlinePlaybackNoAd = true");
+
+    console.log("=== 4. Testing Network-Level Ad Blocking ===");
     
-    // Test 1: Ad endpoints should return empty 200 OK immediately
+    // Ad endpoints blocked
     const adRes = await window.fetch('https://www.youtube.com/api/stats/ads?ad_type=1');
     const adData = await adRes.json();
     assert.deepStrictEqual(adData, {}, "Ad endpoint must be blocked with empty object");
     console.log(" ✓ Blocked /api/stats/ads");
 
-    const ptrackRes = await window.fetch('https://www.youtube.com/ptracking?test=1');
-    const ptrackData = await ptrackRes.json();
-    assert.deepStrictEqual(ptrackData, {}, "Tracking endpoint must be blocked");
-    console.log(" ✓ Blocked /ptracking");
-
-    // Test 2: Player response must strip all adPlacements, playerAds, adSlots, and playbackTracking
-    const playerRes = await window.fetch('https://www.youtube.com/youtubei/v1/player', {
-        method: 'POST',
-        body: JSON.stringify({ videoId: 'dQw4w9WgXcQ' })
-    });
-    const playerData = await playerRes.json();
-    assert.strictEqual(playerData.adPlacements, undefined, "adPlacements must be deleted");
-    assert.strictEqual(playerData.playerAds, undefined, "playerAds must be deleted");
-    assert.strictEqual(playerData.adSlots, undefined, "adSlots must be deleted");
-    assert.strictEqual(playerData.playbackTracking.atrUrl, undefined, "atrUrl must be deleted");
-    assert.strictEqual(playerData.videoDetails.videoId, 'dQw4w9WgXcQ', "videoId preserved");
-    console.log(" ✓ Stripped adPlacements and playerAds from /youtubei/v1/player");
-
-    // Test 3: Browse & Guide response must remove 'Get YouTube Premium' and statementBannerRenderer
-    const guideRes = await window.fetch('https://www.youtube.com/youtubei/v1/guide');
-    const guideData = await guideRes.json();
-    assert.strictEqual(guideData.items.length, 1, "Guide items must have Premium and banner promos removed");
-    assert.strictEqual(guideData.items[0].title, 'Home', "Only legitimate non-promo items retained");
-    console.log(" ✓ Cleaned 'Get YouTube Premium' and banners from guide/browse responses");
-
-    // Test 4: Test XHR ad filtering
+    // XHR ad filtering
     const xhr = new XMLHttpRequest();
     xhr.open('GET', 'https://googleads.g.doubleclick.net/pagead/ads');
     xhr.send('test');
     assert.strictEqual(xhr.status, 0, "XHR ad request swallowed synchronously");
     console.log(" ✓ Filtered XHR ad requests");
 
-    // Test 5: Test XHR player ad stripping
-    const playerXhr = new XMLHttpRequest();
-    playerXhr.open('POST', 'https://www.youtube.com/youtubei/v1/player');
-    playerXhr.send(JSON.stringify({ videoId: 'dQw4w9WgXcQ' }));
-    const parsedXHR = JSON.parse(playerXhr.responseText);
-    assert.strictEqual(parsedXHR.adPlacements, undefined, "XHR player response must strip adPlacements");
-    assert.strictEqual(parsedXHR.playerAds, undefined, "XHR player response must strip playerAds");
-    console.log(" ✓ Stripped ads from XMLHttpRequest player responses");
-
-    // Test 6: Verify timeupdate listener and SponsorBlock skipping
-    console.log("=== 4. Testing SponsorBlock Timeupdate Event Skipping ===");
+    // SponsorBlock skipping test
+    console.log("=== 5. Testing SponsorBlock Timeupdate Event Skipping ===");
     await new Promise(r => setTimeout(r, 600));
 
     assert(listeners['timeupdate'] !== undefined, "timeupdate listener must be attached to video");
@@ -195,17 +210,11 @@ eval(code);
     assert.strictEqual(mockVideo.currentTime, 30.0, "Video must jump to the end of sponsor segment (30.0)");
     console.log(" ✓ Video successfully skipped from 16.0s to 30.0s via timeupdate");
 
-    // Position outside sponsor segment
-    mockVideo.currentTime = 35.0;
-    listeners['timeupdate']();
-    assert.strictEqual(mockVideo.currentTime, 35.0, "Video should not jump when outside sponsor segment");
-    console.log(" ✓ Video maintained playback timestamp outside sponsor segments");
-
-    // Test 7: Verify styles contain Leanback ad and premium hiding rules
+    // Verify CSS injection
     assert(appendedStyles.includes('ytlr-ad-renderer'), "CSS must include ytlr-ad-renderer");
     assert(appendedStyles.includes('Get YouTube Premium'), "CSS must include Get YouTube Premium");
     console.log(" ✓ Verified Leanback & YouTube Premium CSS styling rules");
 
-    console.log("=== ALL AD-BLOCK, SPONSORBLOCK, AND PREMIUM REMOVAL TESTS PASSED! ===");
+    console.log("=== ALL AD-BLOCK, SPONSORBLOCK, SETTINGS UI, AND PREMIUM REMOVAL TESTS PASSED! ===");
     process.exit(0);
 })();

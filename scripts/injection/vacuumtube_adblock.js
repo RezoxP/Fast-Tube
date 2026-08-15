@@ -1,11 +1,195 @@
 // Fast-Tube Injection Script
-// High-performance ad-blocking, SponsorBlock, and Premium promo cleanup for YouTube TV (Cobalt)
+// Advanced ad-blocking, SponsorBlock, and Settings UI integration for YouTube TV on Cobalt
+// Derived from TizenTube and VacuumTube
 
 (function() {
     if (window.__fast_tube_injected__) return;
     window.__fast_tube_injected__ = true;
 
-    // --- 1. Ad URL Patterns ---
+    // --- 1. Settings Injection (Fast-Tube Settings in YouTube TV) ---
+    function PatchSettings(settingsObject) {
+        if (!settingsObject || !Array.isArray(settingsObject.items)) return;
+        
+        // Avoid duplicate category
+        for (let i = 0; i < settingsObject.items.length; i++) {
+            const cat = settingsObject.items[i]?.settingCategoryCollectionRenderer;
+            if (cat && cat.categoryId === 'fast_tube_category') return;
+        }
+
+        const fastTubeAction = {
+            settingActionRenderer: {
+                title: {
+                    runs: [{ text: "Fast-Tube Settings" }]
+                },
+                actionLabel: {
+                    runs: [{ text: "Patches Active" }]
+                },
+                summary: {
+                    runs: [{ text: "Ad-Block, SponsorBlock & No-Ad Playback Active" }]
+                },
+                itemId: "fast_tube_status_item",
+                thumbnail: {
+                    thumbnails: [
+                        { url: "https://www.gstatic.com/ytlr/img/parent_code.png" }
+                    ]
+                },
+                trackingParams: "null"
+            }
+        };
+
+        const fastTubeCategory = {
+            settingCategoryCollectionRenderer: {
+                categoryId: "fast_tube_category",
+                title: {
+                    runs: [{ text: "Fast-Tube" }]
+                },
+                items: [fastTubeAction],
+                focused: false,
+                trackingParams: "null"
+            }
+        };
+
+        // Remove "Get YouTube Premium" and promo categories from settings
+        for (let i = settingsObject.items.length - 1; i >= 0; i--) {
+            const item = settingsObject.items[i];
+            const str = JSON.stringify(item);
+            if (str && (str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('SPunlimited') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
+                settingsObject.items.splice(i, 1);
+            }
+        }
+
+        // Add Fast-Tube category to the top of settings
+        settingsObject.items.unshift(fastTubeCategory);
+    }
+
+    // --- 2. SponsorBlock Integration ---
+    let currentVideoId = null;
+    let sponsorSegments = [];
+    const segmentCache = new Map();
+
+    function checkSponsorBlock(videoId) {
+        if (!videoId || typeof videoId !== 'string' || videoId === currentVideoId) return;
+        currentVideoId = videoId;
+        if (segmentCache.has(videoId)) {
+            sponsorSegments = segmentCache.get(videoId);
+            return;
+        }
+        const fetchFunc = window.fetch;
+        if (typeof fetchFunc === 'function') {
+            fetchFunc('https://sponsor.ajay.app/api/skipSegments?videoID=' + encodeURIComponent(videoId) + '&categories=["sponsor","interaction","intro","outro","selfpromo","preview","music_offtopic","filler"]')
+                .then(res => res.ok ? res.json() : [])
+                .then(data => {
+                    if (Array.isArray(data)) {
+                        sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1] }));
+                        segmentCache.set(videoId, sponsorSegments);
+                        if (segmentCache.size > 100) segmentCache.delete(segmentCache.keys().next().value);
+                    } else {
+                        sponsorSegments = [];
+                    }
+                })
+                .catch(() => { sponsorSegments = []; });
+        }
+    }
+
+    // --- 3. Core JSON.parse Hook (TizenTube Ad-Block & Settings Hook) ---
+    const origParse = JSON.parse;
+    JSON.parse = function() {
+        const r = origParse.apply(this, arguments);
+        if (!r || typeof r !== 'object') return r;
+        try {
+            // A. Remove video player ads
+            if (r.adPlacements) {
+                r.adPlacements = [];
+            }
+            if (r.playerAds) {
+                r.playerAds = false;
+            }
+            if (r.adSlots) {
+                r.adSlots = [];
+            }
+            if (r.adBreakParams) {
+                delete r.adBreakParams;
+            }
+            if (r.paidContentOverlay) {
+                r.paidContentOverlay = null;
+            }
+            if (r.playbackTracking) {
+                delete r.playbackTracking.atrUrl;
+                delete r.playbackTracking.cpnUrl;
+                delete r.playbackTracking.videostatsPlaybackUrl;
+                delete r.playbackTracking.videostatsDelayplayUrl;
+                delete r.playbackTracking.videostatsWatchtimeUrl;
+                delete r.playbackTracking.ptrackingUrl;
+                delete r.playbackTracking.qoeUrl;
+            }
+
+            // B. Extract videoId for SponsorBlock
+            if (r.videoDetails && r.videoDetails.videoId) {
+                checkSponsorBlock(r.videoDetails.videoId);
+            }
+
+            // C. Remove home screen / browse masthead ads & nudges
+            if (r.contents && r.contents.tvBrowseRenderer && r.contents.tvBrowseRenderer.content && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer && r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents) {
+                const contents = r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents;
+                r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents = contents.filter(elm => !elm.adSlotRenderer && !elm.feedNudgeRenderer && !elm.statementBannerRenderer && !elm.premiumUpsellRenderer);
+                for (let i = 0; i < r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents.length; i++) {
+                    const shelf = r.contents.tvBrowseRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents[i];
+                    if (shelf.shelfRenderer && shelf.shelfRenderer.content && shelf.shelfRenderer.content.horizontalListRenderer && shelf.shelfRenderer.content.horizontalListRenderer.items) {
+                        shelf.shelfRenderer.content.horizontalListRenderer.items = shelf.shelfRenderer.content.horizontalListRenderer.items.filter(item => !item.adSlotRenderer && !item.compactPromotedItemRenderer);
+                    }
+                }
+            }
+
+            // D. Remove Shorts ads
+            if (!Array.isArray(r) && r.entries && Array.isArray(r.entries)) {
+                r.entries = r.entries.filter(elm => !elm?.command?.reelWatchEndpoint?.adClientParams?.isAd);
+            }
+
+            // E. Remove 'Get YouTube Premium' & SPunlimited from guide items
+            if (r.items && Array.isArray(r.items)) {
+                for (let i = r.items.length - 1; i >= 0; i--) {
+                    const item = r.items[i];
+                    const str = JSON.stringify(item);
+                    if (str && (str.indexOf('SPunlimited') !== -1 || str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1)) {
+                        r.items.splice(i, 1);
+                    }
+                }
+            }
+
+            // F. Patch Settings with Fast-Tube option
+            if (r.title && r.title.runs && Array.isArray(r.items)) {
+                PatchSettings(r);
+            }
+        } catch (e) {}
+        return r;
+    };
+
+    window.JSON.parse = JSON.parse;
+
+    // --- 4. Core JSON.stringify Hook (Inline No-Ad Flag) ---
+    const origStringify = JSON.stringify;
+    JSON.stringify = function(value, replacer, space) {
+        if (value && typeof value === 'object' && value.playbackContext && value.playbackContext.contentPlaybackContext) {
+            try {
+                value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
+            } catch(e) {}
+        }
+        return origStringify.call(this, value, replacer, space);
+    };
+
+    window.JSON.stringify = JSON.stringify;
+
+    // Patch any existing internal _yttv references
+    if (typeof window._yttv === 'object') {
+        for (const key in window._yttv) {
+            if (window._yttv[key] && window._yttv[key].JSON) {
+                window._yttv[key].JSON.parse = JSON.parse;
+                window._yttv[key].JSON.stringify = JSON.stringify;
+            }
+        }
+    }
+
+    // --- 5. Network Level Ad Interception (Fetch & XMLHttpRequest) ---
     const AD_URL_PATTERNS = [
         '/api/stats/ads',
         '/ptracking',
@@ -25,114 +209,10 @@
         return false;
     }
 
-    // --- 2. Response Sanitization ---
-    function sanitizePlayerResponse(data) {
-        if (!data || typeof data !== 'object') return data;
-        delete data.adPlacements;
-        delete data.playerAds;
-        delete data.adSlots;
-        delete data.adBreakParams;
-        if (data.playbackTracking) {
-            delete data.playbackTracking.atrUrl;
-            delete data.playbackTracking.cpnUrl;
-            delete data.playbackTracking.videostatsPlaybackUrl;
-            delete data.playbackTracking.videostatsDelayplayUrl;
-            delete data.playbackTracking.videostatsWatchtimeUrl;
-            delete data.playbackTracking.ptrackingUrl;
-            delete data.playbackTracking.qoeUrl;
-        }
-        return data;
-    }
-
-    function sanitizeBrowseResponse(data) {
-        if (!data || typeof data !== 'object') return data;
-        function cleanNode(obj) {
-            if (!obj || typeof obj !== 'object') return;
-            if (Array.isArray(obj)) {
-                for (let i = obj.length - 1; i >= 0; i--) {
-                    const item = obj[i];
-                    if (item) {
-                        const keys = Object.keys(item);
-                        let remove = false;
-                        for (let k = 0; k < keys.length; k++) {
-                            const key = keys[k];
-                            if (key.indexOf('adPlacement') !== -1 ||
-                                key.indexOf('promotedSparkles') !== -1 ||
-                                key.indexOf('statementBanner') !== -1 ||
-                                key.indexOf('premiumUpsell') !== -1 ||
-                                key.indexOf('mealbarPromo') !== -1) {
-                                remove = true;
-                                break;
-                            }
-                        }
-                        const str = JSON.stringify(item);
-                        if (str.indexOf('SPunlimited') !== -1 || str.indexOf('Get YouTube Premium') !== -1 || str.indexOf('ypc_get_offline_upsell') !== -1) {
-                            remove = true;
-                        }
-                        if (remove) {
-                            obj.splice(i, 1);
-                        } else {
-                            cleanNode(item);
-                        }
-                    }
-                }
-            } else {
-                delete obj.adPlacements;
-                delete obj.playerAds;
-                delete obj.adSlots;
-                delete obj.adBreakParams;
-                delete obj.statementBannerRenderer;
-                delete obj.premiumUpsellRenderer;
-                delete obj.mealbarPromoRenderer;
-                const keys = Object.keys(obj);
-                for (let i = 0; i < keys.length; i++) {
-                    const key = keys[i];
-                    if (typeof obj[key] === 'object' && obj[key] !== null) {
-                        cleanNode(obj[key]);
-                    }
-                }
-            }
-        }
-        cleanNode(data);
-        return data;
-    }
-
-    // --- 3. SponsorBlock Integration ---
-    let currentVideoId = null;
-    let sponsorSegments = [];
-    const segmentCache = new Map();
-
-    function checkSponsorBlock(videoId) {
-        if (!videoId || videoId === currentVideoId) return;
-        currentVideoId = videoId;
-        if (segmentCache.has(videoId)) {
-            sponsorSegments = segmentCache.get(videoId);
-            return;
-        }
-        const fetchFunc = originalFetch || window.fetch;
-        if (typeof fetchFunc === 'function') {
-            fetchFunc(`https://sponsor.ajay.app/api/skipSegments?videoID=${videoId}&categories=["sponsor","interaction","intro","outro","selfpromo","preview","music_offtopic","filler"]`)
-                .then(res => res.ok ? res.json() : [])
-                .then(data => {
-                    if (Array.isArray(data)) {
-                        sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1] }));
-                        segmentCache.set(videoId, sponsorSegments);
-                        if (segmentCache.size > 100) segmentCache.delete(segmentCache.keys().next().value);
-                    } else {
-                        sponsorSegments = [];
-                    }
-                })
-                .catch(() => { sponsorSegments = []; });
-        }
-    }
-
-    // --- 4. Fetch Interception ---
     const originalFetch = window.fetch;
     if (typeof originalFetch === 'function') {
         window.fetch = async function(...args) {
             const url = typeof args[0] === 'string' ? args[0] : (args[0] && args[0].url ? args[0].url : '');
-            
-            // Block ad URLs immediately
             if (isAdUrl(url)) {
                 return new Response(JSON.stringify({}), {
                     status: 200,
@@ -140,8 +220,6 @@
                     headers: { 'Content-Type': 'application/json' }
                 });
             }
-
-            // Intercept player & Shorts
             if (url.indexOf('/youtubei/v1/player') !== -1 || url.indexOf('/youtubei/v1/reel/') !== -1) {
                 try {
                     if (args[1] && args[1].body) {
@@ -150,45 +228,12 @@
                             if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
                         } catch(e) {}
                     }
-                    const response = await originalFetch.apply(this, args);
-                    const clone = response.clone();
-                    const data = await clone.json();
-                    if (data && data.videoDetails && data.videoDetails.videoId) {
-                        checkSponsorBlock(data.videoDetails.videoId);
-                    }
-                    sanitizePlayerResponse(data);
-                    return new Response(JSON.stringify(data), {
-                        status: response.status,
-                        statusText: response.statusText,
-                        headers: response.headers
-                    });
-                } catch (e) {
-                    return originalFetch.apply(this, args);
-                }
+                } catch(e) {}
             }
-
-            // Intercept browse / guide / next / account
-            if (url.indexOf('/youtubei/v1/browse') !== -1 || url.indexOf('/youtubei/v1/guide') !== -1 || url.indexOf('/youtubei/v1/next') !== -1 || url.indexOf('/youtubei/v1/account/') !== -1) {
-                try {
-                    const response = await originalFetch.apply(this, args);
-                    const clone = response.clone();
-                    const data = await clone.json();
-                    sanitizeBrowseResponse(data);
-                    return new Response(JSON.stringify(data), {
-                        status: response.status,
-                        statusText: response.statusText,
-                        headers: response.headers
-                    });
-                } catch (e) {
-                    return originalFetch.apply(this, args);
-                }
-            }
-
             return originalFetch.apply(this, args);
         };
     }
 
-    // --- 5. XMLHttpRequest Interception ---
     if (typeof XMLHttpRequest !== 'undefined') {
         const origOpen = XMLHttpRequest.prototype.open;
         const origSend = XMLHttpRequest.prototype.send;
@@ -202,7 +247,6 @@
         XMLHttpRequest.prototype.send = function(body) {
             const url = this.__url || '';
             if (isAdUrl(url)) {
-                // Mock instant 200 OK
                 setTimeout(() => {
                     try {
                         Object.defineProperty(this, 'readyState', { value: 4, configurable: true });
@@ -218,41 +262,11 @@
                 return;
             }
 
-            const isPlayer = url.indexOf('/youtubei/v1/player') !== -1 || url.indexOf('/youtubei/v1/reel/') !== -1;
-            const isBrowse = url.indexOf('/youtubei/v1/browse') !== -1 || url.indexOf('/youtubei/v1/guide') !== -1 || url.indexOf('/youtubei/v1/next') !== -1 || url.indexOf('/youtubei/v1/account/') !== -1;
-
-            if (isPlayer && body) {
+            if (url.indexOf('/youtubei/v1/player') !== -1 && body) {
                 try {
                     const reqData = typeof body === 'string' ? JSON.parse(body) : body;
                     if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
                 } catch(e) {}
-            }
-
-            if (isPlayer || isBrowse) {
-                const self = this;
-                const sanitizeXHR = function() {
-                    try {
-                        if (self.readyState === 4 && (self.status === 200 || self.status === 0) && self.responseText) {
-                            let data = JSON.parse(self.responseText);
-                            if (isPlayer) {
-                                if (data && data.videoDetails && data.videoDetails.videoId) {
-                                    checkSponsorBlock(data.videoDetails.videoId);
-                                }
-                                data = sanitizePlayerResponse(data);
-                            } else if (isBrowse) {
-                                data = sanitizeBrowseResponse(data);
-                            }
-                            const sanitizedStr = JSON.stringify(data);
-                            Object.defineProperty(self, 'responseText', { value: sanitizedStr, configurable: true });
-                            Object.defineProperty(self, 'response', { value: (self.responseType === 'json' ? data : sanitizedStr), configurable: true });
-                        }
-                    } catch(e) {}
-                };
-
-                if (typeof this.addEventListener === 'function') {
-                    this.addEventListener('readystatechange', sanitizeXHR, true);
-                    this.addEventListener('load', sanitizeXHR, true);
-                }
             }
 
             return origSend.call(this, body);
@@ -282,14 +296,13 @@
         try { trackedVideo.addEventListener('timeupdate', onTimeUpdate, { passive: true }); } catch(e) {}
     }
 
-    // High frequency ad skipper & watchdog
+    // Ad Watchdog & Fast-Forward Fallback
     setInterval(() => {
         if (typeof document === 'undefined') return;
         const video = document.querySelector('video');
         if (video) {
             hookVideoElement(video);
             
-            // Check for ad containers or ad interrupting state
             const adShowing = document.querySelector('.ad-interrupting, .ad-showing, .ytp-ad-module, .ytp-ad-player-overlay, ytlr-ad-renderer, .ytp-ad-self-ad-badge, .ytp-ad-text');
             if (adShowing) {
                 if (video.duration && !isNaN(video.duration) && video.currentTime < video.duration) {
@@ -298,14 +311,12 @@
                 video.playbackRate = 16.0;
             }
             
-            // Click skip buttons
             const skipButton = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, button.ytp-ad-skip-button');
             if (skipButton && typeof skipButton.click === 'function') {
                 skipButton.click();
             }
         }
 
-        // Hash video ID check
         const hash = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '';
         if (hash && hash.indexOf('v=') !== -1) {
             const vMatch = hash.match(/v=([a-zA-Z0-9_-]{11})/);
