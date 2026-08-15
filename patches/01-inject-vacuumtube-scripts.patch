@@ -1,5 +1,5 @@
 diff --git a/cobalt/browser/web_module.cc b/cobalt/browser/web_module.cc
-index 9edc8e199..f2a44cfa2 100644
+index 9edc8e199..ba16a5bec 100644
 --- a/cobalt/browser/web_module.cc
 +++ b/cobalt/browser/web_module.cc
 @@ -20,6 +20,10 @@
@@ -13,7 +13,7 @@ index 9edc8e199..f2a44cfa2 100644
  #include "base/command_line.h"
  #include "base/logging.h"
  #include "base/memory/weak_ptr.h"
-@@ -345,6 +349,1225 @@ class WebModule::Impl {
+@@ -345,6 +349,1224 @@ class WebModule::Impl {
              window_->performance(), load_timing_info);
        }
      }
@@ -1235,7 +1235,6 @@ index 9edc8e199..f2a44cfa2 100644
 +      ExecuteJavascript(adblock_script, base::SourceLocation("vacuumtube_adblock.js", 1, 1), NULL, &succeeded);
 +      LOG(INFO) << "[Fast-Tube] AdBlock & Settings script injection result: " << succeeded;
 +    }
-+  }
+   }
  
    // Inject the DOM event object into the window or the element.
-   void InjectInputEvent(scoped_refptr<dom::Element> element,
