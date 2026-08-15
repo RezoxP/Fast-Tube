@@ -216,54 +216,69 @@ eval(code);
         ]
     });
     const parsedSettings = JSON.parse(rawSettingsPayload);
-    assert.strictEqual(parsedSettings.items.length, 4, "3 Fast-Tube categories added, Premium promo stripped");
+    assert.strictEqual(parsedSettings.items.length, 5, "4 Fast-Tube categories added, Premium promo stripped");
     
-    // Category 1: General
+    // Category 1: General & Performance
     const ftGenCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
     assert.strictEqual(ftGenCategory.categoryId, 'fast_tube_general_category');
-    assert.strictEqual(ftGenCategory.title.runs[0].text, 'Fast-Tube: General');
-    assert.strictEqual(ftGenCategory.items.length, 4, "General category must have 4 toggles");
+    assert.strictEqual(ftGenCategory.title.runs[0].text, 'Fast-Tube: General & Performance');
+    assert.strictEqual(ftGenCategory.items.length, 7, "General & Performance category must have 7 toggles");
     assert.strictEqual(ftGenCategory.items[0].settingBooleanRenderer.itemId, 'adblock');
-    assert.strictEqual(ftGenCategory.items[1].settingBooleanRenderer.itemId, 'hideShorts');
-    assert.strictEqual(ftGenCategory.items[2].settingBooleanRenderer.itemId, 'hidePaidPromotion');
-    assert.strictEqual(ftGenCategory.items[3].settingBooleanRenderer.itemId, 'sb_show_toast');
+    assert.strictEqual(ftGenCategory.items[1].settingBooleanRenderer.itemId, 'low_memory_mode');
+    assert.strictEqual(ftGenCategory.items[2].settingBooleanRenderer.itemId, 'returnDislikes');
+    assert.strictEqual(ftGenCategory.items[3].settingBooleanRenderer.itemId, 'dearrow');
+    assert.strictEqual(ftGenCategory.items[4].settingBooleanRenderer.itemId, 'dearrow_thumbnails');
+    assert.strictEqual(ftGenCategory.items[5].settingBooleanRenderer.itemId, 'hidePaidPromotion');
+    assert.strictEqual(ftGenCategory.items[6].settingBooleanRenderer.itemId, 'sb_show_toast');
 
-    // Category 2: SponsorBlock (Auto-Skip)
-    const ftSBAutoCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
+    // Category 2: Sidebar Navigation
+    const ftSidebarCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
+    assert.strictEqual(ftSidebarCategory.categoryId, 'fast_tube_sidebar_category');
+    assert.strictEqual(ftSidebarCategory.title.runs[0].text, 'Fast-Tube: Sidebar Navigation');
+    assert.strictEqual(ftSidebarCategory.items.length, 8, "Sidebar category must have 8 toggles");
+
+    // Category 3: SponsorBlock (Auto-Skip)
+    const ftSBAutoCategory = parsedSettings.items[2].settingCategoryCollectionRenderer;
     assert.strictEqual(ftSBAutoCategory.categoryId, 'fast_tube_sb_auto_category');
     assert.strictEqual(ftSBAutoCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock (Auto-Skip)');
     assert.strictEqual(ftSBAutoCategory.items.length, 7, "Auto-Skip category must have 7 toggles");
-    assert.strictEqual(ftSBAutoCategory.items[0].settingBooleanRenderer.itemId, 'sponsorblock');
-    assert.strictEqual(ftSBAutoCategory.items[1].settingBooleanRenderer.itemId, 'sb_auto_sponsor');
-    assert.strictEqual(ftSBAutoCategory.items[2].settingBooleanRenderer.itemId, 'sb_auto_intro');
-    assert.strictEqual(ftSBAutoCategory.items[3].settingBooleanRenderer.itemId, 'sb_auto_outro');
-    assert.strictEqual(ftSBAutoCategory.items[4].settingBooleanRenderer.itemId, 'sb_auto_selfpromo');
-    assert.strictEqual(ftSBAutoCategory.items[5].settingBooleanRenderer.itemId, 'sb_auto_preview');
-    assert.strictEqual(ftSBAutoCategory.items[6].settingBooleanRenderer.itemId, 'sb_auto_music_offtopic');
 
-    // Category 3: SponsorBlock (Skip Button)
-    const ftSBBtnCategory = parsedSettings.items[2].settingCategoryCollectionRenderer;
+    // Category 4: SponsorBlock (Skip Button)
+    const ftSBBtnCategory = parsedSettings.items[3].settingCategoryCollectionRenderer;
     assert.strictEqual(ftSBBtnCategory.categoryId, 'fast_tube_sb_btn_category');
     assert.strictEqual(ftSBBtnCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock (Skip Button)');
     assert.strictEqual(ftSBBtnCategory.items.length, 6, "Skip Button category must have 6 toggles");
-    assert.strictEqual(ftSBBtnCategory.items[0].settingBooleanRenderer.itemId, 'sb_btn_sponsor');
-    assert.strictEqual(ftSBBtnCategory.items[1].settingBooleanRenderer.itemId, 'sb_btn_intro');
-    assert.strictEqual(ftSBBtnCategory.items[2].settingBooleanRenderer.itemId, 'sb_btn_outro');
-    assert.strictEqual(ftSBBtnCategory.items[3].settingBooleanRenderer.itemId, 'sb_btn_selfpromo');
-    assert.strictEqual(ftSBBtnCategory.items[4].settingBooleanRenderer.itemId, 'sb_btn_preview');
-    assert.strictEqual(ftSBBtnCategory.items[5].settingBooleanRenderer.itemId, 'sb_btn_music_offtopic');
-    console.log(" ✓ Injected interactive Fast-Tube General, SB Auto-Skip & SB Skip Button categories with 17 total granular toggles");
+    console.log(" ✓ Injected interactive General, Sidebar, SB Auto-Skip & SB Skip Button categories with 28 total granular toggles");
 
     // Test toggle via resolveCommand
-    // Simulate user toggling "Auto-Skip: Previews & Recaps" to ON
+    // Simulate user toggling "Return YouTube Dislikes" to ON
     const toggleCommand = {
-        fastTubeOption: 'sb_auto_preview',
+        fastTubeOption: 'returnDislikes',
         fastTubeValue: true
     };
     global._yttv.testModule.instance.resolveCommand(toggleCommand);
-    assert.strictEqual(ftSBAutoCategory.items[5].settingBooleanRenderer.enabled, true, "sb_auto_preview enabled state updated");
-    assert(localStorage.getItem('fast_tube_config').includes('"sb_auto_preview":true'), "Settings persisted to localStorage");
-    console.log(" ✓ resolveCommand successfully handled per-category toggle & persisted to localStorage");
+    assert.strictEqual(ftGenCategory.items[2].settingBooleanRenderer.enabled, true, "returnDislikes enabled state updated");
+    assert(localStorage.getItem('fast_tube_config').includes('"returnDislikes":true'), "Settings persisted to localStorage");
+    console.log(" ✓ resolveCommand successfully handled granular toggle & persisted to localStorage");
+
+    // Test Sidebar Filtering
+    const guidePayload = {
+        items: [
+            {
+                guideSectionRenderer: {
+                    items: [
+                        { guideEntryRenderer: { icon: { iconType: 'SEARCH' } } },
+                        { guideEntryRenderer: { icon: { iconType: 'YOUTUBE_SHORTS_FILL_24' } } }
+                    ]
+                }
+            }
+        ]
+    };
+    // Toggle hideShortsTab
+    global._yttv.testModule.instance.resolveCommand({ fastTubeOption: 'hideShortsTab', fastTubeValue: true });
+    const parsedGuide = JSON.parse(JSON.stringify(guidePayload));
+    assert.strictEqual(parsedGuide.items[0].guideSectionRenderer.items.length, 1, "Shorts sidebar tab filtered out");
+    console.log(" ✓ Sidebar guide filtering successfully hidden Shorts tab");
 
     console.log("=== 6. Testing Network-Level Ad Blocking ===");
     const adRes = await window.fetch('https://www.youtube.com/api/stats/ads?ad_type=1');

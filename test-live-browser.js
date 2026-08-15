@@ -180,7 +180,8 @@ const path = require('path');
         return {
             totalCategories: parsed.items.length,
             categoryTitles: categories,
-            hasGeneral: categories.includes("Fast-Tube: General"),
+            hasGeneral: categories.includes("Fast-Tube: General & Performance"),
+            hasSidebar: categories.includes("Fast-Tube: Sidebar Navigation"),
             hasSBAuto: categories.includes("Fast-Tube: SponsorBlock (Auto-Skip)"),
             hasSBBtn: categories.includes("Fast-Tube: SponsorBlock (Skip Button)")
         };
@@ -194,7 +195,7 @@ const path = require('path');
     console.log("=== 6. Live Test Summary ===");
     console.log(`✓ Fast-Tube successfully injected: ${isInjected}`);
     console.log(`✓ Video tiles and shelves loaded without blanking: ${homeTilesCount > 0 || appHtmlLength > 500}`);
-    console.log(`✓ Settings categories injected: ${settingsTestResult.hasGeneral && settingsTestResult.hasSBAuto && settingsTestResult.hasSBBtn}`);
+    console.log(`✓ All 4 Settings categories injected: ${settingsTestResult.hasGeneral && settingsTestResult.hasSidebar && settingsTestResult.hasSBAuto && settingsTestResult.hasSBBtn}`);
     console.log(`✓ Maximum execution efficiency: ${perfResults.avgMicrosecondsPerCall.toFixed(2)} µs per call`);
     console.log("=== Live Browser Testing Completed Successfully ===");
 })();
