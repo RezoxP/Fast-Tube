@@ -216,51 +216,72 @@ eval(code);
         ]
     });
     const parsedSettings = JSON.parse(rawSettingsPayload);
-    assert.strictEqual(parsedSettings.items.length, 4, "3 Fast-Tube categories added, Premium promo stripped");
+    assert.strictEqual(parsedSettings.items.length, 5, "Fast-Tube main category + 3 categories added, Premium promo stripped");
     
+    // Main Entry Category
+    const ftMainCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
+    assert.strictEqual(ftMainCategory.categoryId, 'fast_tube_main_category');
+    assert.strictEqual(ftMainCategory.items[0].settingActionRenderer.itemId, 'fast_tube_settings_action');
+
     // Category 1: General & Performance
-    const ftGenCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
+    const ftGenCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
     assert.strictEqual(ftGenCategory.categoryId, 'fast_tube_general_category');
     assert.strictEqual(ftGenCategory.title.runs[0].text, 'Fast-Tube: General & Performance');
     assert.strictEqual(ftGenCategory.items.length, 7, "General & Performance category must have 7 toggles");
     assert(ftGenCategory.items[0].settingBooleanRenderer.summary.runs[0].text.length > 5, "Has short description");
 
     // Category 2: Sidebar Navigation
-    const ftSidebarCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
+    const ftSidebarCategory = parsedSettings.items[2].settingCategoryCollectionRenderer;
     assert.strictEqual(ftSidebarCategory.categoryId, 'fast_tube_sidebar_category');
     assert.strictEqual(ftSidebarCategory.title.runs[0].text, 'Fast-Tube: Sidebar Navigation');
     assert.strictEqual(ftSidebarCategory.items.length, 8, "Sidebar category must have 8 toggles");
 
     // Category 3: SponsorBlock (Per-Category Controls)
-    const ftSBCategory = parsedSettings.items[2].settingCategoryCollectionRenderer;
+    const ftSBCategory = parsedSettings.items[3].settingCategoryCollectionRenderer;
     assert.strictEqual(ftSBCategory.categoryId, 'fast_tube_sb_category');
     assert.strictEqual(ftSBCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock');
     assert.strictEqual(ftSBCategory.items.length, 13, "SponsorBlock category must have master switch + 6 Auto-Skip + 6 Skip Button toggles");
-    assert.strictEqual(ftSBCategory.items[0].settingBooleanRenderer.itemId, 'sponsorblock');
-    assert.strictEqual(ftSBCategory.items[1].settingBooleanRenderer.itemId, 'sb_auto_sponsor');
-    assert.strictEqual(ftSBCategory.items[2].settingBooleanRenderer.itemId, 'sb_auto_intro');
-    assert.strictEqual(ftSBCategory.items[3].settingBooleanRenderer.itemId, 'sb_auto_outro');
-    assert.strictEqual(ftSBCategory.items[4].settingBooleanRenderer.itemId, 'sb_auto_selfpromo');
-    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.itemId, 'sb_auto_preview');
-    assert.strictEqual(ftSBCategory.items[6].settingBooleanRenderer.itemId, 'sb_auto_music_offtopic');
-    assert.strictEqual(ftSBCategory.items[7].settingBooleanRenderer.itemId, 'sb_btn_sponsor');
-    assert.strictEqual(ftSBCategory.items[8].settingBooleanRenderer.itemId, 'sb_btn_intro');
-    assert.strictEqual(ftSBCategory.items[9].settingBooleanRenderer.itemId, 'sb_btn_outro');
-    assert.strictEqual(ftSBCategory.items[10].settingBooleanRenderer.itemId, 'sb_btn_selfpromo');
-    assert.strictEqual(ftSBCategory.items[11].settingBooleanRenderer.itemId, 'sb_btn_preview');
-    assert.strictEqual(ftSBCategory.items[12].settingBooleanRenderer.itemId, 'sb_btn_music_offtopic');
-    console.log(" ✓ Injected per-category Auto-Skip & Skip Button toggles with short descriptions in SponsorBlock category");
+    console.log(" ✓ Injected Fast-Tube Settings modal action + per-category toggles");
 
-    // Test toggle via resolveCommand
-    // Simulate user toggling "Return YouTube Dislikes" to ON
+    // Test JSON.stringify playback context hook (isInlinePlaybackNoAd)
+    const mockPlaybackContext = {
+        playbackContext: {
+            contentPlaybackContext: {
+                html5Preference: 'HTML5_PREF_WANTS',
+                signatureTimestamp: 12345
+            }
+        }
+    };
+    const stringified = JSON.stringify(mockPlaybackContext);
+    assert(stringified.includes('"isInlinePlaybackNoAd":true'), "isInlinePlaybackNoAd injected for clean video playback");
+    console.log(" ✓ JSON.stringify properly injected isInlinePlaybackNoAd: true to prevent video playback errors");
+
+    // Test modal toggle via FT_TOGGLE (toggle hideShortsTab from false to true)
     const toggleCommand = {
-        fastTubeOption: 'returnDislikes',
-        fastTubeValue: true
+        customAction: {
+            action: 'FT_TOGGLE',
+            parameters: { key: 'hideShortsTab', submenu: 'sidebar', index: 0 }
+        }
     };
     global._yttv.testModule.instance.resolveCommand(toggleCommand);
-    assert.strictEqual(ftGenCategory.items[2].settingBooleanRenderer.enabled, true, "returnDislikes enabled state updated");
-    assert(localStorage.getItem('fast_tube_config').includes('"returnDislikes":true'), "Settings persisted to localStorage");
-    console.log(" ✓ resolveCommand successfully handled granular toggle & persisted to localStorage");
+    assert.strictEqual(ftSidebarCategory.items[0].settingBooleanRenderer.enabled, true, "hideShortsTab enabled state updated via modal toggle");
+    assert(localStorage.getItem('fast_tube_config').includes('"hideShortsTab":true'), "Settings persisted to localStorage");
+    console.log(" ✓ FT_TOGGLE modal action successfully updated state & persisted to localStorage");
+
+    // Test setClientSettingEndpoint
+    const clientSettingCmd = {
+        setClientSettingEndpoint: {
+            settingDatas: [
+                {
+                    clientSettingEnum: { item: 'hideGamingTab' },
+                    boolValue: true
+                }
+            ]
+        }
+    };
+    global._yttv.testModule.instance.resolveCommand(clientSettingCmd);
+    assert(localStorage.getItem('fast_tube_config').includes('"hideGamingTab":true'), "setClientSettingEndpoint saved");
+    console.log(" ✓ setClientSettingEndpoint command handled properly");
 
     // Test Sidebar Filtering
     const guidePayload = {

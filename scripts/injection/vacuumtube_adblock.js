@@ -1,12 +1,13 @@
 // Fast-Tube Injection Script
-// Per-Category SponsorBlock (Auto-Skip vs Manual Skip Button per category) + Return YouTube Dislikes + DeArrow + Low Memory Mode + Sidebar Tabs
-// Concise descriptions for every setting on YouTube TV
+// 1. Fixes video playback errors via isInlinePlaybackNoAd and clean JSON processing
+// 2. Interactive Fast-Tube Leanback Settings Modal + Direct Settings Toggling with full D-Pad support
+// 3. Return YouTube Dislikes (RYD) + DeArrow + Low Memory Mode + Sidebar Tabs Filtering + Per-Category SponsorBlock
 
 (function() {
     if (window.__fast_tube_injected__) return;
     window.__fast_tube_injected__ = true;
 
-    // --- 1. Config Management & Granular Per-Category Defaults ---
+    // --- 1. Config Management & Defaults ---
     const DEFAULT_CONFIG = {
         // General & Performance
         adblock: true,
@@ -27,18 +28,14 @@
         hideLiveTab: false,
         hideSportsTab: false,
 
-        // SponsorBlock Master Switch
+        // SponsorBlock
         sponsorblock: true,
-
-        // Per-Category Auto-Skip (Instantly jumps past segment)
         sb_auto_sponsor: true,
         sb_auto_intro: true,
         sb_auto_outro: true,
         sb_auto_selfpromo: true,
         sb_auto_preview: false,
         sb_auto_music_offtopic: false,
-
-        // Per-Category Manual Skip Button (Shows on-screen prompt to press OK)
         sb_btn_sponsor: true,
         sb_btn_intro: true,
         sb_btn_outro: true,
@@ -59,6 +56,25 @@
         try {
             localStorage.setItem('fast_tube_config', JSON.stringify(ftConfig));
         } catch(e) {}
+    }
+
+    function toggleOption(key) {
+        if (ftConfig[key] !== undefined) {
+            ftConfig[key] = !ftConfig[key];
+            saveConfig();
+            if (key === 'low_memory_mode') {
+                applyLowMemoryMode();
+                if (ftConfig.low_memory_mode) clearAllCaches();
+            }
+            if (key.startsWith('sb_') || key === 'sponsorblock') {
+                segmentCache.clear();
+                currentVideoId = null;
+                removeSkipButton();
+            }
+            updateDirectSettingsCategories();
+            return ftConfig[key];
+        }
+        return false;
     }
 
     // --- 2. Low Memory Mode Optimizations ---
@@ -265,18 +281,251 @@
         return 'none';
     }
 
-    // --- 7. Interactive Leanback Settings UI ---
+    // --- 7. YouTube TV Leanback Settings: Native Modal UI & Command Execution ---
+    function callResolveCommand(cmd) {
+        if (typeof window._yttv === 'object' && window._yttv) {
+            for (let key in window._yttv) {
+                if (window._yttv[key]?.instance?.resolveCommand) {
+                    try {
+                        window._yttv[key].instance.resolveCommand(cmd);
+                        return true;
+                    } catch(e) {}
+                }
+            }
+        }
+        return false;
+    }
+
+    function createModalButtonItem(title, subtitle, icon, secondaryIcon, commands) {
+        const btn = {
+            compactLinkRenderer: {
+                title: { simpleText: title },
+                serviceEndpoint: {
+                    commandExecutorCommand: {
+                        commands: commands
+                    }
+                }
+            }
+        };
+        if (subtitle) {
+            btn.compactLinkRenderer.subtitle = { simpleText: subtitle };
+        }
+        if (icon) {
+            btn.compactLinkRenderer.icon = { iconType: icon };
+        }
+        if (secondaryIcon) {
+            btn.compactLinkRenderer.secondaryIcon = { iconType: secondaryIcon };
+        }
+        return btn;
+    }
+
+    function showLeanbackModal(headerTitle, headerSubtitle, items, uniqueId, update, selectedIndex) {
+        const modalCmd = {
+            openPopupAction: {
+                popupType: 'MODAL',
+                popup: {
+                    overlaySectionRenderer: {
+                        overlay: {
+                            overlayTwoPanelRenderer: {
+                                actionPanel: {
+                                    overlayPanelRenderer: {
+                                        header: {
+                                            overlayPanelHeaderRenderer: {
+                                                title: { simpleText: headerTitle },
+                                                subtitle: { simpleText: headerSubtitle || '' }
+                                            }
+                                        },
+                                        content: {
+                                            overlayPanelItemListRenderer: {
+                                                items: items,
+                                                selectedIndex: selectedIndex || 0
+                                            }
+                                        }
+                                    }
+                                },
+                                backButton: {
+                                    buttonRenderer: {
+                                        accessibilityData: {
+                                            accessibilityData: { label: 'Back' }
+                                        },
+                                        command: {
+                                            signalAction: { signal: 'POPUP_BACK' }
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        dismissalCommand: {
+                            signalAction: { signal: 'POPUP_BACK' }
+                        }
+                    }
+                },
+                uniqueId: uniqueId || 'fast-tube-settings-modal'
+            }
+        };
+
+        if (update) {
+            modalCmd.openPopupAction.shouldMatchUniqueId = true;
+            modalCmd.openPopupAction.updateAction = true;
+        }
+
+        callResolveCommand(modalCmd);
+    }
+
+    // Modal Submenus Definition
+    function openFastTubeSubmenu(submenuName, update, selectedIndex) {
+        let title = "Fast-Tube Settings";
+        let subtitle = "";
+        let items = [];
+
+        if (submenuName === 'general') {
+            title = "General & Performance";
+            subtitle = "Ad-block, memory optimization, dislikes & DeArrow";
+            const toggles = [
+                { key: 'adblock', title: 'Ad-Block', sub: 'Block all video ads, sponsored feed cards, and banners', icon: 'DOLLAR_SIGN' },
+                { key: 'low_memory_mode', title: 'Low Memory Mode', sub: 'Optimize RAM usage and aggressively free video caches', icon: 'SETTINGS' },
+                { key: 'returnDislikes', title: 'Return YouTube Dislikes', sub: 'Fetch and display public dislike counts on video player', icon: 'DISLIKE' },
+                { key: 'dearrow', title: 'DeArrow Clean Titles', sub: 'Replace clickbait titles with community-submitted titles', icon: 'VISIBILITY_OFF' },
+                { key: 'dearrow_thumbnails', title: 'DeArrow Clean Thumbnails', sub: 'Replace misleading thumbnails with clean video stills', icon: 'TV' },
+                { key: 'hidePaidPromotion', title: 'Hide Paid Promo Badges', sub: 'Remove "Includes paid promotion" overlays from video player', icon: 'MONEY_HAND' },
+                { key: 'sb_show_toast', title: 'Show Toast Notifications', sub: 'Display on-screen banner popup when skipping a segment', icon: 'FEED' }
+            ];
+            items = toggles.map((t, idx) => {
+                const isEnabled = !!ftConfig[t.key];
+                return createModalButtonItem(
+                    t.title,
+                    t.sub,
+                    t.icon,
+                    isEnabled ? 'CHECK_BOX' : 'CHECK_BOX_OUTLINE_BLANK',
+                    [{ customAction: { action: 'FT_TOGGLE', parameters: { key: t.key, submenu: 'general', index: idx } } }]
+                );
+            });
+        } else if (submenuName === 'sidebar') {
+            title = "Sidebar Navigation";
+            subtitle = "Choose which tabs to display or hide on the sidebar";
+            const toggles = [
+                { key: 'hideShortsTab', title: 'Hide Shorts Tab', sub: 'Hide Shorts button from navigation sidebar', icon: 'YOUTUBE_SHORTS_FILL_24' },
+                { key: 'hideGamingTab', title: 'Hide Gaming Tab', sub: 'Hide Gaming section from navigation sidebar', icon: 'GAMING' },
+                { key: 'hideMusicTab', title: 'Hide Music Tab', sub: 'Hide YouTube Music from navigation sidebar', icon: 'YOUTUBE_MUSIC' },
+                { key: 'hideNewsTab', title: 'Hide News Tab', sub: 'Hide News section from navigation sidebar', icon: 'NEWS' },
+                { key: 'hidePodcastsTab', title: 'Hide Podcasts Tab', sub: 'Hide Podcasts section from navigation sidebar', icon: 'BROADCAST' },
+                { key: 'hideMoviesTab', title: 'Hide Movies & TV Tab', sub: 'Hide Movies & TV from navigation sidebar', icon: 'CLAPPERBOARD' },
+                { key: 'hideLiveTab', title: 'Hide Live Tab', sub: 'Hide Live Streams section from navigation sidebar', icon: 'LIVE' },
+                { key: 'hideSportsTab', title: 'Hide Sports Tab', sub: 'Hide Sports section from navigation sidebar', icon: 'TROPHY' }
+            ];
+            items = toggles.map((t, idx) => {
+                const isEnabled = !!ftConfig[t.key];
+                return createModalButtonItem(
+                    t.title,
+                    t.sub,
+                    t.icon,
+                    isEnabled ? 'CHECK_BOX' : 'CHECK_BOX_OUTLINE_BLANK',
+                    [{ customAction: { action: 'FT_TOGGLE', parameters: { key: t.key, submenu: 'sidebar', index: idx } } }]
+                );
+            });
+        } else if (submenuName === 'sponsorblock') {
+            title = "SponsorBlock Settings";
+            subtitle = "Configure automatic skipping and on-screen skip buttons";
+            const toggles = [
+                { key: 'sponsorblock', title: 'Enable SponsorBlock', sub: 'Master switch to enable SponsorBlock segment skipping', icon: 'MONEY_HAND' },
+                { key: 'sb_auto_sponsor', title: 'Auto-Skip: Sponsors', sub: 'Automatically jump past paid sponsors and endorsements', icon: 'PLAY_CIRCLE' },
+                { key: 'sb_auto_intro', title: 'Auto-Skip: Intros', sub: 'Automatically jump past intro animations and pause breaks', icon: 'PLAY_CIRCLE' },
+                { key: 'sb_auto_outro', title: 'Auto-Skip: Outros', sub: 'Automatically jump past end credits and subscribe screens', icon: 'PLAY_CIRCLE' },
+                { key: 'sb_auto_selfpromo', title: 'Auto-Skip: Self-Promotion', sub: 'Automatically jump past merch plugs and channel reminders', icon: 'PLAY_CIRCLE' },
+                { key: 'sb_auto_preview', title: 'Auto-Skip: Previews', sub: 'Automatically jump past episode recaps and teaser clips', icon: 'PLAY_CIRCLE' },
+                { key: 'sb_auto_music_offtopic', title: 'Auto-Skip: Non-Music', sub: 'Automatically jump past dialogue breaks in music videos', icon: 'PLAY_CIRCLE' },
+                { key: 'sb_btn_sponsor', title: 'Skip Button: Sponsors', sub: 'Show on-screen button to skip sponsors manually with OK', icon: 'SKIP_NEXT' },
+                { key: 'sb_btn_intro', title: 'Skip Button: Intros', sub: 'Show on-screen button to skip intros manually with OK', icon: 'SKIP_NEXT' },
+                { key: 'sb_btn_outro', title: 'Skip Button: Outros', sub: 'Show on-screen button to skip outros manually with OK', icon: 'SKIP_NEXT' },
+                { key: 'sb_btn_selfpromo', title: 'Skip Button: Self-Promotion', sub: 'Show on-screen button to skip self-promotion manually with OK', icon: 'SKIP_NEXT' },
+                { key: 'sb_btn_preview', title: 'Skip Button: Previews', sub: 'Show on-screen button to skip previews manually with OK', icon: 'SKIP_NEXT' },
+                { key: 'sb_btn_music_offtopic', title: 'Skip Button: Non-Music', sub: 'Show on-screen button to skip non-music manually with OK', icon: 'SKIP_NEXT' }
+            ];
+            items = toggles.map((t, idx) => {
+                const isEnabled = !!ftConfig[t.key];
+                return createModalButtonItem(
+                    t.title,
+                    t.sub,
+                    t.icon,
+                    isEnabled ? 'CHECK_BOX' : 'CHECK_BOX_OUTLINE_BLANK',
+                    [{ customAction: { action: 'FT_TOGGLE', parameters: { key: t.key, submenu: 'sponsorblock', index: idx } } }]
+                );
+            });
+        } else {
+            // Main settings modal menu
+            title = "Fast-Tube Settings";
+            subtitle = "Customizable Ad-Block, SponsorBlock, RYD & DeArrow";
+            items = [
+                createModalButtonItem(
+                    "General & Performance",
+                    "Ad-Block, memory optimization, dislikes & DeArrow",
+                    "SETTINGS",
+                    "CHEVRON_RIGHT",
+                    [{ customAction: { action: 'FT_SUBMENU_SHOW', parameters: 'general' } }]
+                ),
+                createModalButtonItem(
+                    "Sidebar Navigation",
+                    "Customize and hide navigation sidebar tabs",
+                    "MENU",
+                    "CHEVRON_RIGHT",
+                    [{ customAction: { action: 'FT_SUBMENU_SHOW', parameters: 'sidebar' } }]
+                ),
+                createModalButtonItem(
+                    "SponsorBlock",
+                    "Configure auto-skip & skip button per category",
+                    "MONEY_HAND",
+                    "CHEVRON_RIGHT",
+                    [{ customAction: { action: 'FT_SUBMENU_SHOW', parameters: 'sponsorblock' } }]
+                )
+            ];
+        }
+
+        showLeanbackModal(title, subtitle, items, 'fast-tube-' + submenuName, update, selectedIndex);
+    }
+
+    function openFastTubeSettingsModal() {
+        openFastTubeSubmenu('main', false, 0);
+    }
+
+    // Direct Setting Boolean Renderer
     function createSettingBooleanRenderer(title, summary, configKey, enabled) {
         return {
             settingBooleanRenderer: {
-                itemId: configKey,
+                itemId: 'VOICE_AND_AUDIO_ACTIVITY',
                 enabled: !!enabled,
                 title: { runs: [{ text: title }] },
                 summary: { runs: [{ text: summary }] },
-                enableServiceEndpoint: { fastTubeOption: configKey, fastTubeValue: true },
-                disableServiceEndpoint: { fastTubeOption: configKey, fastTubeValue: false }
+                enableServiceEndpoint: {
+                    setClientSettingEndpoint: {
+                        settingDatas: [{ clientSettingEnum: { item: configKey }, boolValue: true }]
+                    },
+                    fastTubeOption: configKey,
+                    fastTubeValue: true
+                },
+                disableServiceEndpoint: {
+                    setClientSettingEndpoint: {
+                        settingDatas: [{ clientSettingEnum: { item: configKey }, boolValue: false }]
+                    },
+                    fastTubeOption: configKey,
+                    fastTubeValue: false
+                }
             }
         };
+    }
+
+    function updateDirectSettingsCategories() {
+        if (window.__ftSettingsCategories) {
+            for (let cat of window.__ftSettingsCategories) {
+                if (cat && cat.items) {
+                    for (let it of cat.items) {
+                        const opt = it?.settingBooleanRenderer?.enableServiceEndpoint?.fastTubeOption;
+                        if (opt && ftConfig[opt] !== undefined) {
+                            it.settingBooleanRenderer.enabled = !!ftConfig[opt];
+                        }
+                    }
+                }
+            }
+        }
     }
 
     function PatchSettings(settingsObject) {
@@ -284,10 +533,38 @@
         
         for (let i = 0; i < settingsObject.items.length; i++) {
             const cat = settingsObject.items[i]?.settingCategoryCollectionRenderer;
-            if (cat && (cat.categoryId === 'fast_tube_general_category' || cat.categoryId === 'fast_tube_sidebar_category' || cat.categoryId === 'fast_tube_sb_category')) {
+            if (cat && (cat.categoryId === 'fast_tube_main_category' || cat.categoryId === 'fast_tube_general_category')) {
                 return;
             }
         }
+
+        // Fast-Tube Main Action Entry Point
+        const ftMainActionEntry = {
+            settingActionRenderer: {
+                title: { runs: [{ text: "Fast-Tube Settings" }] },
+                summary: { runs: [{ text: "Configure Ad-Block, SponsorBlock, Dislikes, DeArrow & Tabs" }] },
+                actionLabel: { runs: [{ text: "Fast-Tube Settings" }] },
+                itemId: "fast_tube_settings_action",
+                serviceEndpoint: {
+                    customAction: {
+                        action: 'FT_SETTINGS_SHOW'
+                    }
+                },
+                thumbnail: {
+                    thumbnails: [{ url: "https://www.gstatic.com/ytlr/img/parent_code.png" }]
+                }
+            }
+        };
+
+        const ftMainCategory = {
+            settingCategoryCollectionRenderer: {
+                categoryId: "fast_tube_main_category",
+                title: { runs: [{ text: "Fast-Tube" }] },
+                items: [ftMainActionEntry],
+                focused: false,
+                trackingParams: "null"
+            }
+        };
 
         const ftGeneralCategory = {
             settingCategoryCollectionRenderer: {
@@ -312,14 +589,14 @@
                 categoryId: "fast_tube_sidebar_category",
                 title: { runs: [{ text: "Fast-Tube: Sidebar Navigation" }] },
                 items: [
-                    createSettingBooleanRenderer("Hide Shorts Tab", "Hide Shorts button from the left navigation sidebar", "hideShortsTab", ftConfig.hideShortsTab),
-                    createSettingBooleanRenderer("Hide Gaming Tab", "Hide Gaming section from the left navigation sidebar", "hideGamingTab", ftConfig.hideGamingTab),
-                    createSettingBooleanRenderer("Hide Music Tab", "Hide YouTube Music from the left navigation sidebar", "hideMusicTab", ftConfig.hideMusicTab),
-                    createSettingBooleanRenderer("Hide News Tab", "Hide News section from the left navigation sidebar", "hideNewsTab", ftConfig.hideNewsTab),
-                    createSettingBooleanRenderer("Hide Podcasts Tab", "Hide Podcasts section from the left navigation sidebar", "hidePodcastsTab", ftConfig.hidePodcastsTab),
-                    createSettingBooleanRenderer("Hide Movies & TV Tab", "Hide Movies & TV from the left navigation sidebar", "hideMoviesTab", ftConfig.hideMoviesTab),
-                    createSettingBooleanRenderer("Hide Live Tab", "Hide Live Streams section from the left navigation sidebar", "hideLiveTab", ftConfig.hideLiveTab),
-                    createSettingBooleanRenderer("Hide Sports Tab", "Hide Sports section from the left navigation sidebar", "hideSportsTab", ftConfig.hideSportsTab)
+                    createSettingBooleanRenderer("Hide Shorts Tab", "Hide Shorts button from navigation sidebar", "hideShortsTab", ftConfig.hideShortsTab),
+                    createSettingBooleanRenderer("Hide Gaming Tab", "Hide Gaming section from navigation sidebar", "hideGamingTab", ftConfig.hideGamingTab),
+                    createSettingBooleanRenderer("Hide Music Tab", "Hide YouTube Music from navigation sidebar", "hideMusicTab", ftConfig.hideMusicTab),
+                    createSettingBooleanRenderer("Hide News Tab", "Hide News section from navigation sidebar", "hideNewsTab", ftConfig.hideNewsTab),
+                    createSettingBooleanRenderer("Hide Podcasts Tab", "Hide Podcasts section from navigation sidebar", "hidePodcastsTab", ftConfig.hidePodcastsTab),
+                    createSettingBooleanRenderer("Hide Movies & TV Tab", "Hide Movies & TV from navigation sidebar", "hideMoviesTab", ftConfig.hideMoviesTab),
+                    createSettingBooleanRenderer("Hide Live Tab", "Hide Live Streams section from navigation sidebar", "hideLiveTab", ftConfig.hideLiveTab),
+                    createSettingBooleanRenderer("Hide Sports Tab", "Hide Sports section from navigation sidebar", "hideSportsTab", ftConfig.hideSportsTab)
                 ],
                 focused: false,
                 trackingParams: "null"
@@ -369,6 +646,26 @@
         settingsObject.items.unshift(ftSBCategory);
         settingsObject.items.unshift(ftSidebarCategory);
         settingsObject.items.unshift(ftGeneralCategory);
+        settingsObject.items.unshift(ftMainCategory);
+    }
+
+    function handleCustomAction(action, params) {
+        if (action === 'FT_SETTINGS_SHOW' || action === 'TT_SETTINGS_SHOW') {
+            openFastTubeSettingsModal();
+            return true;
+        }
+        if (action === 'FT_SUBMENU_SHOW') {
+            openFastTubeSubmenu(params, false, 0);
+            return true;
+        }
+        if (action === 'FT_TOGGLE') {
+            if (params && params.key) {
+                toggleOption(params.key);
+                openFastTubeSubmenu(params.submenu, true, params.index || 0);
+            }
+            return true;
+        }
+        return false;
     }
 
     function hookResolveCommand() {
@@ -378,43 +675,74 @@
             if (inst && typeof inst.resolveCommand === 'function' && !inst.__ft_rc_hooked) {
                 inst.__ft_rc_hooked = true;
                 const origRC = inst.resolveCommand;
-                inst.resolveCommand = function(command) {
-                    if (command && command.fastTubeOption !== undefined) {
-                        const opt = command.fastTubeOption;
-                        const val = !!command.fastTubeValue;
+                inst.resolveCommand = function(cmd, _) {
+                    if (!cmd) return origRC.apply(this, arguments);
+
+                    // 1. Handle fastTubeOption directly
+                    if (cmd.fastTubeOption !== undefined) {
+                        const opt = cmd.fastTubeOption;
+                        const val = !!cmd.fastTubeValue;
                         ftConfig[opt] = val;
                         saveConfig();
-
                         if (opt === 'low_memory_mode') {
                             applyLowMemoryMode();
                             if (val) clearAllCaches();
                         }
-
                         if (opt.startsWith('sb_') || opt === 'sponsorblock') {
                             segmentCache.clear();
                             currentVideoId = null;
                             removeSkipButton();
                         }
-
-                        if (window.__ftSettingsCategories) {
-                            for (let cat of window.__ftSettingsCategories) {
-                                if (cat && cat.items) {
-                                    for (let it of cat.items) {
-                                        if (it?.settingBooleanRenderer?.itemId === opt) {
-                                            it.settingBooleanRenderer.enabled = val;
-                                        }
-                                    }
-                                }
-                            }
-                        }
+                        updateDirectSettingsCategories();
                         return true;
                     }
+
+                    // 2. Handle setClientSettingEndpoint
+                    if (cmd.setClientSettingEndpoint && Array.isArray(cmd.setClientSettingEndpoint.settingDatas)) {
+                        for (let s of cmd.setClientSettingEndpoint.settingDatas) {
+                            const item = s?.clientSettingEnum?.item;
+                            if (item && ftConfig[item] !== undefined) {
+                                const val = s.boolValue !== undefined ? !!s.boolValue : (s.intValue !== undefined ? Number(s.intValue) : s.stringValue);
+                                ftConfig[item] = val;
+                                saveConfig();
+                                if (item === 'low_memory_mode') {
+                                    applyLowMemoryMode();
+                                    if (val) clearAllCaches();
+                                }
+                                updateDirectSettingsCategories();
+                            }
+                        }
+                    }
+
+                    // 3. Handle customAction
+                    if (cmd.customAction) {
+                        if (handleCustomAction(cmd.customAction.action, cmd.customAction.parameters)) return true;
+                    }
+                    if (cmd.signalAction?.customAction) {
+                        if (handleCustomAction(cmd.signalAction.customAction.action, cmd.signalAction.customAction.parameters)) return true;
+                    }
+
+                    // 4. Handle commandExecutorCommand
+                    if (cmd.commandExecutorCommand && Array.isArray(cmd.commandExecutorCommand.commands)) {
+                        for (let c of cmd.commandExecutorCommand.commands) {
+                            if (c.customAction && handleCustomAction(c.customAction.action, c.customAction.parameters)) {
+                                return true;
+                            }
+                            if (c.fastTubeOption !== undefined) {
+                                ftConfig[c.fastTubeOption] = !!c.fastTubeValue;
+                                saveConfig();
+                                updateDirectSettingsCategories();
+                            }
+                        }
+                    }
+
                     return origRC.apply(this, arguments);
                 };
             }
         }
     }
     hookResolveCommand();
+    setInterval(hookResolveCommand, 500);
 
     // --- 8. SponsorBlock UI: Toast & On-Screen Skip Button ---
     function showToast(title, subtitle) {
@@ -532,13 +860,29 @@
         }
     }
 
-    // --- 10. Core JSON.parse Hook ---
+    // --- 10. Playback Error Fix via isInlinePlaybackNoAd in JSON.stringify ---
+    const origStringify = JSON.stringify;
+    JSON.stringify = function (value, replacer, space) {
+        if (value?.playbackContext?.contentPlaybackContext) {
+            try {
+                const copiedValue = JSON.parse(origStringify(value));
+                if (!copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
+                    copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
+                    return origStringify.call(this, copiedValue, replacer, space);
+                }
+            } catch(e) {}
+        }
+        return origStringify.call(this, value, replacer, space);
+    };
+    window.JSON.stringify = JSON.stringify;
+
+    // --- 11. Core JSON.parse Hook (Ad-Stripping, Feeds & Settings) ---
     const origParse = JSON.parse;
     JSON.parse = function() {
         const r = origParse.apply(this, arguments);
         if (!r || typeof r !== 'object') return r;
         try {
-            // A. Video ads removal (Instant memory zeroing)
+            // A. Video ads removal
             if (ftConfig.adblock) {
                 if (r.adPlacements) r.adPlacements = [];
                 if (r.playerAds) r.playerAds = false;
@@ -577,7 +921,9 @@
                     for (let feed of homeFeed.contents) {
                         let horizontal = feed?.shelfRenderer?.content?.horizontalListRenderer;
                         if (horizontal && horizontal.items) {
-                            if (ftConfig.adblock) horizontal.items = horizontal.items.filter(i => !i.adSlotRenderer && !i.compactPromotedItemRenderer);
+                            if (ftConfig.adblock) {
+                                horizontal.items = horizontal.items.filter(i => !i.adSlotRenderer && !i.compactPromotedItemRenderer);
+                            }
                             if (ftConfig.dearrow || ftConfig.dearrow_thumbnails) {
                                 for (let it of horizontal.items) patchDeArrowInItem(it);
                             }
@@ -591,7 +937,9 @@
                     for (let feed of searchFeed.contents) {
                         let horizontal = feed?.shelfRenderer?.content?.horizontalListRenderer;
                         if (horizontal && horizontal.items) {
-                            if (ftConfig.adblock) horizontal.items = horizontal.items.filter(i => !i.adSlotRenderer && !i.compactPromotedItemRenderer);
+                            if (ftConfig.adblock) {
+                                horizontal.items = horizontal.items.filter(i => !i.adSlotRenderer && !i.compactPromotedItemRenderer);
+                            }
                             if (ftConfig.dearrow || ftConfig.dearrow_thumbnails) {
                                 for (let it of horizontal.items) patchDeArrowInItem(it);
                             }
@@ -616,7 +964,7 @@
                 }
             }
 
-            // F. Patch Settings with Fast-Tube categories
+            // F. Patch Settings with Fast-Tube Categories & Modal Action
             if (r.title && r.title.runs && Array.isArray(r.items)) {
                 PatchSettings(r);
             }
@@ -630,11 +978,12 @@
         for (const key in window._yttv) {
             if (window._yttv[key] && window._yttv[key].JSON) {
                 window._yttv[key].JSON.parse = JSON.parse;
+                window._yttv[key].JSON.stringify = JSON.stringify;
             }
         }
     }
 
-    // --- 11. Network Level Ad Interception ---
+    // --- 12. Network Level Ad Interception ---
     const AD_URL_REGEX = /\/api\/stats\/ads|\/ptracking|\/pagead\/|doubleclick\.net|adservice\.google\.com/;
     function isAdUrl(url) {
         return typeof url === 'string' && AD_URL_REGEX.test(url);
@@ -702,7 +1051,7 @@
         };
     }
 
-    // --- 12. Event-Driven Video Hooking & Per-Category SponsorBlock ---
+    // --- 13. Event-Driven Video Hooking & Per-Category SponsorBlock ---
     let trackedVideo = null;
     function onTimeUpdate() {
         if (!ftConfig.sponsorblock || !trackedVideo || trackedVideo.paused || !sponsorSegments.length) {
@@ -769,7 +1118,7 @@
         }, true);
     }
 
-    // --- 13. UI Styling Injection ---
+    // --- 14. UI Styling Injection ---
     const injectStyles = () => {
         if (typeof document === 'undefined' || document.getElementById('fast-tube-styles')) return;
         const style = document.createElement('style');

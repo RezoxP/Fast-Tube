@@ -180,6 +180,7 @@ const path = require('path');
         return {
             totalCategories: parsed.items.length,
             categoryTitles: categories,
+            hasMainModalEntry: categories.includes("Fast-Tube"),
             hasGeneral: categories.includes("Fast-Tube: General & Performance"),
             hasSidebar: categories.includes("Fast-Tube: Sidebar Navigation"),
             hasSponsorBlock: categories.includes("Fast-Tube: SponsorBlock")
@@ -188,13 +189,21 @@ const path = require('path');
 
     console.log("Live Settings Categories:", settingsTestResult);
 
+    // Test live playbackContext hook
+    const isPlaybackNoAdWorking = await page.evaluate(() => {
+        const testObj = { playbackContext: { contentPlaybackContext: { test: 1 } } };
+        const res = JSON.stringify(testObj);
+        return res.includes('"isInlinePlaybackNoAd":true');
+    });
+
     const isInjected = await page.evaluate(() => window.__fast_tube_injected__);
     await browser.close();
 
     console.log("=== 6. Live Test Summary ===");
     console.log(`✓ Fast-Tube successfully injected: ${isInjected}`);
+    console.log(`✓ Video playback error fix (isInlinePlaybackNoAd): ${isPlaybackNoAdWorking}`);
     console.log(`✓ Video tiles and shelves loaded without blanking: ${homeTilesCount > 0 || appHtmlLength > 500}`);
-    console.log(`✓ All 3 compact Settings categories injected: ${settingsTestResult.hasGeneral && settingsTestResult.hasSidebar && settingsTestResult.hasSponsorBlock}`);
+    console.log(`✓ All Fast-Tube Settings categories & Modal entry injected: ${settingsTestResult.hasMainModalEntry && settingsTestResult.hasGeneral && settingsTestResult.hasSidebar && settingsTestResult.hasSponsorBlock}`);
     console.log(`✓ Maximum execution efficiency: ${perfResults.avgMicrosecondsPerCall.toFixed(2)} µs per call`);
     console.log("=== Live Browser Testing Completed Successfully ===");
 })();
