@@ -1,3 +1,41 @@
+diff --git a/cobalt/loader/embedded_resources/cobalt_splash_screen.css b/cobalt/loader/embedded_resources/cobalt_splash_screen.css
+index 36e548075..1a520446e 100644
+--- a/cobalt/loader/embedded_resources/cobalt_splash_screen.css
++++ b/cobalt/loader/embedded_resources/cobalt_splash_screen.css
+@@ -20,11 +20,7 @@ body {
+ }
+ 
+ #splash {
+-  background-color: #ffffff;
+-  background-image: url("h5vcc-embedded://cobalt_word_logo_356.png");
+-  background-position: center center;
+-  background-repeat: no-repeat;
+-  background-size: auto 33%;
++  background-color: #000000;
+   height: 100%;
+   left: 0;
+   position: absolute;
+diff --git a/cobalt/loader/embedded_resources/cobalt_splash_screen.html b/cobalt/loader/embedded_resources/cobalt_splash_screen.html
+index 7d597980d..3342e7fb4 100644
+--- a/cobalt/loader/embedded_resources/cobalt_splash_screen.html
++++ b/cobalt/loader/embedded_resources/cobalt_splash_screen.html
+@@ -19,15 +19,13 @@
+ <head>
+   <meta http-equiv="Content-Security-Policy" content="default-src 'none';
+       script-src h5vcc-embedded://*/splash_screen.js;
+-      style-src h5vcc-embedded://*/cobalt_splash_screen.css;
+-      img-src h5vcc-embedded://*/cobalt_word_logo_356.png;">
++      style-src h5vcc-embedded://*/cobalt_splash_screen.css;">
+ <link rel="stylesheet" type="text/css"
+     href="h5vcc-embedded://cobalt_splash_screen.css">
+ </head>
+ 
+ <body>
+   <div id="splash">
+-    <img src="h5vcc-embedded://cobalt_word_logo_356.png" class="hidden">
+   </div>
+   <div id="loading">
+     <div id="spinner">
 diff --git a/starboard/android/apk/app/build.gradle b/starboard/android/apk/app/build.gradle
 index 55ba2b964..f5839846f 100644
 --- a/starboard/android/apk/app/build.gradle
@@ -35,39 +73,30 @@ index 55ba2b964..f5839846f 100644
      }
  }
 diff --git a/starboard/android/apk/app/proguard-rules.pro b/starboard/android/apk/app/proguard-rules.pro
-index a4b8a549a..abf7f1781 100644
+index a4b8a549a..7dd49f2bc 100644
 --- a/starboard/android/apk/app/proguard-rules.pro
 +++ b/starboard/android/apk/app/proguard-rules.pro
-@@ -14,17 +14,20 @@
+@@ -21,8 +21,17 @@
+ # JNI is an entry point that's hard to keep track of, so the @UsedByNative
+ # annotation marks fields and methods used by native code.
  
- # Proguard flags needed for the Android Starboard Java implementation to work
- # properly with its JNI native library.
--#
--# For more details, see
--#   http://developer.android.com/guide/developing/tools/proguard.html
- 
--# JNI is an entry point that's hard to keep track of, so the @UsedByNative
--# annotation marks fields and methods used by native code.
+-# Annotations are implemented as attributes, so we have to explicitly keep them.
+--keepattributes *Annotation*
 +# Annotations & JNI metadata attributes
 +-keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
 +
 +# Keep all Cobalt and Starboard JNI classes, methods, and fields
 +-keep class dev.cobalt.** { *; }
 +-dontwarn dev.cobalt.**
- 
--# Annotations are implemented as attributes, so we have to explicitly keep them.
---keepattributes *Annotation*
++
 +# Keep all native methods and their declaring classes
 +-keepclasseswithmembernames class * {
 +    native <methods>;
 +}
  
--# Keep classes, methods, and fields that are accessed with JNI.
-+# Keep classes, methods, and fields that are accessed with JNI annotations
+ # Keep classes, methods, and fields that are accessed with JNI.
  -keep @interface dev.cobalt.util.UsedByNative
- -keep @dev.cobalt.util.UsedByNative class *
- -keepclasseswithmembers class * {
-@@ -33,3 +36,9 @@
+@@ -33,3 +42,9 @@
  -keepclasseswithmembers class * {
    @dev.cobalt.util.UsedByNative <fields>;
  }
@@ -78,7 +107,7 @@ index a4b8a549a..abf7f1781 100644
 +-keep class androidx.core.** { *; }
 +-dontwarn androidx.**
 diff --git a/starboard/android/apk/app/src/app/AndroidManifest.xml b/starboard/android/apk/app/src/app/AndroidManifest.xml
-index 5fd31967b..237e766c5 100644
+index 5fd31967b..6d6620f86 100644
 --- a/starboard/android/apk/app/src/app/AndroidManifest.xml
 +++ b/starboard/android/apk/app/src/app/AndroidManifest.xml
 @@ -38,7 +38,7 @@
@@ -90,6 +119,53 @@ index 5fd31967b..237e766c5 100644
  
      <activity android:name="dev.cobalt.app.MainActivity"
        android:exported="true"
+@@ -47,7 +47,7 @@
+       android:screenOrientation="sensorLandscape"
+       android:theme="@style/CobaltTheme">
+       <meta-data android:name="cobalt.APP_URL" android:value="https://www.youtube.com/tv"/>
+-      <meta-data android:name="cobalt.SPLASH_URL" android:value="h5vcc-embedded://cobalt_splash_screen.html"/>
++      <meta-data android:name="cobalt.SPLASH_URL" android:value="none"/>
+       <meta-data android:name="cobalt.EVERGREEN_LITE" android:value="false"/>
+       <meta-data android:name="android.app.lib_name" android:value="cobalt"/>
+       <intent-filter>
+diff --git a/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.css b/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.css
+index e3ca851b7..1a520446e 100644
+--- a/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.css
++++ b/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.css
+@@ -20,11 +20,7 @@ body {
+ }
+ 
+ #splash {
+-  background-color: #16396b;
+-  background-image: url("file:///cobalt_logo_1024.png");
+-  background-position: center center;
+-  background-repeat: no-repeat;
+-  background-size: auto 33%;
++  background-color: #000000;
+   height: 100%;
+   left: 0;
+   position: absolute;
+diff --git a/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.html b/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.html
+index 3a453a645..918918ac2 100644
+--- a/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.html
++++ b/starboard/android/apk/app/src/app/assets/web/cobalt_blue_splash_screen.html
+@@ -19,15 +19,13 @@
+ <head>
+   <meta http-equiv="Content-Security-Policy" content="default-src 'none';
+       script-src h5vcc-embedded://*/splash_screen.js;
+-      style-src file://*/cobalt_blue_splash_screen.css;
+-      img-src file://*/cobalt_logo_1024.png;">
++      style-src file://*/cobalt_blue_splash_screen.css;">
+ <link rel="stylesheet" type="text/css"
+     href="file:///cobalt_blue_splash_screen.css">
+ </head>
+ 
+ <body>
+   <div id="splash">
+-    <img src="file:///cobalt_logo_1024.png" class="hidden">
+   </div>
+   <div id="loading">
+     <div id="spinner">
 diff --git a/starboard/android/apk/app/src/app/res/values/strings.xml b/starboard/android/apk/app/src/app/res/values/strings.xml
 index 4b54b94d9..c48edf62c 100644
 --- a/starboard/android/apk/app/src/app/res/values/strings.xml
@@ -100,6 +176,19 @@ index 4b54b94d9..c48edf62c 100644
  <resources>
 -  <string name="app_name">Cobalt On Android TV</string>
 +  <string name="app_name">Fast-Tube</string>
+ </resources>
+diff --git a/starboard/android/apk/app/src/main/res/values/colors.xml b/starboard/android/apk/app/src/main/res/values/colors.xml
+index 30fde0cea..626efac23 100644
+--- a/starboard/android/apk/app/src/main/res/values/colors.xml
++++ b/starboard/android/apk/app/src/main/res/values/colors.xml
+@@ -16,6 +16,6 @@
+ -->
+ 
+ <resources>
+-  <color name="cobalt_blue">#ff16396b</color>
+-  <color name="primary">@color/cobalt_blue</color>
++  <color name="cobalt_blue">#ff000000</color>
++  <color name="primary">#ff000000</color>
  </resources>
 diff --git a/starboard/android/arm/toolchain/BUILD.gn b/starboard/android/arm/toolchain/BUILD.gn
 index 6b167d172..5dc5844d8 100644

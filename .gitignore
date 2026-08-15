@@ -6,3 +6,4 @@ out/
 release-apks/
 actionlint
 *.log
+*.png
