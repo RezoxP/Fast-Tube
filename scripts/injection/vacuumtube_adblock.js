@@ -470,21 +470,9 @@
     }
 
     // --- 6. Network Level Ad Interception ---
-    const AD_URL_PATTERNS = [
-        '/api/stats/ads',
-        '/ptracking',
-        '/pagead/',
-        'googleads.g.doubleclick.net',
-        'doubleclick.net',
-        'adservice.google.com'
-    ];
-
+    const AD_URL_REGEX = /\/api\/stats\/ads|\/ptracking|\/pagead\/|doubleclick\.net|adservice\.google\.com/;
     function isAdUrl(url) {
-        if (!url || typeof url !== 'string') return false;
-        for (let i = 0; i < AD_URL_PATTERNS.length; i++) {
-            if (url.indexOf(AD_URL_PATTERNS[i]) !== -1) return true;
-        }
-        return false;
+        return typeof url === 'string' && AD_URL_REGEX.test(url);
     }
 
     const originalFetch = window.fetch;

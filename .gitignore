@@ -7,3 +7,4 @@ release-apks/
 actionlint
 *.log
 *.png
+node_modules/
