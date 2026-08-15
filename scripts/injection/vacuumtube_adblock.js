@@ -1,11 +1,28 @@
 // Fast-Tube Injection Script
-// 1. Fixes video playback errors via isInlinePlaybackNoAd and clean JSON processing
+// 1. Dual-layer Ad-Blocking & Video Playback Error Fix via isInlinePlaybackNoAd
 // 2. Interactive Fast-Tube Leanback Settings Modal + Direct Settings Toggling with full D-Pad support
 // 3. Return YouTube Dislikes (RYD) + DeArrow + Low Memory Mode + Sidebar Tabs Filtering + Per-Category SponsorBlock
+// 4. Startup Account Picker / Who's Watching bypass
 
 (function() {
     if (window.__fast_tube_injected__) return;
     window.__fast_tube_injected__ = true;
+
+    // --- 0. Startup Screen / Who's Watching Bypass ---
+    function bypassWhosWatching() {
+        try {
+            let recurring = localStorage.getItem('yt.leanback.default::recurring_actions');
+            let data = recurring ? JSON.parse(recurring) : { data: { data: {} } };
+            if (!data.data) data.data = {};
+            if (!data.data.data) data.data.data = {};
+            const futureTime = Date.now() + (30 * 24 * 60 * 60 * 1000); // 30 days ahead
+            data.data.data['startup-screen-account-selector-with-guest'] = { lastFired: futureTime };
+            data.data.data['whos_watching_fullscreen_zero_accounts'] = { lastFired: futureTime };
+            data.data.data['startup-screen-signed-out-welcome-back'] = { lastFired: futureTime };
+            localStorage.setItem('yt.leanback.default::recurring_actions', JSON.stringify(data));
+        } catch(e) {}
+    }
+    bypassWhosWatching();
 
     // --- 1. Config Management & Defaults ---
     const DEFAULT_CONFIG = {
@@ -882,10 +899,10 @@
         const r = origParse.apply(this, arguments);
         if (!r || typeof r !== 'object') return r;
         try {
-            // A. Video ads removal
+            // A. Video ads removal (safely clear without breaking object types)
             if (ftConfig.adblock) {
                 if (r.adPlacements) r.adPlacements = [];
-                if (r.playerAds) r.playerAds = false;
+                if (r.playerAds) r.playerAds = [];
                 if (r.adSlots) r.adSlots = [];
             }
 
@@ -947,6 +964,22 @@
                     }
                 }
 
+                // Continuation contents
+                let contFeed = r.continuationContents?.sectionListContinuation?.contents;
+                if (contFeed) {
+                    for (let feed of contFeed) {
+                        let horizontal = feed?.shelfRenderer?.content?.horizontalListRenderer;
+                        if (horizontal && horizontal.items) {
+                            if (ftConfig.adblock) {
+                                horizontal.items = horizontal.items.filter(i => !i.adSlotRenderer && !i.compactPromotedItemRenderer);
+                            }
+                            if (ftConfig.dearrow || ftConfig.dearrow_thumbnails) {
+                                for (let it of horizontal.items) patchDeArrowInItem(it);
+                            }
+                        }
+                    }
+                }
+
                 // Shorts ads removal
                 if (ftConfig.adblock && !Array.isArray(r) && r.entries && Array.isArray(r.entries)) {
                     r.entries = r.entries.filter(elm => !elm?.command?.reelWatchEndpoint?.adClientParams?.isAd);
@@ -984,6 +1017,7 @@
     }
 
     // --- 12. Network Level Ad Interception ---
+    // Strictly block only ad statistics, tracking, and doubleclick endpoints without blocking playback/video chunks
     const AD_URL_REGEX = /\/api\/stats\/ads|\/ptracking|\/pagead\/|doubleclick\.net|adservice\.google\.com/;
     function isAdUrl(url) {
         return typeof url === 'string' && AD_URL_REGEX.test(url);
@@ -1051,10 +1085,22 @@
         };
     }
 
-    // --- 13. Event-Driven Video Hooking & Per-Category SponsorBlock ---
+    // --- 13. Event-Driven Video Hooking, Watchdog & Per-Category SponsorBlock ---
     let trackedVideo = null;
     function onTimeUpdate() {
-        if (!ftConfig.sponsorblock || !trackedVideo || trackedVideo.paused || !sponsorSegments.length) {
+        if (!trackedVideo) return;
+
+        // Ad Watchdog: Auto-skip residual ad if in ad container
+        if (ftConfig.adblock) {
+            try {
+                const isAdShowing = document.querySelector('.ad-showing, .ad-interrupting, [class*="ad-showing"], [class*="ad-interrupting"]');
+                if (isAdShowing && trackedVideo.duration && isFinite(trackedVideo.duration) && trackedVideo.duration > 0) {
+                    trackedVideo.currentTime = trackedVideo.duration;
+                }
+            } catch(e) {}
+        }
+
+        if (!ftConfig.sponsorblock || trackedVideo.paused || !sponsorSegments.length) {
             removeSkipButton();
             return;
         }

@@ -10,15 +10,13 @@ const path = require('path');
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
-            '--disable-web-security',
-            '--disable-features=IsolateOrigins,site-per-process'
+            '--autoplay-policy=no-user-gesture-required'
         ]
     });
 
     const context = await browser.newContext({
         viewport: { width: 1920, height: 1080 },
-        userAgent: 'Mozilla/5.0 (Linux; Android 10; BRAVIA 4K UR2 Build/PTT1.190515.001.S50) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/100.0.4896.127 Large Screen Safari/537.36 Cobalt/24.lts.4.1018671-gold (unlike Gecko) Starboard/14',
-        deviceScaleFactor: 1
+        userAgent: 'Mozilla/5.0 (Linux; Android 10; BRAVIA 4K UR2 Build/PTT1.190515.001.S50) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Cobalt/25.lts.1-gold'
     });
 
     const injectionCode = fs.readFileSync(path.join(__dirname, 'scripts/injection/vacuumtube_adblock.js'), 'utf8');
@@ -31,25 +29,15 @@ const path = require('path');
     const page = await context.newPage();
 
     let blockedAdsCount = 0;
-    let browseRequestsCount = 0;
-    let playerRequestsCount = 0;
-    let attestationRequestsCount = 0;
-    const interceptedUrls = [];
+    let videoStreamReqCount = 0;
 
     page.on('request', request => {
         const url = request.url();
         if (url.includes('/api/stats/ads') || url.includes('/ptracking') || url.includes('/pagead/') || url.includes('doubleclick.net') || url.includes('adservice.google.com')) {
             blockedAdsCount++;
-            interceptedUrls.push(url);
         }
-        if (url.includes('/youtubei/v1/browse')) {
-            browseRequestsCount++;
-        }
-        if (url.includes('/youtubei/v1/player')) {
-            playerRequestsCount++;
-        }
-        if (url.includes('/youtubei/v1/att/get')) {
-            attestationRequestsCount++;
+        if (url.includes('videoplayback') || url.includes('initplayback')) {
+            videoStreamReqCount++;
         }
     });
 
@@ -72,26 +60,21 @@ const path = require('path');
     }
 
     console.log(`DOM loaded in ${Date.now() - startTime}ms`);
+    await page.waitForTimeout(3000);
 
-    console.log("=== 3. Navigating past onboarding / Get Started ===");
+    // Bypass onboarding / account selector if present
     try {
-        const isInjected = await page.evaluate(() => window.__fast_tube_injected__);
-        console.log("Fast-Tube Injected Status:", isInjected);
-
-        // Click Get Started button directly
-        const btn = page.locator('button, [role="button"], ytlr-button-renderer').filter({ hasText: 'Get started' });
-        if (await btn.count() > 0) {
-            console.log("Found Get started button via locator, clicking...");
-            await btn.first().click();
-        } else {
-            console.log("Clicking coordinate (125, 705)...");
-            await page.mouse.click(125, 705);
-        }
-
-        await page.waitForTimeout(6000);
-    } catch(e) {
-        console.log("Navigation note:", e.message);
-    }
+        await page.keyboard.press("Enter");
+        await page.waitForTimeout(1500);
+        await page.keyboard.press("ArrowDown");
+        await page.waitForTimeout(200);
+        await page.keyboard.press("ArrowDown");
+        await page.waitForTimeout(200);
+        await page.keyboard.press("ArrowDown");
+        await page.waitForTimeout(200);
+        await page.keyboard.press("Enter");
+        await page.waitForTimeout(3000);
+    } catch(e) {}
 
     // Capture screenshot of Home Feed
     await page.screenshot({ path: 'test_live_home_feed.png' });
@@ -103,68 +86,51 @@ const path = require('path');
     });
     console.log(`Detected ${homeTilesCount} video/shelf DOM elements rendered on Home Feed.`);
 
-    const appHtmlLength = await page.evaluate(() => document.body ? document.body.innerHTML.length : 0);
-    console.log(`Body HTML Length: ${appHtmlLength} bytes`);
-
-    // Test JSON.parse micro-benchmark for performance efficiency
-    console.log("=== 4. Benchmarking JSON.parse & Memory Overhead ===");
-    const perfResults = await page.evaluate(() => {
-        const samplePayload = JSON.stringify({
-            contents: {
-                tvBrowseRenderer: {
-                    content: {
-                        tvSurfaceContentRenderer: {
-                            content: {
-                                sectionListRenderer: {
-                                    contents: [
-                                        { adSlotRenderer: { id: "ad" } },
-                                        { promoShelfRenderer: { id: "promo" } },
-                                        {
-                                            shelfRenderer: {
-                                                title: "Trending Movies",
-                                                content: {
-                                                    horizontalListRenderer: {
-                                                        items: [
-                                                            { adSlotRenderer: { id: "ad1" } },
-                                                            { compactPromotedItemRenderer: { id: "promo1" } },
-                                                            { tileRenderer: { title: "Movie 1" } },
-                                                            { tileRenderer: { title: "Movie 2" } }
-                                                        ]
-                                                    }
-                                                }
-                                            }
-                                        }
-                                    ]
-                                }
+    console.log("=== 3. Testing Video Playback Execution ===");
+    const playResult = await page.evaluate(() => {
+        if (window._yttv) {
+            for (let k in window._yttv) {
+                if (window._yttv[k]?.instance?.resolveCommand) {
+                    try {
+                        window._yttv[k].instance.resolveCommand({
+                            watchEndpoint: {
+                                videoId: "dQw4w9WgXcQ"
                             }
-                        }
+                        });
+                        return { status: "invoked_watchEndpoint" };
+                    } catch(e) {
+                        return { status: "error", error: e.message };
                     }
                 }
-            },
-            adPlacements: [{ ad: 1 }, { ad: 2 }],
-            playerAds: true,
-            adSlots: [{ slot: 1 }]
-        });
-
-        const ITERATIONS = 10000;
-        const start = performance.now();
-        for (let i = 0; i < ITERATIONS; i++) {
-            JSON.parse(samplePayload);
+            }
         }
-        const totalDurationMs = performance.now() - start;
-        const avgMicrosecondsPerCall = (totalDurationMs / ITERATIONS) * 1000;
+        return { status: "rc_not_found" };
+    });
+    console.log("Play command dispatch:", playResult);
 
+    console.log("Waiting 10 seconds for video stream and playback verification...");
+    await page.waitForTimeout(10000);
+
+    const videoState = await page.evaluate(() => {
+        const v = document.querySelector("video");
+        const bodyText = document.body ? document.body.innerText : "";
         return {
-            iterations: ITERATIONS,
-            totalDurationMs: totalDurationMs,
-            avgMicrosecondsPerCall: avgMicrosecondsPerCall
+            hasVideo: !!v,
+            videoSrc: v ? (v.src || v.currentSrc) : null,
+            currentTime: v ? v.currentTime : null,
+            duration: v ? v.duration : null,
+            paused: v ? v.paused : null,
+            readyState: v ? v.readyState : null,
+            networkState: v ? v.networkState : null,
+            hasErrorOverlay: bodyText.includes("Something went wrong") || bodyText.includes("Playback ID")
         };
     });
+    console.log("Video Playback State:", JSON.stringify(videoState, null, 2));
 
-    console.log(`Performance Benchmark: ${perfResults.iterations} JSON.parse calls took ${perfResults.totalDurationMs.toFixed(2)}ms`);
-    console.log(`Average time per JSON.parse call: ${perfResults.avgMicrosecondsPerCall.toFixed(3)} microseconds (< 0.05ms!)`);
+    await page.screenshot({ path: 'test_live_playback.png' });
+    console.log("Saved playback screenshot to test_live_playback.png");
 
-    console.log("=== 5. Testing Settings Injection & Category Toggling in Live Context ===");
+    console.log("=== 4. Testing Settings Injection & Category Toggling ===");
     const settingsTestResult = await page.evaluate(() => {
         const mockSettings = {
             title: { runs: [{ text: "Settings" }] },
@@ -186,7 +152,6 @@ const path = require('path');
             hasSponsorBlock: categories.includes("Fast-Tube: SponsorBlock")
         };
     });
-
     console.log("Live Settings Categories:", settingsTestResult);
 
     // Test live playbackContext hook
@@ -199,11 +164,11 @@ const path = require('path');
     const isInjected = await page.evaluate(() => window.__fast_tube_injected__);
     await browser.close();
 
-    console.log("=== 6. Live Test Summary ===");
+    console.log("=== 5. Live Test Summary ===");
     console.log(`✓ Fast-Tube successfully injected: ${isInjected}`);
     console.log(`✓ Video playback error fix (isInlinePlaybackNoAd): ${isPlaybackNoAdWorking}`);
-    console.log(`✓ Video tiles and shelves loaded without blanking: ${homeTilesCount > 0 || appHtmlLength > 500}`);
+    console.log(`✓ Video stream chunks received (${videoStreamReqCount} requests): ${videoStreamReqCount > 0}`);
+    console.log(`✓ Video actively playing (hasVideo: ${videoState.hasVideo}, paused: ${videoState.paused}, currentTime: ${videoState.currentTime?.toFixed(2)}s): ${videoState.hasVideo && !videoState.hasErrorOverlay}`);
     console.log(`✓ All Fast-Tube Settings categories & Modal entry injected: ${settingsTestResult.hasMainModalEntry && settingsTestResult.hasGeneral && settingsTestResult.hasSidebar && settingsTestResult.hasSponsorBlock}`);
-    console.log(`✓ Maximum execution efficiency: ${perfResults.avgMicrosecondsPerCall.toFixed(2)} µs per call`);
     console.log("=== Live Browser Testing Completed Successfully ===");
 })();

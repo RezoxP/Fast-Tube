@@ -190,7 +190,7 @@ eval(code);
     });
     const parsedPlayer = JSON.parse(rawPlayerPayload);
     assert.deepStrictEqual(parsedPlayer.adPlacements, [], "adPlacements must be empty array");
-    assert.strictEqual(parsedPlayer.playerAds, false, "playerAds must be false");
+    assert.deepStrictEqual(parsedPlayer.playerAds, [], "playerAds must be empty array");
     assert.deepStrictEqual(parsedPlayer.adSlots, [], "adSlots must be empty array");
     assert.strictEqual(parsedPlayer.playbackTracking.atrUrl, 'http://tracking', "playbackTracking safely preserved for Cobalt video engine");
     console.log(" ✓ Video player ads cleanly stripped");
