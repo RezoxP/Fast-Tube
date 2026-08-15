@@ -216,30 +216,41 @@ eval(code);
         ]
     });
     const parsedSettings = JSON.parse(rawSettingsPayload);
-    assert.strictEqual(parsedSettings.items.length, 2, "Fast-Tube added, Premium promo stripped");
-    const ftCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
-    assert.strictEqual(ftCategory.categoryId, 'fast_tube_category');
-    assert.strictEqual(ftCategory.title.runs[0].text, 'Fast-Tube');
-    assert.strictEqual(ftCategory.items.length, 3, "Must have 3 interactive boolean setting toggles");
+    assert.strictEqual(parsedSettings.items.length, 3, "2 Fast-Tube categories added, Premium promo stripped");
     
-    // Verify items: Ad-Block, SponsorBlock, Hide Shorts
-    assert.strictEqual(ftCategory.items[0].settingBooleanRenderer.itemId, 'adblock');
-    assert.strictEqual(ftCategory.items[0].settingBooleanRenderer.enabled, true);
-    assert.strictEqual(ftCategory.items[1].settingBooleanRenderer.itemId, 'sponsorblock');
-    assert.strictEqual(ftCategory.items[1].settingBooleanRenderer.enabled, true);
-    assert.strictEqual(ftCategory.items[2].settingBooleanRenderer.itemId, 'hideShorts');
-    console.log(" ✓ Injected interactive Fast-Tube category with 3 configurable boolean toggles");
+    // Category 1: General
+    const ftGenCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
+    assert.strictEqual(ftGenCategory.categoryId, 'fast_tube_general_category');
+    assert.strictEqual(ftGenCategory.title.runs[0].text, 'Fast-Tube: General');
+    assert.strictEqual(ftGenCategory.items.length, 3, "General category must have 3 toggles");
+    assert.strictEqual(ftGenCategory.items[0].settingBooleanRenderer.itemId, 'adblock');
+    assert.strictEqual(ftGenCategory.items[1].settingBooleanRenderer.itemId, 'hideShorts');
+    assert.strictEqual(ftGenCategory.items[2].settingBooleanRenderer.itemId, 'hidePaidPromotion');
+
+    // Category 2: SponsorBlock
+    const ftSBCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
+    assert.strictEqual(ftSBCategory.categoryId, 'fast_tube_sb_category');
+    assert.strictEqual(ftSBCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock');
+    assert.strictEqual(ftSBCategory.items.length, 7, "SponsorBlock category must have 7 granular toggles");
+    assert.strictEqual(ftSBCategory.items[0].settingBooleanRenderer.itemId, 'sponsorblock');
+    assert.strictEqual(ftSBCategory.items[1].settingBooleanRenderer.itemId, 'sb_sponsor');
+    assert.strictEqual(ftSBCategory.items[2].settingBooleanRenderer.itemId, 'sb_intro');
+    assert.strictEqual(ftSBCategory.items[3].settingBooleanRenderer.itemId, 'sb_outro');
+    assert.strictEqual(ftSBCategory.items[4].settingBooleanRenderer.itemId, 'sb_selfpromo');
+    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.itemId, 'sb_preview');
+    assert.strictEqual(ftSBCategory.items[6].settingBooleanRenderer.itemId, 'sb_music_offtopic');
+    console.log(" ✓ Injected interactive Fast-Tube General & SponsorBlock categories with 10 granular toggles");
 
     // Test toggle via resolveCommand
-    // Simulate user toggling "Hide Shorts" to ON
+    // Simulate user toggling "Skip Previews & Recaps" to ON
     const toggleCommand = {
-        fastTubeOption: 'hideShorts',
+        fastTubeOption: 'sb_preview',
         fastTubeValue: true
     };
     global._yttv.testModule.instance.resolveCommand(toggleCommand);
-    assert.strictEqual(ftCategory.items[2].settingBooleanRenderer.enabled, true, "Hide Shorts enabled state updated");
-    assert(localStorage.getItem('fast_tube_config').includes('"hideShorts":true'), "Settings persisted to localStorage");
-    console.log(" ✓ resolveCommand successfully handled setting toggle & persisted to localStorage");
+    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.enabled, true, "sb_preview enabled state updated");
+    assert(localStorage.getItem('fast_tube_config').includes('"sb_preview":true'), "Settings persisted to localStorage");
+    console.log(" ✓ resolveCommand successfully handled granular SponsorBlock toggle & persisted to localStorage");
 
     console.log("=== 6. Testing Network-Level Ad Blocking ===");
     const adRes = await window.fetch('https://www.youtube.com/api/stats/ads?ad_type=1');

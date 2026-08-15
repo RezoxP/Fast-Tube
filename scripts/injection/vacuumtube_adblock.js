@@ -1,16 +1,26 @@
 // Fast-Tube Injection Script
-// High-performance ad-blocking, SponsorBlock, and Configurable Settings for YouTube TV on Cobalt
+// Highly configurable ad-blocking, granular SponsorBlock categories, and Leanback Settings
 // Zero-polling, event-driven architecture for maximum performance
 
 (function() {
     if (window.__fast_tube_injected__) return;
     window.__fast_tube_injected__ = true;
 
-    // --- 1. Config Management & Persistence ---
+    // --- 1. Config Management & Granular Settings ---
     const DEFAULT_CONFIG = {
+        // General
         adblock: true,
+        hideShorts: false,
+        hidePaidPromotion: true,
+
+        // SponsorBlock Granular Categories
         sponsorblock: true,
-        hideShorts: false
+        sb_sponsor: true,
+        sb_intro: true,
+        sb_outro: true,
+        sb_selfpromo: true,
+        sb_preview: false,
+        sb_music_offtopic: false
     };
 
     let ftConfig = Object.assign({}, DEFAULT_CONFIG);
@@ -27,7 +37,18 @@
         } catch(e) {}
     }
 
-    // --- 2. Interactive Leanback Settings ---
+    function getActiveSBCategories() {
+        const cats = [];
+        if (ftConfig.sb_sponsor !== false) cats.push('sponsor');
+        if (ftConfig.sb_intro !== false) { cats.push('intro'); cats.push('intermission'); }
+        if (ftConfig.sb_outro !== false) cats.push('outro');
+        if (ftConfig.sb_selfpromo !== false) cats.push('selfpromo');
+        if (ftConfig.sb_preview !== false) { cats.push('preview'); cats.push('filler'); }
+        if (ftConfig.sb_music_offtopic !== false) cats.push('music_offtopic');
+        return cats;
+    }
+
+    // --- 2. Interactive Leanback Settings Categories ---
     function createSettingBooleanRenderer(title, summary, configKey, enabled) {
         return {
             settingBooleanRenderer: {
@@ -55,28 +76,52 @@
         if (!settingsObject || !Array.isArray(settingsObject.items)) return;
         
         for (let i = 0; i < settingsObject.items.length; i++) {
-            if (settingsObject.items[i]?.settingCategoryCollectionRenderer?.categoryId === 'fast_tube_category') {
+            const cat = settingsObject.items[i]?.settingCategoryCollectionRenderer;
+            if (cat && (cat.categoryId === 'fast_tube_general_category' || cat.categoryId === 'fast_tube_sb_category')) {
                 return;
             }
         }
 
-        const ftCategory = {
+        const ftGeneralCategory = {
             settingCategoryCollectionRenderer: {
-                categoryId: "fast_tube_category",
+                categoryId: "fast_tube_general_category",
                 title: {
-                    runs: [{ text: "Fast-Tube" }]
+                    runs: [{ text: "Fast-Tube: General" }]
                 },
                 items: [
                     createSettingBooleanRenderer("Ad-Block", "Block video ads, banners, and promoted feed items", "adblock", ftConfig.adblock),
-                    createSettingBooleanRenderer("SponsorBlock", "Automatically skip sponsor segments in videos", "sponsorblock", ftConfig.sponsorblock),
-                    createSettingBooleanRenderer("Hide Shorts", "Hide Shorts from home feeds and navigation bar", "hideShorts", ftConfig.hideShorts)
+                    createSettingBooleanRenderer("Hide Shorts", "Hide Shorts from home feeds and navigation bar", "hideShorts", ftConfig.hideShorts),
+                    createSettingBooleanRenderer("Hide Paid Promo Badges", "Hide 'Includes paid promotion' overlays on videos", "hidePaidPromotion", ftConfig.hidePaidPromotion)
                 ],
                 focused: false,
                 trackingParams: "null"
             }
         };
 
-        window.__ftSettingsCategory = ftCategory.settingCategoryCollectionRenderer;
+        const ftSBCategory = {
+            settingCategoryCollectionRenderer: {
+                categoryId: "fast_tube_sb_category",
+                title: {
+                    runs: [{ text: "Fast-Tube: SponsorBlock" }]
+                },
+                items: [
+                    createSettingBooleanRenderer("Enable SponsorBlock", "Master switch for automatic segment skipping", "sponsorblock", ftConfig.sponsorblock),
+                    createSettingBooleanRenderer("Skip Sponsors", "Skip paid promotions, sponsorships, and endorsements", "sb_sponsor", ftConfig.sb_sponsor),
+                    createSettingBooleanRenderer("Skip Intros & Intermissions", "Skip channel intros, intro animation, and pauses", "sb_intro", ftConfig.sb_intro),
+                    createSettingBooleanRenderer("Skip Outros & End Cards", "Skip end credits, outro cards, and subscribe screens", "sb_outro", ftConfig.sb_outro),
+                    createSettingBooleanRenderer("Skip Self-Promotion", "Skip merch plugs, channel membership, and sub reminders", "sb_selfpromo", ftConfig.sb_selfpromo),
+                    createSettingBooleanRenderer("Skip Previews & Recaps", "Skip 'Coming up', episode recaps, and teaser clips", "sb_preview", ftConfig.sb_preview),
+                    createSettingBooleanRenderer("Skip Non-Music Sections", "Skip music video intros, outros, and dialogue breaks", "sb_music_offtopic", ftConfig.sb_music_offtopic)
+                ],
+                focused: false,
+                trackingParams: "null"
+            }
+        };
+
+        window.__ftSettingsCategories = [
+            ftGeneralCategory.settingCategoryCollectionRenderer,
+            ftSBCategory.settingCategoryCollectionRenderer
+        ];
 
         // Filter out "Get YouTube Premium" and promo categories from settings
         for (let i = settingsObject.items.length - 1; i >= 0; i--) {
@@ -87,8 +132,9 @@
             }
         }
 
-        // Add Fast-Tube category to the top of settings
-        settingsObject.items.unshift(ftCategory);
+        // Add Fast-Tube categories to the top of settings
+        settingsObject.items.unshift(ftSBCategory);
+        settingsObject.items.unshift(ftGeneralCategory);
     }
 
     function hookResolveCommand() {
@@ -104,10 +150,20 @@
                         const val = !!command.fastTubeValue;
                         ftConfig[opt] = val;
                         saveConfig();
-                        if (window.__ftSettingsCategory && window.__ftSettingsCategory.items) {
-                            for (let it of window.__ftSettingsCategory.items) {
-                                if (it?.settingBooleanRenderer?.itemId === opt) {
-                                    it.settingBooleanRenderer.enabled = val;
+
+                        if (opt.startsWith('sb_') || opt === 'sponsorblock') {
+                            segmentCache.clear();
+                            currentVideoId = null;
+                        }
+
+                        if (window.__ftSettingsCategories) {
+                            for (let cat of window.__ftSettingsCategories) {
+                                if (cat && cat.items) {
+                                    for (let it of cat.items) {
+                                        if (it?.settingBooleanRenderer?.itemId === opt) {
+                                            it.settingBooleanRenderer.enabled = val;
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -132,13 +188,21 @@
             sponsorSegments = segmentCache.get(videoId);
             return;
         }
+
+        const activeCats = getActiveSBCategories();
+        if (activeCats.length === 0) {
+            sponsorSegments = [];
+            return;
+        }
+
         const fetchFunc = window.fetch;
         if (typeof fetchFunc === 'function') {
-            fetchFunc('https://sponsor.ajay.app/api/skipSegments?videoID=' + encodeURIComponent(videoId) + '&categories=["sponsor","interaction","intro","outro","selfpromo","preview","music_offtopic","filler"]')
+            const catParam = encodeURIComponent(JSON.stringify(activeCats));
+            fetchFunc('https://sponsor.ajay.app/api/skipSegments?videoID=' + encodeURIComponent(videoId) + '&categories=' + catParam)
                 .then(res => res.ok ? res.json() : [])
                 .then(data => {
                     if (Array.isArray(data)) {
-                        sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1] }));
+                        sponsorSegments = data.map(s => ({ start: s.segment[0], end: s.segment[1], category: s.category }));
                         segmentCache.set(videoId, sponsorSegments);
                         if (segmentCache.size > 100) segmentCache.delete(segmentCache.keys().next().value);
                     } else {
@@ -166,9 +230,10 @@
                 if (r.adSlots) {
                     r.adSlots = [];
                 }
-                if (r.paidContentOverlay) {
-                    r.paidContentOverlay = null;
-                }
+            }
+
+            if (ftConfig.hidePaidPromotion && r.paidContentOverlay) {
+                r.paidContentOverlay = null;
             }
 
             // B. Extract videoId for SponsorBlock
@@ -226,7 +291,7 @@
                 }
             }
 
-            // D. Patch Settings with Fast-Tube option
+            // D. Patch Settings with Fast-Tube categories
             if (r.title && r.title.runs && Array.isArray(r.items)) {
                 PatchSettings(r);
             }
@@ -367,7 +432,7 @@
         if (typeof document === 'undefined' || document.getElementById('fast-tube-styles')) return;
         const style = document.createElement('style');
         style.id = 'fast-tube-styles';
-        style.textContent = 'ytd-ad-slot-renderer,ytd-promoted-sparkles-web-renderer,.ytd-display-ad-renderer,.ytp-ad-overlay-container,.ytp-ad-message-container,.ytp-ad-skip-button-container,.ytp-ad-preview-container,.ytp-ad-player-overlay,.ytp-ad-image-overlay,yt-mealbar-promo-renderer,ytd-statement-banner-renderer,.badge-style-type-ad,ytlr-ad-badge-renderer,ytlr-ad-renderer,ytlr-compact-promoted-item-renderer,ytlr-promoted-video-renderer,ytlr-statement-banner-renderer,ytlr-mealbar-promo-renderer,ytlr-premium-promo-renderer,.ytlr-ad-badge,[class*="ad-showing"] .ytp-ad-overlay-container,[class*="ad-interrupting"] .ytp-ad-overlay-container,[aria-label="Get YouTube Premium"],[aria-label*="YouTube Premium"]{display:none !important;visibility:hidden !important;opacity:0 !important;pointer-events:none !important;height:0 !important;width:0 !important;}';
+        style.textContent = 'ytd-ad-slot-renderer,ytd-promoted-sparkles-web-renderer,.ytd-display-ad-renderer,.ytp-ad-overlay-container,.ytp-ad-message-container,.ytp-ad-skip-button-container,.ytp-ad-preview-container,.ytp-ad-player-overlay,.ytp-ad-image-overlay,yt-mealbar-promo-renderer,ytd-statement-banner-renderer,.badge-style-type-ad,ytlr-ad-badge-renderer,ytlr-ad-renderer,ytlr-compact-promoted-item-renderer,ytlr-promoted-video-renderer,ytlr-statement-banner-renderer,ytlr-mealbar-promo-renderer,ytlr-premium-promo-renderer,.ytlr-ad-badge,[class*="ad-showing"] .ytp-ad-overlay-container,[class*="ad-interrupting"] .ytp-ad-overlay-container,[aria-label="Get YouTube Premium"],[aria-label*="YouTube Premium"],.ytp-paid-content-overlay{display:none !important;visibility:hidden !important;opacity:0 !important;pointer-events:none !important;height:0 !important;width:0 !important;}';
         const target = document.head || document.documentElement || document.body;
         if (target && typeof target.appendChild === 'function') {
             target.appendChild(style);
