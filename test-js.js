@@ -220,16 +220,15 @@ eval(code);
     const ftCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
     assert.strictEqual(ftCategory.categoryId, 'fast_tube_category');
     assert.strictEqual(ftCategory.title.runs[0].text, 'Fast-Tube');
-    assert.strictEqual(ftCategory.items.length, 4, "Must have 4 interactive boolean setting toggles");
+    assert.strictEqual(ftCategory.items.length, 3, "Must have 3 interactive boolean setting toggles");
     
-    // Verify items: Ad-Block, SponsorBlock, Auto-Skip, Hide Shorts
+    // Verify items: Ad-Block, SponsorBlock, Hide Shorts
     assert.strictEqual(ftCategory.items[0].settingBooleanRenderer.itemId, 'adblock');
     assert.strictEqual(ftCategory.items[0].settingBooleanRenderer.enabled, true);
     assert.strictEqual(ftCategory.items[1].settingBooleanRenderer.itemId, 'sponsorblock');
     assert.strictEqual(ftCategory.items[1].settingBooleanRenderer.enabled, true);
-    assert.strictEqual(ftCategory.items[2].settingBooleanRenderer.itemId, 'autoskip');
-    assert.strictEqual(ftCategory.items[3].settingBooleanRenderer.itemId, 'hideShorts');
-    console.log(" ✓ Injected interactive Fast-Tube category with 4 configurable boolean toggles");
+    assert.strictEqual(ftCategory.items[2].settingBooleanRenderer.itemId, 'hideShorts');
+    console.log(" ✓ Injected interactive Fast-Tube category with 3 configurable boolean toggles");
 
     // Test toggle via resolveCommand
     // Simulate user toggling "Hide Shorts" to ON
@@ -238,7 +237,7 @@ eval(code);
         fastTubeValue: true
     };
     global._yttv.testModule.instance.resolveCommand(toggleCommand);
-    assert.strictEqual(ftCategory.items[3].settingBooleanRenderer.enabled, true, "Hide Shorts enabled state updated");
+    assert.strictEqual(ftCategory.items[2].settingBooleanRenderer.enabled, true, "Hide Shorts enabled state updated");
     assert(localStorage.getItem('fast_tube_config').includes('"hideShorts":true'), "Settings persisted to localStorage");
     console.log(" ✓ resolveCommand successfully handled setting toggle & persisted to localStorage");
 

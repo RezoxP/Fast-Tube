@@ -1,6 +1,6 @@
 // Fast-Tube Injection Script
 // High-performance ad-blocking, SponsorBlock, and Configurable Settings for YouTube TV on Cobalt
-// Based on VacuumTube and TizenTube architectures
+// Zero-polling, event-driven architecture for maximum performance
 
 (function() {
     if (window.__fast_tube_injected__) return;
@@ -10,7 +10,6 @@
     const DEFAULT_CONFIG = {
         adblock: true,
         sponsorblock: true,
-        autoskip: true,
         hideShorts: false
     };
 
@@ -70,7 +69,6 @@
                 items: [
                     createSettingBooleanRenderer("Ad-Block", "Block video ads, banners, and promoted feed items", "adblock", ftConfig.adblock),
                     createSettingBooleanRenderer("SponsorBlock", "Automatically skip sponsor segments in videos", "sponsorblock", ftConfig.sponsorblock),
-                    createSettingBooleanRenderer("Auto-Skip Watchdog", "Fast-forward & auto-click residual ad skip buttons", "autoskip", ftConfig.autoskip),
                     createSettingBooleanRenderer("Hide Shorts", "Hide Shorts from home feeds and navigation bar", "hideShorts", ftConfig.hideShorts)
                 ],
                 focused: false,
@@ -94,10 +92,10 @@
     }
 
     function hookResolveCommand() {
-        if (typeof window._yttv !== 'object') return;
+        if (typeof window._yttv !== 'object' || !window._yttv) return;
         for (let key in window._yttv) {
             const inst = window._yttv[key]?.instance;
-            if (inst && inst.resolveCommand && !inst.__ft_rc_hooked) {
+            if (inst && typeof inst.resolveCommand === 'function' && !inst.__ft_rc_hooked) {
                 inst.__ft_rc_hooked = true;
                 const origRC = inst.resolveCommand;
                 inst.resolveCommand = function(command) {
@@ -151,13 +149,13 @@
         }
     }
 
-    // --- 4. Core JSON.parse Hook (VacuumTube Ad-Block & Settings) ---
+    // --- 4. Core JSON.parse Hook (VacuumTube-Style Pure Performance Ad-Block) ---
     const origParse = JSON.parse;
     JSON.parse = function() {
         const r = origParse.apply(this, arguments);
         if (!r || typeof r !== 'object') return r;
         try {
-            // A. Video ads removal (Safe VacuumTube method)
+            // A. Video ads removal (Instant memory zeroing)
             if (ftConfig.adblock) {
                 if (r.adPlacements) {
                     r.adPlacements = [];
@@ -176,6 +174,7 @@
             // B. Extract videoId for SponsorBlock
             if (r.videoDetails && r.videoDetails.videoId) {
                 checkSponsorBlock(r.videoDetails.videoId);
+                hookActiveVideo();
             }
 
             // C. Home feed ads & promos removal
@@ -325,7 +324,7 @@
         };
     }
 
-    // --- 6. Video Element Hooking & SponsorBlock Skipper ---
+    // --- 6. Event-Driven Video Hooking & SponsorBlock Skipper ---
     let trackedVideo = null;
     function onTimeUpdate() {
         if (!ftConfig.sponsorblock || !trackedVideo || trackedVideo.paused || !sponsorSegments.length) return;
@@ -348,36 +347,20 @@
         try { trackedVideo.addEventListener('timeupdate', onTimeUpdate, { passive: true }); } catch(e) {}
     }
 
-    // Watchdog & Settings Hook Interval
-    setInterval(() => {
+    function hookActiveVideo() {
         if (typeof document === 'undefined') return;
-        hookResolveCommand();
         const video = document.querySelector('video');
-        if (video) {
-            hookVideoElement(video);
-            
-            if (ftConfig.autoskip) {
-                const adShowing = document.querySelector('.ad-interrupting, .ad-showing, .ytp-ad-module, .ytp-ad-player-overlay, ytlr-ad-renderer, .ytp-ad-self-ad-badge, .ytp-ad-text');
-                if (adShowing) {
-                    if (video.duration && !isNaN(video.duration) && video.currentTime < video.duration) {
-                        video.currentTime = video.duration;
-                    }
-                    video.playbackRate = 16.0;
-                }
-                
-                const skipButton = document.querySelector('.ytp-ad-skip-button, .ytp-ad-skip-button-modern, .ytp-skip-ad-button, button.ytp-ad-skip-button');
-                if (skipButton && typeof skipButton.click === 'function') {
-                    skipButton.click();
-                }
-            }
-        }
+        if (video) hookVideoElement(video);
+        hookResolveCommand();
+    }
 
-        const hash = (typeof window !== 'undefined' && window.location && window.location.hash) ? window.location.hash : '';
-        if (hash && hash.indexOf('v=') !== -1) {
-            const vMatch = hash.match(/v=([a-zA-Z0-9_-]{11})/);
-            if (vMatch && vMatch[1]) checkSponsorBlock(vMatch[1]);
-        }
-    }, 500);
+    if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+        document.addEventListener('play', (e) => {
+            if (e.target && e.target.tagName === 'VIDEO') {
+                hookVideoElement(e.target);
+            }
+        }, true);
+    }
 
     // --- 7. CSS Rules Injection ---
     const injectStyles = () => {
