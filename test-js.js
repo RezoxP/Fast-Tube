@@ -231,21 +231,25 @@ eval(code);
     assert.strictEqual(ftSidebarCategory.title.runs[0].text, 'Fast-Tube: Sidebar Navigation');
     assert.strictEqual(ftSidebarCategory.items.length, 8, "Sidebar category must have 8 toggles");
 
-    // Category 3: SponsorBlock (Compact)
+    // Category 3: SponsorBlock (Per-Category Controls)
     const ftSBCategory = parsedSettings.items[2].settingCategoryCollectionRenderer;
     assert.strictEqual(ftSBCategory.categoryId, 'fast_tube_sb_category');
     assert.strictEqual(ftSBCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock');
-    assert.strictEqual(ftSBCategory.items.length, 9, "Compact SponsorBlock category must have 9 toggles");
+    assert.strictEqual(ftSBCategory.items.length, 13, "SponsorBlock category must have master switch + 6 Auto-Skip + 6 Skip Button toggles");
     assert.strictEqual(ftSBCategory.items[0].settingBooleanRenderer.itemId, 'sponsorblock');
-    assert.strictEqual(ftSBCategory.items[1].settingBooleanRenderer.itemId, 'sb_auto_skip');
-    assert.strictEqual(ftSBCategory.items[2].settingBooleanRenderer.itemId, 'sb_show_skip_button');
-    assert.strictEqual(ftSBCategory.items[3].settingBooleanRenderer.itemId, 'sb_sponsor');
-    assert.strictEqual(ftSBCategory.items[4].settingBooleanRenderer.itemId, 'sb_intro');
-    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.itemId, 'sb_outro');
-    assert.strictEqual(ftSBCategory.items[6].settingBooleanRenderer.itemId, 'sb_selfpromo');
-    assert.strictEqual(ftSBCategory.items[7].settingBooleanRenderer.itemId, 'sb_preview');
-    assert.strictEqual(ftSBCategory.items[8].settingBooleanRenderer.itemId, 'sb_music_offtopic');
-    console.log(" ✓ Injected compact General, Sidebar, and SponsorBlock categories with short descriptions (24 total toggles)");
+    assert.strictEqual(ftSBCategory.items[1].settingBooleanRenderer.itemId, 'sb_auto_sponsor');
+    assert.strictEqual(ftSBCategory.items[2].settingBooleanRenderer.itemId, 'sb_auto_intro');
+    assert.strictEqual(ftSBCategory.items[3].settingBooleanRenderer.itemId, 'sb_auto_outro');
+    assert.strictEqual(ftSBCategory.items[4].settingBooleanRenderer.itemId, 'sb_auto_selfpromo');
+    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.itemId, 'sb_auto_preview');
+    assert.strictEqual(ftSBCategory.items[6].settingBooleanRenderer.itemId, 'sb_auto_music_offtopic');
+    assert.strictEqual(ftSBCategory.items[7].settingBooleanRenderer.itemId, 'sb_btn_sponsor');
+    assert.strictEqual(ftSBCategory.items[8].settingBooleanRenderer.itemId, 'sb_btn_intro');
+    assert.strictEqual(ftSBCategory.items[9].settingBooleanRenderer.itemId, 'sb_btn_outro');
+    assert.strictEqual(ftSBCategory.items[10].settingBooleanRenderer.itemId, 'sb_btn_selfpromo');
+    assert.strictEqual(ftSBCategory.items[11].settingBooleanRenderer.itemId, 'sb_btn_preview');
+    assert.strictEqual(ftSBCategory.items[12].settingBooleanRenderer.itemId, 'sb_btn_music_offtopic');
+    console.log(" ✓ Injected per-category Auto-Skip & Skip Button toggles with short descriptions in SponsorBlock category");
 
     // Test toggle via resolveCommand
     // Simulate user toggling "Return YouTube Dislikes" to ON
