@@ -216,44 +216,54 @@ eval(code);
         ]
     });
     const parsedSettings = JSON.parse(rawSettingsPayload);
-    assert.strictEqual(parsedSettings.items.length, 3, "2 Fast-Tube categories added, Premium promo stripped");
+    assert.strictEqual(parsedSettings.items.length, 4, "3 Fast-Tube categories added, Premium promo stripped");
     
     // Category 1: General
     const ftGenCategory = parsedSettings.items[0].settingCategoryCollectionRenderer;
     assert.strictEqual(ftGenCategory.categoryId, 'fast_tube_general_category');
     assert.strictEqual(ftGenCategory.title.runs[0].text, 'Fast-Tube: General');
-    assert.strictEqual(ftGenCategory.items.length, 3, "General category must have 3 toggles");
+    assert.strictEqual(ftGenCategory.items.length, 4, "General category must have 4 toggles");
     assert.strictEqual(ftGenCategory.items[0].settingBooleanRenderer.itemId, 'adblock');
     assert.strictEqual(ftGenCategory.items[1].settingBooleanRenderer.itemId, 'hideShorts');
     assert.strictEqual(ftGenCategory.items[2].settingBooleanRenderer.itemId, 'hidePaidPromotion');
+    assert.strictEqual(ftGenCategory.items[3].settingBooleanRenderer.itemId, 'sb_show_toast');
 
-    // Category 2: SponsorBlock
-    const ftSBCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
-    assert.strictEqual(ftSBCategory.categoryId, 'fast_tube_sb_category');
-    assert.strictEqual(ftSBCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock');
-    assert.strictEqual(ftSBCategory.items.length, 10, "SponsorBlock category must have 10 granular toggles");
-    assert.strictEqual(ftSBCategory.items[0].settingBooleanRenderer.itemId, 'sponsorblock');
-    assert.strictEqual(ftSBCategory.items[1].settingBooleanRenderer.itemId, 'sb_auto_skip');
-    assert.strictEqual(ftSBCategory.items[2].settingBooleanRenderer.itemId, 'sb_show_skip_button');
-    assert.strictEqual(ftSBCategory.items[3].settingBooleanRenderer.itemId, 'sb_show_toast');
-    assert.strictEqual(ftSBCategory.items[4].settingBooleanRenderer.itemId, 'sb_sponsor');
-    assert.strictEqual(ftSBCategory.items[5].settingBooleanRenderer.itemId, 'sb_intro');
-    assert.strictEqual(ftSBCategory.items[6].settingBooleanRenderer.itemId, 'sb_outro');
-    assert.strictEqual(ftSBCategory.items[7].settingBooleanRenderer.itemId, 'sb_selfpromo');
-    assert.strictEqual(ftSBCategory.items[8].settingBooleanRenderer.itemId, 'sb_preview');
-    assert.strictEqual(ftSBCategory.items[9].settingBooleanRenderer.itemId, 'sb_music_offtopic');
-    console.log(" ✓ Injected interactive Fast-Tube General & SponsorBlock categories with 13 total granular toggles");
+    // Category 2: SponsorBlock (Auto-Skip)
+    const ftSBAutoCategory = parsedSettings.items[1].settingCategoryCollectionRenderer;
+    assert.strictEqual(ftSBAutoCategory.categoryId, 'fast_tube_sb_auto_category');
+    assert.strictEqual(ftSBAutoCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock (Auto-Skip)');
+    assert.strictEqual(ftSBAutoCategory.items.length, 7, "Auto-Skip category must have 7 toggles");
+    assert.strictEqual(ftSBAutoCategory.items[0].settingBooleanRenderer.itemId, 'sponsorblock');
+    assert.strictEqual(ftSBAutoCategory.items[1].settingBooleanRenderer.itemId, 'sb_auto_sponsor');
+    assert.strictEqual(ftSBAutoCategory.items[2].settingBooleanRenderer.itemId, 'sb_auto_intro');
+    assert.strictEqual(ftSBAutoCategory.items[3].settingBooleanRenderer.itemId, 'sb_auto_outro');
+    assert.strictEqual(ftSBAutoCategory.items[4].settingBooleanRenderer.itemId, 'sb_auto_selfpromo');
+    assert.strictEqual(ftSBAutoCategory.items[5].settingBooleanRenderer.itemId, 'sb_auto_preview');
+    assert.strictEqual(ftSBAutoCategory.items[6].settingBooleanRenderer.itemId, 'sb_auto_music_offtopic');
+
+    // Category 3: SponsorBlock (Skip Button)
+    const ftSBBtnCategory = parsedSettings.items[2].settingCategoryCollectionRenderer;
+    assert.strictEqual(ftSBBtnCategory.categoryId, 'fast_tube_sb_btn_category');
+    assert.strictEqual(ftSBBtnCategory.title.runs[0].text, 'Fast-Tube: SponsorBlock (Skip Button)');
+    assert.strictEqual(ftSBBtnCategory.items.length, 6, "Skip Button category must have 6 toggles");
+    assert.strictEqual(ftSBBtnCategory.items[0].settingBooleanRenderer.itemId, 'sb_btn_sponsor');
+    assert.strictEqual(ftSBBtnCategory.items[1].settingBooleanRenderer.itemId, 'sb_btn_intro');
+    assert.strictEqual(ftSBBtnCategory.items[2].settingBooleanRenderer.itemId, 'sb_btn_outro');
+    assert.strictEqual(ftSBBtnCategory.items[3].settingBooleanRenderer.itemId, 'sb_btn_selfpromo');
+    assert.strictEqual(ftSBBtnCategory.items[4].settingBooleanRenderer.itemId, 'sb_btn_preview');
+    assert.strictEqual(ftSBBtnCategory.items[5].settingBooleanRenderer.itemId, 'sb_btn_music_offtopic');
+    console.log(" ✓ Injected interactive Fast-Tube General, SB Auto-Skip & SB Skip Button categories with 17 total granular toggles");
 
     // Test toggle via resolveCommand
-    // Simulate user toggling "Skip Previews & Recaps" to ON
+    // Simulate user toggling "Auto-Skip: Previews & Recaps" to ON
     const toggleCommand = {
-        fastTubeOption: 'sb_preview',
+        fastTubeOption: 'sb_auto_preview',
         fastTubeValue: true
     };
     global._yttv.testModule.instance.resolveCommand(toggleCommand);
-    assert.strictEqual(ftSBCategory.items[8].settingBooleanRenderer.enabled, true, "sb_preview enabled state updated");
-    assert(localStorage.getItem('fast_tube_config').includes('"sb_preview":true'), "Settings persisted to localStorage");
-    console.log(" ✓ resolveCommand successfully handled granular SponsorBlock toggle & persisted to localStorage");
+    assert.strictEqual(ftSBAutoCategory.items[5].settingBooleanRenderer.enabled, true, "sb_auto_preview enabled state updated");
+    assert(localStorage.getItem('fast_tube_config').includes('"sb_auto_preview":true'), "Settings persisted to localStorage");
+    console.log(" ✓ resolveCommand successfully handled per-category toggle & persisted to localStorage");
 
     console.log("=== 6. Testing Network-Level Ad Blocking ===");
     const adRes = await window.fetch('https://www.youtube.com/api/stats/ads?ad_type=1');
