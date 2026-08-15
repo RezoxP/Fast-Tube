@@ -1,12 +1,12 @@
 // Fast-Tube Injection Script
-// Complete Return YouTube Dislikes (RYD), DeArrow, Low Memory Mode, Sidebar Toggles,
-// SponsorBlock (Auto-Skip vs Manual Skip Button per category), and Leanback Settings for YouTube TV
+// Compact & Fast SponsorBlock Configuration + Return YouTube Dislikes (RYD) + DeArrow + Low Memory Mode + Sidebar Tabs
+// Complete short descriptions for every setting on YouTube TV
 
 (function() {
     if (window.__fast_tube_injected__) return;
     window.__fast_tube_injected__ = true;
 
-    // --- 1. Config Management & Granular Settings ---
+    // --- 1. Config Management & Defaults ---
     const DEFAULT_CONFIG = {
         // General & Performance
         adblock: true,
@@ -17,7 +17,7 @@
         hidePaidPromotion: true,
         sb_show_toast: true,
 
-        // Sidebar Tabs
+        // Sidebar Navigation
         hideShortsTab: false,
         hideGamingTab: false,
         hideMusicTab: false,
@@ -27,24 +27,16 @@
         hideLiveTab: false,
         hideSportsTab: false,
 
-        // SponsorBlock Master Switch
+        // SponsorBlock (Compact & Fast)
         sponsorblock: true,
-
-        // Auto-Skip per category
-        sb_auto_sponsor: true,
-        sb_auto_intro: true,
-        sb_auto_outro: true,
-        sb_auto_selfpromo: true,
-        sb_auto_preview: false,
-        sb_auto_music_offtopic: false,
-
-        // Manual Skip Button prompt per category
-        sb_btn_sponsor: true,
-        sb_btn_intro: true,
-        sb_btn_outro: true,
-        sb_btn_selfpromo: true,
-        sb_btn_preview: true,
-        sb_btn_music_offtopic: true
+        sb_auto_skip: true,
+        sb_show_skip_button: true,
+        sb_sponsor: true,
+        sb_intro: true,
+        sb_outro: true,
+        sb_selfpromo: true,
+        sb_preview: false,
+        sb_music_offtopic: false
     };
 
     let ftConfig = Object.assign({}, DEFAULT_CONFIG);
@@ -123,7 +115,6 @@
 
         const formattedDislikes = formatCompactNumber(votes.dislikes);
 
-        // Patch transport controls like/dislike buttons
         const actions = r.transportControls?.transportControlsRenderer?.engagementActions;
         if (Array.isArray(actions)) {
             const likeAction = actions.find(a => a.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_LIKE_BUTTON');
@@ -133,7 +124,6 @@
             }
         }
 
-        // Patch video description factoid
         const panel = r.engagementPanels?.find(p => p.engagementPanelSectionListRenderer?.panelIdentifier === 'video-description-ep-identifier');
         const header = panel?.engagementPanelSectionListRenderer?.content?.structuredDescriptionContentRenderer?.items?.[0]?.videoDescriptionHeaderRenderer;
         if (header) {
@@ -230,13 +220,25 @@
     // --- 6. SponsorBlock Logic & Categories ---
     function getActiveSBCategories() {
         const cats = [];
-        if (ftConfig.sb_auto_sponsor || ftConfig.sb_btn_sponsor) cats.push('sponsor');
-        if (ftConfig.sb_auto_intro || ftConfig.sb_btn_intro) { cats.push('intro'); cats.push('intermission'); }
-        if (ftConfig.sb_auto_outro || ftConfig.sb_btn_outro) cats.push('outro');
-        if (ftConfig.sb_auto_selfpromo || ftConfig.sb_btn_selfpromo) cats.push('selfpromo');
-        if (ftConfig.sb_auto_preview || ftConfig.sb_btn_preview) { cats.push('preview'); cats.push('filler'); }
-        if (ftConfig.sb_auto_music_offtopic || ftConfig.sb_btn_music_offtopic) cats.push('music_offtopic');
+        if (ftConfig.sb_sponsor !== false) cats.push('sponsor');
+        if (ftConfig.sb_intro !== false) { cats.push('intro'); cats.push('intermission'); }
+        if (ftConfig.sb_outro !== false) cats.push('outro');
+        if (ftConfig.sb_selfpromo !== false) cats.push('selfpromo');
+        if (ftConfig.sb_preview !== false) { cats.push('preview'); cats.push('filler'); }
+        if (ftConfig.sb_music_offtopic !== false) cats.push('music_offtopic');
         return cats;
+    }
+
+    function isCategoryEnabled(category) {
+        switch (category) {
+            case 'sponsor': return ftConfig.sb_sponsor !== false;
+            case 'intro': case 'intermission': return ftConfig.sb_intro !== false;
+            case 'outro': return ftConfig.sb_outro !== false;
+            case 'selfpromo': return ftConfig.sb_selfpromo !== false;
+            case 'preview': case 'filler': return ftConfig.sb_preview !== false;
+            case 'music_offtopic': return ftConfig.sb_music_offtopic !== false;
+            default: return true;
+        }
     }
 
     function getCategoryName(category) {
@@ -249,22 +251,6 @@
             case 'music_offtopic': return 'Non-Music';
             default: return 'Segment';
         }
-    }
-
-    function getCategoryAction(category) {
-        let autoKey = null;
-        let btnKey = null;
-        switch (category) {
-            case 'sponsor': autoKey = 'sb_auto_sponsor'; btnKey = 'sb_btn_sponsor'; break;
-            case 'intro': case 'intermission': autoKey = 'sb_auto_intro'; btnKey = 'sb_btn_intro'; break;
-            case 'outro': autoKey = 'sb_auto_outro'; btnKey = 'sb_btn_outro'; break;
-            case 'selfpromo': autoKey = 'sb_auto_selfpromo'; btnKey = 'sb_btn_selfpromo'; break;
-            case 'preview': case 'filler': autoKey = 'sb_auto_preview'; btnKey = 'sb_btn_preview'; break;
-            case 'music_offtopic': autoKey = 'sb_auto_music_offtopic'; btnKey = 'sb_btn_music_offtopic'; break;
-        }
-        if (autoKey && ftConfig[autoKey]) return 'auto';
-        if (btnKey && ftConfig[btnKey]) return 'button';
-        return 'none';
     }
 
     // --- 7. Interactive Leanback Settings UI ---
@@ -286,7 +272,7 @@
         
         for (let i = 0; i < settingsObject.items.length; i++) {
             const cat = settingsObject.items[i]?.settingCategoryCollectionRenderer;
-            if (cat && (cat.categoryId === 'fast_tube_general_category' || cat.categoryId === 'fast_tube_sidebar_category' || cat.categoryId === 'fast_tube_sb_auto_category' || cat.categoryId === 'fast_tube_sb_btn_category')) {
+            if (cat && (cat.categoryId === 'fast_tube_general_category' || cat.categoryId === 'fast_tube_sidebar_category' || cat.categoryId === 'fast_tube_sb_category')) {
                 return;
             }
         }
@@ -296,13 +282,13 @@
                 categoryId: "fast_tube_general_category",
                 title: { runs: [{ text: "Fast-Tube: General & Performance" }] },
                 items: [
-                    createSettingBooleanRenderer("Ad-Block", "Block video ads, banners, and promoted feed items", "adblock", ftConfig.adblock),
-                    createSettingBooleanRenderer("Low Memory Mode", "Enable memory saving mode and reduce cache retention", "low_memory_mode", ftConfig.low_memory_mode),
-                    createSettingBooleanRenderer("Return YouTube Dislikes", "Fetch and display true dislike counts on videos", "returnDislikes", ftConfig.returnDislikes),
+                    createSettingBooleanRenderer("Ad-Block", "Block all video ads, sponsored feed cards, and banners", "adblock", ftConfig.adblock),
+                    createSettingBooleanRenderer("Low Memory Mode", "Optimize RAM usage and aggressively free video caches", "low_memory_mode", ftConfig.low_memory_mode),
+                    createSettingBooleanRenderer("Return YouTube Dislikes", "Fetch and display public dislike counts on video player", "returnDislikes", ftConfig.returnDislikes),
                     createSettingBooleanRenderer("DeArrow Clean Titles", "Replace clickbait titles with community-submitted titles", "dearrow", ftConfig.dearrow),
-                    createSettingBooleanRenderer("DeArrow Clean Thumbnails", "Replace clickbait thumbnails with clean video frames", "dearrow_thumbnails", ftConfig.dearrow_thumbnails),
-                    createSettingBooleanRenderer("Hide Paid Promo Badges", "Hide 'Includes paid promotion' overlays on videos", "hidePaidPromotion", ftConfig.hidePaidPromotion),
-                    createSettingBooleanRenderer("Show Toast Notifications", "Show on-screen notification when a segment is skipped", "sb_show_toast", ftConfig.sb_show_toast)
+                    createSettingBooleanRenderer("DeArrow Clean Thumbnails", "Replace misleading thumbnails with clean video stills", "dearrow_thumbnails", ftConfig.dearrow_thumbnails),
+                    createSettingBooleanRenderer("Hide Paid Promo Badges", "Remove 'Includes paid promotion' overlays from video player", "hidePaidPromotion", ftConfig.hidePaidPromotion),
+                    createSettingBooleanRenderer("Show Toast Notifications", "Display on-screen banner popup when skipping a segment", "sb_show_toast", ftConfig.sb_show_toast)
                 ],
                 focused: false,
                 trackingParams: "null"
@@ -314,49 +300,34 @@
                 categoryId: "fast_tube_sidebar_category",
                 title: { runs: [{ text: "Fast-Tube: Sidebar Navigation" }] },
                 items: [
-                    createSettingBooleanRenderer("Hide Shorts Tab", "Hide Shorts button from sidebar navigation", "hideShortsTab", ftConfig.hideShortsTab),
-                    createSettingBooleanRenderer("Hide Gaming Tab", "Hide Gaming button from sidebar navigation", "hideGamingTab", ftConfig.hideGamingTab),
-                    createSettingBooleanRenderer("Hide Music Tab", "Hide YouTube Music button from sidebar navigation", "hideMusicTab", ftConfig.hideMusicTab),
-                    createSettingBooleanRenderer("Hide News Tab", "Hide News button from sidebar navigation", "hideNewsTab", ftConfig.hideNewsTab),
-                    createSettingBooleanRenderer("Hide Podcasts Tab", "Hide Podcasts button from sidebar navigation", "hidePodcastsTab", ftConfig.hidePodcastsTab),
-                    createSettingBooleanRenderer("Hide Movies & TV Tab", "Hide Movies & TV button from sidebar navigation", "hideMoviesTab", ftConfig.hideMoviesTab),
-                    createSettingBooleanRenderer("Hide Live Tab", "Hide Live Streams button from sidebar navigation", "hideLiveTab", ftConfig.hideLiveTab),
-                    createSettingBooleanRenderer("Hide Sports Tab", "Hide Sports button from sidebar navigation", "hideSportsTab", ftConfig.hideSportsTab)
+                    createSettingBooleanRenderer("Hide Shorts Tab", "Hide Shorts button from the left navigation sidebar", "hideShortsTab", ftConfig.hideShortsTab),
+                    createSettingBooleanRenderer("Hide Gaming Tab", "Hide Gaming section from the left navigation sidebar", "hideGamingTab", ftConfig.hideGamingTab),
+                    createSettingBooleanRenderer("Hide Music Tab", "Hide YouTube Music from the left navigation sidebar", "hideMusicTab", ftConfig.hideMusicTab),
+                    createSettingBooleanRenderer("Hide News Tab", "Hide News section from the left navigation sidebar", "hideNewsTab", ftConfig.hideNewsTab),
+                    createSettingBooleanRenderer("Hide Podcasts Tab", "Hide Podcasts section from the left navigation sidebar", "hidePodcastsTab", ftConfig.hidePodcastsTab),
+                    createSettingBooleanRenderer("Hide Movies & TV Tab", "Hide Movies & TV from the left navigation sidebar", "hideMoviesTab", ftConfig.hideMoviesTab),
+                    createSettingBooleanRenderer("Hide Live Tab", "Hide Live Streams section from the left navigation sidebar", "hideLiveTab", ftConfig.hideLiveTab),
+                    createSettingBooleanRenderer("Hide Sports Tab", "Hide Sports section from the left navigation sidebar", "hideSportsTab", ftConfig.hideSportsTab)
                 ],
                 focused: false,
                 trackingParams: "null"
             }
         };
 
-        const ftSBAutoCategory = {
+        const ftSBCategory = {
             settingCategoryCollectionRenderer: {
-                categoryId: "fast_tube_sb_auto_category",
-                title: { runs: [{ text: "Fast-Tube: SponsorBlock (Auto-Skip)" }] },
+                categoryId: "fast_tube_sb_category",
+                title: { runs: [{ text: "Fast-Tube: SponsorBlock" }] },
                 items: [
-                    createSettingBooleanRenderer("Enable SponsorBlock", "Master switch for SponsorBlock capabilities", "sponsorblock", ftConfig.sponsorblock),
-                    createSettingBooleanRenderer("Auto-Skip: Sponsors", "Automatically skip paid promotions and endorsements", "sb_auto_sponsor", ftConfig.sb_auto_sponsor),
-                    createSettingBooleanRenderer("Auto-Skip: Intros & Intermissions", "Automatically skip channel intros and animation pauses", "sb_auto_intro", ftConfig.sb_auto_intro),
-                    createSettingBooleanRenderer("Auto-Skip: Outros & End Cards", "Automatically skip end credits and outro screens", "sb_auto_outro", ftConfig.sb_auto_outro),
-                    createSettingBooleanRenderer("Auto-Skip: Self-Promotion", "Automatically skip merch plugs and channel reminders", "sb_auto_selfpromo", ftConfig.sb_auto_selfpromo),
-                    createSettingBooleanRenderer("Auto-Skip: Previews & Recaps", "Automatically skip episode recaps and teaser clips", "sb_auto_preview", ftConfig.sb_auto_preview),
-                    createSettingBooleanRenderer("Auto-Skip: Non-Music Sections", "Automatically skip dialogue breaks and music video intros", "sb_auto_music_offtopic", ftConfig.sb_auto_music_offtopic)
-                ],
-                focused: false,
-                trackingParams: "null"
-            }
-        };
-
-        const ftSBBtnCategory = {
-            settingCategoryCollectionRenderer: {
-                categoryId: "fast_tube_sb_btn_category",
-                title: { runs: [{ text: "Fast-Tube: SponsorBlock (Skip Button)" }] },
-                items: [
-                    createSettingBooleanRenderer("Skip Button: Sponsors", "Show on-screen button to skip sponsors manually", "sb_btn_sponsor", ftConfig.sb_btn_sponsor),
-                    createSettingBooleanRenderer("Skip Button: Intros & Intermissions", "Show on-screen button to skip intros manually", "sb_btn_intro", ftConfig.sb_btn_intro),
-                    createSettingBooleanRenderer("Skip Button: Outros & End Cards", "Show on-screen button to skip outros manually", "sb_btn_outro", ftConfig.sb_btn_outro),
-                    createSettingBooleanRenderer("Skip Button: Self-Promotion", "Show on-screen button to skip self-promotion manually", "sb_btn_selfpromo", ftConfig.sb_btn_selfpromo),
-                    createSettingBooleanRenderer("Skip Button: Previews & Recaps", "Show on-screen button to skip previews manually", "sb_btn_preview", ftConfig.sb_btn_preview),
-                    createSettingBooleanRenderer("Skip Button: Non-Music Sections", "Show on-screen button to skip non-music manually", "sb_btn_music_offtopic", ftConfig.sb_btn_music_offtopic)
+                    createSettingBooleanRenderer("Enable SponsorBlock", "Master switch to enable SponsorBlock segment skipping", "sponsorblock", ftConfig.sponsorblock),
+                    createSettingBooleanRenderer("Auto-Skip Mode", "Instantly jump past segments (turn OFF to show Skip Button)", "sb_auto_skip", ftConfig.sb_auto_skip),
+                    createSettingBooleanRenderer("Show Skip Button Prompt", "Display on-screen button to skip segments manually with OK", "sb_show_skip_button", ftConfig.sb_show_skip_button),
+                    createSettingBooleanRenderer("Skip Sponsors", "Skip paid promotions, sponsorships, and affiliate plugs", "sb_sponsor", ftConfig.sb_sponsor),
+                    createSettingBooleanRenderer("Skip Intros & Intermissions", "Skip channel intro animations, title cards, and pauses", "sb_intro", ftConfig.sb_intro),
+                    createSettingBooleanRenderer("Skip Outros & End Cards", "Skip end credits, outro screens, and subscribe cards", "sb_outro", ftConfig.sb_outro),
+                    createSettingBooleanRenderer("Skip Self-Promotion", "Skip merch plugs, subscribe reminders, and memberships", "sb_selfpromo", ftConfig.sb_selfpromo),
+                    createSettingBooleanRenderer("Skip Previews & Recaps", "Skip 'coming up' previews, teaser clips, and recaps", "sb_preview", ftConfig.sb_preview),
+                    createSettingBooleanRenderer("Skip Non-Music Sections", "Skip music video dialogue breaks and non-music parts", "sb_music_offtopic", ftConfig.sb_music_offtopic)
                 ],
                 focused: false,
                 trackingParams: "null"
@@ -366,8 +337,7 @@
         window.__ftSettingsCategories = [
             ftGeneralCategory.settingCategoryCollectionRenderer,
             ftSidebarCategory.settingCategoryCollectionRenderer,
-            ftSBAutoCategory.settingCategoryCollectionRenderer,
-            ftSBBtnCategory.settingCategoryCollectionRenderer
+            ftSBCategory.settingCategoryCollectionRenderer
         ];
 
         // Filter out "Get YouTube Premium" and promo categories from settings
@@ -380,8 +350,7 @@
         }
 
         // Add Fast-Tube categories to top of settings
-        settingsObject.items.unshift(ftSBBtnCategory);
-        settingsObject.items.unshift(ftSBAutoCategory);
+        settingsObject.items.unshift(ftSBCategory);
         settingsObject.items.unshift(ftSidebarCategory);
         settingsObject.items.unshift(ftGeneralCategory);
     }
@@ -547,7 +516,7 @@
         }
     }
 
-    // --- 10. Core JSON.parse Hook (Pure Performance Ad-Block + RYD + DeArrow + Settings + Sidebar) ---
+    // --- 10. Core JSON.parse Hook ---
     const origParse = JSON.parse;
     JSON.parse = function() {
         const r = origParse.apply(this, arguments);
@@ -725,7 +694,7 @@
         };
     }
 
-    // --- 12. Event-Driven Video Hooking & Per-Category SponsorBlock ---
+    // --- 12. Event-Driven Video Hooking & SponsorBlock ---
     let trackedVideo = null;
     function onTimeUpdate() {
         if (!ftConfig.sponsorblock || !trackedVideo || trackedVideo.paused || !sponsorSegments.length) {
@@ -743,17 +712,16 @@
             }
         }
 
-        if (inSegment) {
+        if (inSegment && isCategoryEnabled(inSegment.category)) {
             const catName = getCategoryName(inSegment.category);
-            const action = getCategoryAction(inSegment.category);
 
-            if (action === 'auto') {
+            if (ftConfig.sb_auto_skip) {
                 removeSkipButton();
                 trackedVideo.currentTime = inSegment.end;
                 if (ftConfig.sb_show_toast !== false) {
                     showToast("Fast-Tube", "Skipped " + catName + " segment");
                 }
-            } else if (action === 'button') {
+            } else if (ftConfig.sb_show_skip_button !== false) {
                 if (activePromptSegment !== inSegment) {
                     activePromptSegment = inSegment;
                     showSkipButton(inSegment, catName);
