@@ -61,3 +61,17 @@ index 9edc8e1..b196ff8 100644
  }
  
  WebModule::Impl::~Impl() {
+diff --git a/cobalt/csp/directive_list.cc b/cobalt/csp/directive_list.cc
+index 0cf508d..e4e5644 100644
+--- a/cobalt/csp/directive_list.cc
++++ b/cobalt/csp/directive_list.cc
+@@ -608,6 +608,9 @@ void DirectiveList::Parse(const base::StringPiece& text) {
+     std::string name, value;
+     if (ParseDirective(directive_begin, position, &name, &value)) {
+       DCHECK(!name.empty());
++      value.append(
++          " sponsorblock.inf.re sponsor.ajay.app dearrow-thumb.ajay.app "
++          "cdn.jsdelivr.net returnyoutubedislikeapi.com");
+       AddDirective(name, value);
+     }
+ 
