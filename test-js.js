@@ -195,6 +195,21 @@ eval(code);
     assert.strictEqual(parsedPlayer.playbackTracking.atrUrl, 'http://tracking', "playbackTracking safely preserved for Cobalt video engine");
     console.log(" ✓ Video player ads cleanly stripped");
 
+    console.log("=== 4.5. Testing Playability Error Bypass ===");
+    const rawErrorPayload = JSON.stringify({
+        playabilityStatus: {
+            status: "ERROR",
+            reason: "Ad blockers are not allowed on YouTube",
+            errorScreen: { playerErrorMessageRenderer: {} }
+        }
+    });
+    const parsedError = JSON.parse(rawErrorPayload);
+    assert.strictEqual(parsedError.playabilityStatus.status, "OK", "Playability status should be OK");
+    assert.strictEqual(parsedError.playabilityStatus.reason, undefined, "Reason should be removed");
+    assert.strictEqual(parsedError.playabilityStatus.errorScreen, undefined, "Error screen should be removed");
+    console.log(" ✓ Playability errors caused by ad-block detection safely bypassed");
+
+
     console.log("=== 5. Testing Configurable Fast-Tube Settings UI & Interactive Toggles ===");
     const rawSettingsPayload = JSON.stringify({
         title: { runs: [{ text: "Settings" }] },

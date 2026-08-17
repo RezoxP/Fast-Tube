@@ -685,6 +685,18 @@
         return false;
     }
 
+    function signalSettingsRefresh() {
+        // Force YouTube TV Leanback UI to pick up new boolean states by
+        // dispatching a lightweight navigation signal that causes the
+        // settings panel to re-render without closing it.
+        try {
+            if (typeof document !== 'undefined') {
+                const evt = new Event('yt-navigate-finish', { bubbles: true });
+                document.dispatchEvent(evt);
+            }
+        } catch(e) {}
+    }
+
     function hookResolveCommand() {
         if (typeof window._yttv !== 'object' || !window._yttv) return;
         for (let key in window._yttv) {
@@ -711,6 +723,7 @@
                             removeSkipButton();
                         }
                         updateDirectSettingsCategories();
+                        signalSettingsRefresh();
                         return true;
                     }
 
@@ -727,6 +740,7 @@
                                     if (val) clearAllCaches();
                                 }
                                 updateDirectSettingsCategories();
+                                signalSettingsRefresh();
                             }
                         }
                     }
@@ -749,6 +763,7 @@
                                 ftConfig[c.fastTubeOption] = !!c.fastTubeValue;
                                 saveConfig();
                                 updateDirectSettingsCategories();
+                                signalSettingsRefresh();
                             }
                         }
                     }
@@ -880,13 +895,9 @@
     // --- 10. Playback Error Fix via isInlinePlaybackNoAd in JSON.stringify ---
     const origStringify = JSON.stringify;
     JSON.stringify = function (value, replacer, space) {
-        if (value?.playbackContext?.contentPlaybackContext) {
+        if (value && typeof value === 'object' && value.playbackContext?.contentPlaybackContext) {
             try {
-                const copiedValue = JSON.parse(origStringify(value));
-                if (!copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
-                    copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
-                    return origStringify.call(this, copiedValue, replacer, space);
-                }
+                value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
             } catch(e) {}
         }
         return origStringify.call(this, value, replacer, space);
@@ -904,6 +915,17 @@
                 if (r.adPlacements) r.adPlacements = [];
                 if (r.playerAds) r.playerAds = [];
                 if (r.adSlots) r.adSlots = [];
+                // Fix playability errors caused by ad-block detection
+                if (r.playabilityStatus) {
+                    if (r.playabilityStatus.status === 'ERROR' || r.playabilityStatus.status === 'UNPLAYABLE' || r.playabilityStatus.status === 'LOGIN_REQUIRED') {
+                        if (r.playabilityStatus.reason?.includes?.('ad') || r.playabilityStatus.reason?.includes?.('premium') || r.playabilityStatus.errorScreen) {
+                            r.playabilityStatus.status = 'OK';
+                            delete r.playabilityStatus.reason;
+                            delete r.playabilityStatus.errorScreen;
+                            delete r.playabilityStatus.playabilityErrorReport;
+                        }
+                    }
+                }
             }
 
             if (ftConfig.hidePaidPromotion && r.paidContentOverlay) {
@@ -1036,9 +1058,19 @@
             }
             if (url.indexOf('/youtubei/v1/player') !== -1) {
                 try {
-                    if (args[1] && args[1].body) {
-                        const reqData = typeof args[1].body === 'string' ? JSON.parse(args[1].body) : args[1].body;
-                        if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
+                    if (args[1] && args[1].body && typeof args[1].body === 'string') {
+                        const reqData = origParse(args[1].body);
+                        if (reqData) {
+                            if (reqData.videoId) checkSponsorBlock(reqData.videoId);
+                            if (reqData.playbackContext && reqData.playbackContext.contentPlaybackContext) {
+                                reqData.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
+                            } else if (!reqData.playbackContext) {
+                                reqData.playbackContext = { contentPlaybackContext: { isInlinePlaybackNoAd: true } };
+                            } else if (!reqData.playbackContext.contentPlaybackContext) {
+                                reqData.playbackContext.contentPlaybackContext = { isInlinePlaybackNoAd: true };
+                            }
+                            args[1] = Object.assign({}, args[1], { body: origStringify(reqData) });
+                        }
                     }
                 } catch(e) {}
             }
@@ -1076,8 +1108,20 @@
 
             if (url.indexOf('/youtubei/v1/player') !== -1 && body) {
                 try {
-                    const reqData = typeof body === 'string' ? JSON.parse(body) : body;
-                    if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
+                    if (typeof body === 'string') {
+                        const reqData = origParse(body);
+                        if (reqData) {
+                            if (reqData.videoId) checkSponsorBlock(reqData.videoId);
+                            if (reqData.playbackContext && reqData.playbackContext.contentPlaybackContext) {
+                                reqData.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
+                            } else if (!reqData.playbackContext) {
+                                reqData.playbackContext = { contentPlaybackContext: { isInlinePlaybackNoAd: true } };
+                            } else if (!reqData.playbackContext.contentPlaybackContext) {
+                                reqData.playbackContext.contentPlaybackContext = { isInlinePlaybackNoAd: true };
+                            }
+                            body = origStringify(reqData);
+                        }
+                    }
                 } catch(e) {}
             }
 
