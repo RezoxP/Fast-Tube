@@ -896,9 +896,29 @@
     const origStringify = JSON.stringify;
     JSON.stringify = function (value, replacer, space) {
         if (value && typeof value === 'object' && value.playbackContext?.contentPlaybackContext) {
-            try {
-                value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
-            } catch(e) {}
+            // Do not mutate the original object as it breaks Polymer UI state
+            if (!replacer) {
+                return origStringify.call(this, value, function (k, v) {
+                    if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
+                        return Object.assign({}, v, { isInlinePlaybackNoAd: true });
+                    }
+                    return v;
+                }, space);
+            } else if (typeof replacer === 'function') {
+                return origStringify.call(this, value, function (k, v) {
+                    if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
+                        v = Object.assign({}, v, { isInlinePlaybackNoAd: true });
+                    }
+                    return replacer.call(this, k, v);
+                }, space);
+            } else {
+                // If replacer is an array, it's safer to do string replacement
+                const str = origStringify.call(this, value, replacer, space);
+                if (typeof str === 'string' && !str.includes('"isInlinePlaybackNoAd":true')) {
+                    return str.replace(/"contentPlaybackContext"\s*:\s*{/, '"contentPlaybackContext":{"isInlinePlaybackNoAd":true,');
+                }
+                return str;
+            }
         }
         return origStringify.call(this, value, replacer, space);
     };

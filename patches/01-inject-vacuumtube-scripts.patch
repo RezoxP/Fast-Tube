@@ -23,32 +23,24 @@ index 9edc8e1..b196ff8 100644
 +  }
 +
 +  void InjectFastTubeScript() {
-+    std::string adblock_script;
-+    base::FilePath web_root;
-+    if (base::PathService::Get(cobalt::paths::DIR_COBALT_WEB_ROOT, &web_root)) {
-+      base::ReadFileToString(web_root.Append("vacuumtube_adblock.js"), &adblock_script);
-+      if (adblock_script.empty()) {
-+        base::ReadFileToString(web_root.Append("injection").Append("vacuumtube_adblock.js"), &adblock_script);
-+      }
-+    }
-+    if (adblock_script.empty()) {
-+      char content_dir[512] = {0};
-+      if (SbSystemGetPath(kSbSystemPathContentDirectory, content_dir, sizeof(content_dir))) {
-+        base::ReadFileToString(base::FilePath(content_dir).Append("vacuumtube_adblock.js"), &adblock_script);
-+        if (adblock_script.empty()) {
-+          base::ReadFileToString(base::FilePath(content_dir).Append("web").Append("vacuumtube_adblock.js"), &adblock_script);
-+        }
-+        if (adblock_script.empty()) {
-+          base::ReadFileToString(base::FilePath(content_dir).Append("injection").Append("vacuumtube_adblock.js"), &adblock_script);
-+        }
-+      }
-+    }
-+    if (!adblock_script.empty()) {
-+      bool succeeded = false;
-+      ExecuteJavascript(adblock_script, base::SourceLocation("vacuumtube_adblock.js", 1, 1), NULL, &succeeded);
-+      LOG(INFO) << "[Fast-Tube] AdBlock & Settings script injection result: " << succeeded;
-+    }
-   }
++    // Generate an epoch timestamp to bypass caching (auto-update)
++    double epoch_time = base::Time::Now().ToDoubleT();
++    std::string url = "https://cdn.jsdelivr.net/gh/RezoxP/Fast-Tube@main/scripts/injection/vacuumtube_adblock.js?v=" + std::to_string(epoch_time);
++
++    // Inject a <script> tag to load the remote script, exactly like TizenTube
++    std::string js_code = 
++        "var script = document.createElement('script');"
++        "script.src = '" + url + "';"
++        "if (document.head) {"
++        "  document.head.appendChild(script);"
++        "} else {"
++        "  document.documentElement.appendChild(script);"
++        "}";
++
++    bool succeeded = false;
++    ExecuteJavascript(js_code, base::SourceLocation("vacuumtube_adblock_injector.js", 1, 1), NULL, &succeeded);
++    LOG(INFO) << "[Fast-Tube] Auto-update script injection result: " << succeeded;
++  }
  
    // Inject the DOM event object into the window or the element.
 @@ -747,6 +782,9 @@ WebModule::Impl::Impl(web::Context* web_context, const ConstructionData& data)
