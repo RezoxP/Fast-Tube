@@ -40,7 +40,7 @@ index 9edc8e1..b196ff8 100644
 +    bool succeeded = false;
 +    ExecuteJavascript(js_code, base::SourceLocation("vacuumtube_adblock_injector.js", 1, 1), NULL, &succeeded);
 +    LOG(INFO) << "[Fast-Tube] Auto-update script injection result: " << succeeded;
-+  }
+   }
  
    // Inject the DOM event object into the window or the element.
 @@ -747,6 +782,9 @@ WebModule::Impl::Impl(web::Context* web_context, const ConstructionData& data)
