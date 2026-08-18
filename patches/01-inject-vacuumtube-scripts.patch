@@ -13,7 +13,7 @@ index 9edc8e1..b196ff8 100644
  #include "base/command_line.h"
  #include "base/logging.h"
  #include "base/memory/weak_ptr.h"
-@@ -345,6 +349,37 @@ class WebModule::Impl {
+@@ -345,6 +349,53 @@ class WebModule::Impl {
              window_->performance(), load_timing_info);
        }
      }
