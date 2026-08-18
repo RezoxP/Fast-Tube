@@ -892,37 +892,10 @@
         }
     }
 
-    // --- 10. Playback Error Fix via isInlinePlaybackNoAd in JSON.stringify ---
-    const origStringify = JSON.stringify;
-    JSON.stringify = function (value, replacer, space) {
-        if (value && typeof value === 'object' && value.playbackContext?.contentPlaybackContext) {
-            // Do not mutate the original object as it breaks Polymer UI state
-            if (!replacer) {
-                return origStringify.call(this, value, function (k, v) {
-                    if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
-                        return Object.assign({}, v, { isInlinePlaybackNoAd: true });
-                    }
-                    return v;
-                }, space);
-            } else if (typeof replacer === 'function') {
-                return origStringify.call(this, value, function (k, v) {
-                    if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
-                        v = Object.assign({}, v, { isInlinePlaybackNoAd: true });
-                    }
-                    return replacer.call(this, k, v);
-                }, space);
-            } else {
-                // If replacer is an array, it's safer to do string replacement
-                const str = origStringify.call(this, value, replacer, space);
-                if (typeof str === 'string' && !str.includes('"isInlinePlaybackNoAd":true')) {
-                    return str.replace(/"contentPlaybackContext"\s*:\s*{/, '"contentPlaybackContext":{"isInlinePlaybackNoAd":true,');
-                }
-                return str;
-            }
-        }
-        return origStringify.call(this, value, replacer, space);
-    };
-    window.JSON.stringify = JSON.stringify;
+    // --- 10. Playback Error Fix ---
+    // Removed JSON.stringify and XHR body mutation. We now rely strictly on JSON.parse hooking,
+    // identical to TizenTube's approach, which intercepts API responses before Polymer processes them,
+    // avoiding UI state corruption and "video playback errors".
 
     // --- 11. Core JSON.parse Hook (Ad-Stripping, Feeds & Settings) ---
     const origParse = JSON.parse;
@@ -1053,7 +1026,6 @@
         for (const key in window._yttv) {
             if (window._yttv[key] && window._yttv[key].JSON) {
                 window._yttv[key].JSON.parse = JSON.parse;
-                window._yttv[key].JSON.stringify = JSON.stringify;
             }
         }
     }
@@ -1076,21 +1048,12 @@
                     headers: { 'Content-Type': 'application/json' }
                 });
             }
+            // SponsorBlock hook only, no body mutation
             if (url.indexOf('/youtubei/v1/player') !== -1) {
                 try {
                     if (args[1] && args[1].body && typeof args[1].body === 'string') {
                         const reqData = origParse(args[1].body);
-                        if (reqData) {
-                            if (reqData.videoId) checkSponsorBlock(reqData.videoId);
-                            if (reqData.playbackContext && reqData.playbackContext.contentPlaybackContext) {
-                                reqData.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
-                            } else if (!reqData.playbackContext) {
-                                reqData.playbackContext = { contentPlaybackContext: { isInlinePlaybackNoAd: true } };
-                            } else if (!reqData.playbackContext.contentPlaybackContext) {
-                                reqData.playbackContext.contentPlaybackContext = { isInlinePlaybackNoAd: true };
-                            }
-                            args[1] = Object.assign({}, args[1], { body: origStringify(reqData) });
-                        }
+                        if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
                     }
                 } catch(e) {}
             }
@@ -1126,21 +1089,12 @@
                 return;
             }
 
+            // SponsorBlock hook only, no body mutation
             if (url.indexOf('/youtubei/v1/player') !== -1 && body) {
                 try {
                     if (typeof body === 'string') {
                         const reqData = origParse(body);
-                        if (reqData) {
-                            if (reqData.videoId) checkSponsorBlock(reqData.videoId);
-                            if (reqData.playbackContext && reqData.playbackContext.contentPlaybackContext) {
-                                reqData.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
-                            } else if (!reqData.playbackContext) {
-                                reqData.playbackContext = { contentPlaybackContext: { isInlinePlaybackNoAd: true } };
-                            } else if (!reqData.playbackContext.contentPlaybackContext) {
-                                reqData.playbackContext.contentPlaybackContext = { isInlinePlaybackNoAd: true };
-                            }
-                            body = origStringify(reqData);
-                        }
+                        if (reqData && reqData.videoId) checkSponsorBlock(reqData.videoId);
                     }
                 } catch(e) {}
             }
@@ -1148,8 +1102,6 @@
             return origSend.call(this, body);
         };
     }
-
-    // --- 13. Event-Driven Video Hooking, Watchdog & Per-Category SponsorBlock ---
     let trackedVideo = null;
     function onTimeUpdate() {
         if (!trackedVideo) return;

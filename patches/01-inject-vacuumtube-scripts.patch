@@ -13,7 +13,7 @@ index 9edc8e1..b196ff8 100644
  #include "base/command_line.h"
  #include "base/logging.h"
  #include "base/memory/weak_ptr.h"
-@@ -345,6 +349,29 @@ class WebModule::Impl {
+@@ -345,6 +349,37 @@ class WebModule::Impl {
              window_->performance(), load_timing_info);
        }
      }
@@ -23,23 +23,47 @@ index 9edc8e1..b196ff8 100644
 +  }
 +
 +  void InjectFastTubeScript() {
-+    // Generate an epoch timestamp to bypass caching (auto-update)
-+    double epoch_time = base::Time::Now().ToDoubleT();
-+    std::string url = "https://cdn.jsdelivr.net/gh/RezoxP/Fast-Tube@main/scripts/injection/vacuumtube_adblock.js?v=" + std::to_string(epoch_time);
++    // 1. Try to fetch the latest script from GitHub synchronously for realtime auto-update
++    std::string js_fetch_code = 
++      "try {"
++      "  var xhr = new XMLHttpRequest();"
++      "  xhr.open('GET', 'https://raw.githubusercontent.com/RezoxP/Fast-Tube/main/scripts/injection/vacuumtube_adblock.js?v=' + Date.now(), false);"
++      "  xhr.send(null);"
++      "  if (xhr.status === 200 && xhr.responseText) {"
++      "    eval(xhr.responseText);"
++      "    window.__ft_injected_remote = true;"
++      "  }"
++      "} catch(e) {}";
++    
++    bool remote_succeeded = false;
++    ExecuteJavascript(js_fetch_code, base::SourceLocation("ft_auto_update.js", 1, 1), NULL, &remote_succeeded);
 +
-+    // Inject a <script> tag to load the remote script, exactly like TizenTube
-+    std::string js_code = 
-+        "var script = document.createElement('script');"
-+        "script.src = '" + url + "';"
-+        "if (document.head) {"
-+        "  document.head.appendChild(script);"
-+        "} else {"
-+        "  document.documentElement.appendChild(script);"
-+        "}";
-+
-+    bool succeeded = false;
-+    ExecuteJavascript(js_code, base::SourceLocation("vacuumtube_adblock_injector.js", 1, 1), NULL, &succeeded);
-+    LOG(INFO) << "[Fast-Tube] Auto-update script injection result: " << succeeded;
++    // 2. Read the local embedded script as a fallback
++    std::string adblock_script;
++    base::FilePath web_root;
++    if (base::PathService::Get(cobalt::paths::DIR_COBALT_WEB_ROOT, &web_root)) {
++      base::ReadFileToString(web_root.Append("vacuumtube_adblock.js"), &adblock_script);
++      if (adblock_script.empty()) {
++        base::ReadFileToString(web_root.Append("injection").Append("vacuumtube_adblock.js"), &adblock_script);
++      }
++    }
++    if (adblock_script.empty()) {
++      char content_dir[512] = {0};
++      if (SbSystemGetPath(kSbSystemPathContentDirectory, content_dir, sizeof(content_dir))) {
++        base::ReadFileToString(base::FilePath(content_dir).Append("vacuumtube_adblock.js"), &adblock_script);
++        if (adblock_script.empty()) {
++          base::ReadFileToString(base::FilePath(content_dir).Append("web").Append("vacuumtube_adblock.js"), &adblock_script);
++        }
++        if (adblock_script.empty()) {
++          base::ReadFileToString(base::FilePath(content_dir).Append("injection").Append("vacuumtube_adblock.js"), &adblock_script);
++        }
++      }
++    }
++    if (!adblock_script.empty()) {
++      std::string js_fallback = "if (!window.__ft_injected_remote) {\n" + adblock_script + "\n}";
++      bool fallback_succeeded = false;
++      ExecuteJavascript(js_fallback, base::SourceLocation("vacuumtube_adblock.js", 1, 1), NULL, &fallback_succeeded);
++    }
    }
  
    // Inject the DOM event object into the window or the element.
@@ -63,7 +87,7 @@ index 0cf508d..e4e5644 100644
        DCHECK(!name.empty());
 +      value.append(
 +          " sponsorblock.inf.re sponsor.ajay.app dearrow-thumb.ajay.app "
-+          "cdn.jsdelivr.net returnyoutubedislikeapi.com");
++          "cdn.jsdelivr.net returnyoutubedislikeapi.com raw.githubusercontent.com");
        AddDirective(name, value);
      }
  
