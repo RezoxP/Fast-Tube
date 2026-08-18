@@ -1106,16 +1106,6 @@
     function onTimeUpdate() {
         if (!trackedVideo) return;
 
-        // Ad Watchdog: Auto-skip residual ad if in ad container
-        if (ftConfig.adblock) {
-            try {
-                const isAdShowing = document.querySelector('.ad-showing, .ad-interrupting, [class*="ad-showing"], [class*="ad-interrupting"]');
-                if (isAdShowing && trackedVideo.duration && isFinite(trackedVideo.duration) && trackedVideo.duration > 0) {
-                    trackedVideo.currentTime = trackedVideo.duration;
-                }
-            } catch(e) {}
-        }
-
         if (!ftConfig.sponsorblock || trackedVideo.paused || !sponsorSegments.length) {
             removeSkipButton();
             return;
