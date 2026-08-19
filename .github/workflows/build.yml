@@ -155,8 +155,8 @@ jobs:
           echo "=== Ccache Status Before Build ==="
           ccache -s || true
           
-          # Build target APK directly with multi-job concurrency for fast ccache resolution
-          ninja -C out/${{ matrix.platform }}_gold cobalt.apk -j 16
+          # Build target APK directly with balanced concurrency for fast ccache resolution and memory safety
+          ninja -C out/${{ matrix.platform }}_gold cobalt.apk -j 4
           
           echo "=== Ccache Status After Build ==="
           ccache -s || true
