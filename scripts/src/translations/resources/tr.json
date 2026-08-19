@@ -1,6 +1,6 @@
 {
     "__contributors": [
-        "reisxd"
+        "RezoxP"
     ],
     "settings": {
         "options": {
@@ -164,7 +164,7 @@
         },
         "ttSettings": {
             "title": "TizenTube Ayarları",
-            "madeByText": "Reis Can (reisxd) tarafından ❤️ ile yapıldı",
+            "madeByText": "RezoxP tarafından ❤️ ile yapıldı",
             "summary": "TizenTube Ayarlarını Aç"
         },
         "supportTT": {
@@ -175,8 +175,8 @@
                 "2": "1. Görünürlüğünü artırmaya yardımcı olmak için GitHub deposuna yıldız verin.",
                 "3": "2. TizenTube'u başkalarıyla paylaşın.",
                 "4": "Maddi olarak katkıda bulunmak isterseniz bağış yapmayı düşünebilirsiniz:",
-                "5": "- Buy Me A Coffee: https://www.buymeacoffee.com/reisxd (tercihen)",
-                "6": "- GitHub Sponsors: https://github.com/sponsors/reisxd"
+                "5": "- Buy Me A Coffee: https://www.buymeacoffee.com/RezoxP (tercihen)",
+                "6": "- GitHub Sponsors: https://github.com/sponsors/RezoxP"
             }
         }
     },

@@ -1,6 +1,6 @@
 {
     "__contributors": [
-        "reisxd"
+        "RezoxP"
     ],
     "settings": {
         "options": {
@@ -163,7 +163,7 @@
         },
         "ttSettings": {
             "title": "Cài đặt TizenTube",
-            "madeByText": "Được tạo bởi Reis Can (reisxd) ❤️",
+            "madeByText": "Được tạo bởi RezoxP ❤️",
             "summary": "Mở Cài đặt TizenTube"
         },
         "supportTT": {
@@ -174,8 +174,8 @@
                 "2": "1. Tặng sao (Star) cho dự án ở trên GitHub để giúp dự án phổ biến hơn.",
                 "3": "2. Chia sẻ TizenTube với mọi người.",
                 "4": "Nếu bạn muốn quyên góp:",
-                "5": "- Buy Me A Coffee: https://www.buymeacoffee.com/reisxd (ưu tiên)",
-                "6": "- GitHub Sponsors: https://github.com/sponsors/reisxd"
+                "5": "- Buy Me A Coffee: https://www.buymeacoffee.com/RezoxP (ưu tiên)",
+                "6": "- GitHub Sponsors: https://github.com/sponsors/RezoxP"
             }
         }
     },

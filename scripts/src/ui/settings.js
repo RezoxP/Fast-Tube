@@ -56,11 +56,11 @@ export default function modernUI(update, parameters) {
                 },
                 {
                     name: 'Buy Me A Coffee',
-                    link: 'https://www.buymeacoffee.com/reisxd',
+                    link: 'https://www.buymeacoffee.com/RezoxP',
                 },
                 {
                     name: 'GitHub Sponsors',
-                    link: 'https:///github.com/sponsors/reisxd',
+                    link: 'https:///github.com/sponsors/RezoxP',
                 }
             ].map((option) => {
                 if (!qrcodes[option.name]) {

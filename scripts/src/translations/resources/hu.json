@@ -1,5 +1,5 @@
 {
-    "__contributors": ["reisxd"],
+    "__contributors": ["RezoxP"],
     "settings": {
         "options": {
             "socialMedia": {
@@ -148,7 +148,7 @@
         },
         "ttSettings": {
             "title": "TizenTube beállítások",
-            "madeByText": "Készítette: Reis Can (reisxd) csupa ❤️-vel",
+            "madeByText": "Készítette: RezoxP csupa ❤️-vel",
             "summary": "Nyisd meg a TizenTube beállításokat"
         },
         "supportTT": {
@@ -159,8 +159,8 @@
                 "2": "1. Csillagozd be a GitHub-on, hogy többekhez eljusson",
                 "3": "2. Oszd meg a TizenTube-ot másokkal",
                 "4": "Ha anyagilag is szeretnéd támogatni, a következő linkeken megteheted:",
-                "5": "- Hívj meg egy kávéra: https://www.buymeacoffee.com/reisxd (inkább ezen)",
-                "6": "- GitHub szponzorok: https://github.com/sponsors/reisxd"
+                "5": "- Hívj meg egy kávéra: https://www.buymeacoffee.com/RezoxP (inkább ezen)",
+                "6": "- GitHub szponzorok: https://github.com/sponsors/RezoxP"
             }
         }
     },
