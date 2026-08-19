@@ -96,7 +96,7 @@ jobs:
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
               echo "Applying $patch..."
-              patch --batch -p1 < "$patch" || { echo "Failed to apply $patch"; exit 1; }
+              git apply --verbose "$patch" || patch --batch -p1 < "$patch" || { echo "Failed to apply $patch"; exit 1; }
             fi
           done
 

@@ -190,7 +190,7 @@ index 30fde0cea..626efac23 100644
 -  <color name="cobalt_blue">#ff16396b</color>
 -  <color name="primary">@color/cobalt_blue</color>
 +  <color name="cobalt_blue">#ff000000</color>
-  <color name="primary">#ff000000</color>
++  <color name="primary">#ff000000</color>
  </resources>
  diff --git a/starboard/android/arm/toolchain/BUILD.gn b/starboard/android/arm/toolchain/BUILD.gn
 index 6b167d172..5dc5844d8 100644

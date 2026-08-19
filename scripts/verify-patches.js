@@ -4,8 +4,10 @@
 //   2. The size & performance optimization patch exists and is well-formed.
 //   3. All Android 7+ (API 24 to latest) performance, stripping, compiler, and linker flags are present.
 //   4. ProGuard / R8 minification rules and Android packaging optimizations are properly configured.
+//   5. The patch applies cleanly against actual Cobalt 25.lts source files.
 const fs = require('fs');
 const path = require('path');
+const cp = require('child_process');
 
 console.log("=== Validating Fast-Tube Size & Performance Patches ===");
 
@@ -87,8 +89,58 @@ console.log("   - Android legacy zip DEFLATE packaging (extractNativeLibs true)"
 console.log("   - Low-memory headroom & HW acceleration (largeHeap + hardwareAccelerated)");
 console.log("   - ProGuard / R8 minification and Leanback / JNI retention rules");
 
-// 4. Verify patch hunk structure
+// 4. Verify patch hunk structure and test patch application
 const hunks = patchContent.split(/^diff --git /m).filter(Boolean);
 console.log(` ✓ Verified ${hunks.length} patch hunks cleanly targeting build.gn, build.gradle, AndroidManifest, ProGuard, and resources.`);
+
+// Test live dry-run application with git apply
+const tempDir = path.join(__dirname, '../.tmp_patch_check');
+if (fs.existsSync(tempDir)) fs.rmSync(tempDir, { recursive: true, force: true });
+fs.mkdirSync(tempDir, { recursive: true });
+
+try {
+    // Initialize temporary git repo to test patch application
+    cp.execSync('git init && git config user.name "Test" && git config user.email "test@example.com"', { cwd: tempDir, stdio: 'pipe' });
+    
+    // Extract target files from patch
+    const fileMatches = patchContent.match(/^--- a\/(.*)$/gm) || [];
+    const files = fileMatches.map(m => m.replace('--- a/', '').trim());
+    
+    console.log(` ✓ Testing patch application against ${files.length} target files from Cobalt 25.lts...`);
+    
+    // Download and write original files
+    for (const relFile of files) {
+        const fullPath = path.join(tempDir, relFile);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        const rawUrl = `https://raw.githubusercontent.com/youtube/cobalt/25.lts.1%2B/${relFile}`;
+        try {
+            cp.execSync(`curl -sL "${rawUrl}" -o "${fullPath}"`, { stdio: 'pipe' });
+        } catch (e) {
+            // Fallback via powershell if curl is missing
+            cp.execSync(`powershell -Command "Invoke-WebRequest -Uri '${rawUrl}' -OutFile '${fullPath}'"`, { stdio: 'pipe' });
+        }
+    }
+    
+    cp.execSync('git add -A && git commit -m "initial cobalt 25.lts baseline"', { cwd: tempDir, stdio: 'pipe' });
+    
+    // Write patch file and apply with git apply
+    const testPatchPath = path.join(tempDir, 'test.patch');
+    fs.writeFileSync(testPatchPath, patchContent, 'utf8');
+    
+    cp.execSync('git apply --check test.patch', { cwd: tempDir, stdio: 'pipe' });
+    console.log(" ✓ 'git apply --check test.patch' PASSED with zero conflicts or malformed headers!");
+    
+    cp.execSync('git apply test.patch', { cwd: tempDir, stdio: 'pipe' });
+    console.log(" ✓ Patch applied cleanly to all Cobalt 25.lts files!");
+} catch (err) {
+    console.error("Patch application test failed:", err.message);
+    if (err.stdout) console.error(err.stdout.toString());
+    if (err.stderr) console.error(err.stderr.toString());
+    process.exit(1);
+} finally {
+    if (fs.existsSync(tempDir)) {
+        try { fs.rmSync(tempDir, { recursive: true, force: true }); } catch (_) {}
+    }
+}
 
 console.log("=== All Size & Performance Patch Validations Passed! ===");
