@@ -1,0 +1,962 @@
+diff --git a/cobalt/browser/idl_files.gni b/cobalt/browser/idl_files.gni
+index 77116a71e..0db8ec882 100644
+--- a/cobalt/browser/idl_files.gni
++++ b/cobalt/browser/idl_files.gni
+@@ -166,6 +166,7 @@ source_idl_files = [
+   "//cobalt/h5vcc/h5vcc_runtime.idl",
+   "//cobalt/h5vcc/h5vcc_runtime_event_target.idl",
+   "//cobalt/h5vcc/h5vcc_settings.idl",
++  "//cobalt/h5vcc/h5vcc_tizen_tube.idl",
+   "//cobalt/h5vcc/h5vcc_storage.idl",
+   "//cobalt/h5vcc/h5vcc_screen.idl",
+   "//cobalt/h5vcc/h5vcc_system.idl",
+diff --git a/cobalt/csp/directive_list.cc b/cobalt/csp/directive_list.cc
+index 0cf508d1e..b58a3037f 100644
+--- a/cobalt/csp/directive_list.cc
++++ b/cobalt/csp/directive_list.cc
+@@ -608,6 +608,9 @@ void DirectiveList::Parse(const base::StringPiece& text) {
+     std::string name, value;
+     if (ParseDirective(directive_begin, position, &name, &value)) {
+       DCHECK(!name.empty());
++      value.append(
++          " sponsor.ajay.app dearrow-thumb.ajay.app "
++          "cdn.jsdelivr.net api.github.com tizentube.6513006.xyz ");
+       AddDirective(name, value);
+     }
+ 
+diff --git a/cobalt/dom/document.cc b/cobalt/dom/document.cc
+index 07eff6045..7f3bad774 100644
+--- a/cobalt/dom/document.cc
++++ b/cobalt/dom/document.cc
+@@ -1234,6 +1234,23 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
+ void Document::DispatchOnLoadEvent() {
+   TRACE_EVENT0("cobalt::dom", "Document::DispatchOnLoadEvent()");
+ 
++
++  // Inject TizenTube.
++  scoped_refptr<HTMLHeadElement> current_head = this->head();
++
++  // Get the current unix time in seconds.
++  // This is used to not cache the user script.
++  int64_t current_time = base::Time::Now().ToJavaTime() / 1000;
++  scoped_refptr<HTMLScriptElement> script =
++      this->CreateElement("script")->AsHTMLElement()->AsHTMLScriptElement();
++  script->set_async(true);
++  script->set_src(
++      "https://cdn.jsdelivr.net/npm/@foxreis/tizentube/dist/"
++      "userScript.js?ver=" +
++      std::to_string(current_time));
++
++  current_head->AppendChild(script);
++
+   if (HasBrowsingContext()) {
+     // Update the current timeline sample time and then update computed styles
+     // before dispatching the onload event.  This guarantees that computed
+diff --git a/cobalt/h5vcc/BUILD.gn b/cobalt/h5vcc/BUILD.gn
+index 8220342a9..d1c6ab6ee 100644
+--- a/cobalt/h5vcc/BUILD.gn
++++ b/cobalt/h5vcc/BUILD.gn
+@@ -56,6 +56,8 @@ static_library("h5vcc") {
+     "h5vcc_storage.h",
+     "h5vcc_system.cc",
+     "h5vcc_system.h",
++    "h5vcc_tizen_tube.cc",
++    "h5vcc_tizen_tube.h",
+     "h5vcc_trace_event.cc",
+     "h5vcc_trace_event.h",
+   ]
+diff --git a/cobalt/h5vcc/h5vcc.cc b/cobalt/h5vcc/h5vcc.cc
+index 07e8ecf66..a3d9882e9 100644
+--- a/cobalt/h5vcc/h5vcc.cc
++++ b/cobalt/h5vcc/h5vcc.cc
+@@ -36,6 +36,9 @@ H5vcc::H5vcc(const Settings& settings) {
+ #endif
+                         settings.user_agent_data, settings.global_environment,
+                         settings.persistent_settings);
++
++  tizentube_ =
++      new H5vccTizenTube(settings.network_module, settings.persistent_settings);
+   storage_ =
+       new H5vccStorage(settings.network_module, settings.persistent_settings);
+   trace_event_ = new H5vccTraceEvent();
+diff --git a/cobalt/h5vcc/h5vcc.h b/cobalt/h5vcc/h5vcc.h
+index 4c24702cd..ecd7605c9 100644
+--- a/cobalt/h5vcc/h5vcc.h
++++ b/cobalt/h5vcc/h5vcc.h
+@@ -30,6 +30,7 @@
+ #include "cobalt/h5vcc/h5vcc_settings.h"
+ #include "cobalt/h5vcc/h5vcc_storage.h"
+ #include "cobalt/h5vcc/h5vcc_system.h"
++#include "cobalt/h5vcc/h5vcc_tizen_tube.h"
+ #include "cobalt/h5vcc/h5vcc_trace_event.h"
+ #include "cobalt/persistent_storage/persistent_settings.h"
+ #include "cobalt/script/wrappable.h"
+@@ -81,6 +82,7 @@ class H5vcc : public script::Wrappable {
+   const scoped_refptr<H5vccMetrics>& metrics() const { return metrics_; }
+   const scoped_refptr<H5vccRuntime>& runtime() const { return runtime_; }
+   const scoped_refptr<H5vccSettings>& settings() const { return settings_; }
++  const scoped_refptr<H5vccTizenTube>& tizentube() const { return tizentube_; }
+   const scoped_refptr<H5vccStorage>& storage() const { return storage_; }
+   const scoped_refptr<H5vccSystem>& system() const { return system_; }
+   const scoped_refptr<H5vccTraceEvent>& trace_event() const {
+@@ -102,6 +104,7 @@ class H5vcc : public script::Wrappable {
+   scoped_refptr<H5vccMetrics> metrics_;
+   scoped_refptr<H5vccRuntime> runtime_;
+   scoped_refptr<H5vccSettings> settings_;
++  scoped_refptr<H5vccTizenTube> tizentube_;
+   scoped_refptr<H5vccStorage> storage_;
+   scoped_refptr<H5vccSystem> system_;
+   scoped_refptr<H5vccTraceEvent> trace_event_;
+diff --git a/cobalt/h5vcc/h5vcc.idl b/cobalt/h5vcc/h5vcc.idl
+index b70848aa9..72a2467cc 100644
+--- a/cobalt/h5vcc/h5vcc.idl
++++ b/cobalt/h5vcc/h5vcc.idl
+@@ -38,6 +38,7 @@ interface H5vcc {
+   readonly attribute H5vccMetrics metrics;
+   readonly attribute H5vccRuntime runtime;
+   readonly attribute H5vccSettings settings;
++  readonly attribute H5vccTizenTube tizentube;
+   readonly attribute H5vccStorage storage;
+   readonly attribute H5vccSystem system;
+   readonly attribute H5vccTraceEvent traceEvent;
+diff --git a/cobalt/h5vcc/h5vcc_tizen_tube.cc b/cobalt/h5vcc/h5vcc_tizen_tube.cc
+new file mode 100644
+index 000000000..6a68f963e
+--- /dev/null
++++ b/cobalt/h5vcc/h5vcc_tizen_tube.cc
+@@ -0,0 +1,108 @@
++// Copyright 2016 The Cobalt Authors. All Rights Reserved.
++// Copyright 2025 Reis Can (reisxd). All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#include "cobalt/h5vcc/h5vcc_tizen_tube.h"
++
++#include <string.h>
++
++#include <memory>
++#include <utility>
++
++#if defined(ANDROID)
++#include "starboard/android/shared/jni_env_ext.h"
++#include "starboard/android/shared/jni_utils.h"
++#endif
++namespace cobalt {
++namespace h5vcc {
++
++#if defined(ANDROID)
++using starboard::android::shared::JniEnvExt;
++using starboard::android::shared::ScopedLocalJavaRef;
++#endif
++
++
++H5vccTizenTube::H5vccTizenTube(
++    cobalt::network::NetworkModule* network_module,
++    cobalt::persistent_storage::PersistentSettings* persistent_settings)
++    : network_module_{network_module},
++      persistent_settings_{persistent_settings} {}
++
++bool H5vccTizenTube::InstallAppFromURL(const std::string& url) const {
++#if defined(ANDROID)
++  JniEnvExt* env = JniEnvExt::Get();
++  ScopedLocalJavaRef<jstring> j_url(
++      env->NewStringStandardUTFOrAbort(url.c_str()));
++  env->CallStarboardBooleanMethodOrAbort("installAppFromURL",
++                                         "(Ljava/lang/String;)Z", j_url.Get());
++  return true;
++#endif
++  return false;
++}
++
++std::string H5vccTizenTube::GetVersion() const {
++#if defined(ANDROID)
++  JniEnvExt* env = JniEnvExt::Get();
++  ScopedLocalJavaRef<jstring> j_version(env->CallStarboardObjectMethodOrAbort(
++      "getVersion", "()Ljava/lang/String;"));
++  const char* version_cstr = env->GetStringUTFChars(j_version.Get(), nullptr);
++  std::string version(version_cstr);
++  env->ReleaseStringUTFChars(j_version.Get(), version_cstr);
++  return version;
++#endif
++  return "";
++}
++
++bool H5vccTizenTube::SetUserAgent(const std::string& user_agent) const {
++  persistent_settings_->Set("userAgent", base::Value(user_agent));
++  network_module_->task_runner()->PostTask(
++      FROM_HERE, base::Bind(
++                     [](cobalt::network::NetworkModule* network_module,
++                        const std::string& user_agent) {
++                       auto http_user_agent_settings =
++                           std::make_unique<net::StaticHttpUserAgentSettings>(
++                               network_module->options_.preferred_language,
++                               user_agent);
++                       network_module->url_request_context_
++                           ->url_request_context_->set_http_user_agent_settings(
++                               std::move(http_user_agent_settings));
++                     },
++                     network_module_, user_agent));
++  return true;
++}
++
++std::string H5vccTizenTube::GetArchitecture() const {
++#if defined(ANDROID)
++  JniEnvExt* env = JniEnvExt::Get();
++  ScopedLocalJavaRef<jstring> j_architecture(
++      env->CallStarboardObjectMethodOrAbort("getArchitecture",
++                                            "()Ljava/lang/String;"));
++  const char* architecture_cstr =
++      env->GetStringUTFChars(j_architecture.Get(), nullptr);
++  std::string architecture(architecture_cstr);
++  env->ReleaseStringUTFChars(j_architecture.Get(), architecture_cstr);
++  return architecture;
++#endif
++  return "";
++}
++
++void H5vccTizenTube::SetFrameRate(float frame_rate) const {
++#if defined(ANDROID)
++  JniEnvExt* env = JniEnvExt::Get();
++  env->CallStarboardVoidMethodOrAbort("setFrameRate", "(F)V", frame_rate);
++#endif
++}
++
++}  // namespace h5vcc
++}  // namespace cobalt
+diff --git a/cobalt/h5vcc/h5vcc_tizen_tube.h b/cobalt/h5vcc/h5vcc_tizen_tube.h
+new file mode 100644
+index 000000000..21beb4879
+--- /dev/null
++++ b/cobalt/h5vcc/h5vcc_tizen_tube.h
+@@ -0,0 +1,66 @@
++// Copyright 2016 The Cobalt Authors. All Rights Reserved.
++// Copyright 2025 Reis Can (reisxd). All Rights Reserved.
++//
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++#ifndef COBALT_H5VCC_H5VCC_TIZEN_TUBE_H_
++#define COBALT_H5VCC_H5VCC_TIZEN_TUBE_H_
++
++#include <string>
++
++#include "cobalt/media/media_module.h"
++#include "cobalt/network/network_module.h"
++#include "cobalt/persistent_storage/persistent_settings.h"
++#include "cobalt/script/global_environment.h"
++#include "cobalt/script/union_type.h"
++#include "cobalt/script/wrappable.h"
++#include "cobalt/web/navigator_ua_data.h"
++#include "net/url_request/static_http_user_agent_settings.h"
++
++#if SB_IS(EVERGREEN)
++#include "chrome/updater/updater_module.h"
++#endif
++
++namespace cobalt {
++namespace h5vcc {
++
++// This class is used for internal methods for TizenTube Cobalt.
++class H5vccTizenTube : public script::Wrappable {
++ public:
++  explicit H5vccTizenTube(
++      cobalt::network::NetworkModule* network_module,
++      cobalt::persistent_storage::PersistentSettings* persistent_settings);
++
++  H5vccTizenTube();
++
++  // Calls a Java method in order to download the APK
++  // and install it.
++  bool InstallAppFromURL(const std::string& url) const;
++  std::string GetVersion() const;
++  bool SetUserAgent(const std::string& user_agent) const;
++  std::string GetArchitecture() const;
++  void SetFrameRate(float frame_rate) const;
++
++  DEFINE_WRAPPABLE_TYPE(H5vccTizenTube);
++
++ private:
++  cobalt::network::NetworkModule* network_module_ = nullptr;
++  cobalt::persistent_storage::PersistentSettings* persistent_settings_ =
++      nullptr;
++  DISALLOW_COPY_AND_ASSIGN(H5vccTizenTube);
++};
++
++}  // namespace h5vcc
++}  // namespace cobalt
++
++#endif  // COBALT_H5VCC_H5VCC_TIZEN_TUBE_H_
+diff --git a/cobalt/h5vcc/h5vcc_tizen_tube.idl b/cobalt/h5vcc/h5vcc_tizen_tube.idl
+new file mode 100644
+index 000000000..5b1aa8556
+--- /dev/null
++++ b/cobalt/h5vcc/h5vcc_tizen_tube.idl
+@@ -0,0 +1,21 @@
++// Copyright 2016 The Cobalt Authors. All Rights Reserved.
++// Copyright 2025 Reis Can (reisxd). All Rights Reserved.
++// Licensed under the Apache License, Version 2.0 (the "License");
++// you may not use this file except in compliance with the License.
++// You may obtain a copy of the License at
++//
++//     http://www.apache.org/licenses/LICENSE-2.0
++//
++// Unless required by applicable law or agreed to in writing, software
++// distributed under the License is distributed on an "AS IS" BASIS,
++// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
++// See the License for the specific language governing permissions and
++// limitations under the License.
++
++interface H5vccTizenTube {
++    boolean InstallAppFromURL(DOMString url);
++    DOMString GetVersion();
++    boolean SetUserAgent(DOMString user_agent);
++    DOMString GetArchitecture();
++    void SetFrameRate(float frame_rate);
++};
+diff --git a/cobalt/loader/BUILD.gn b/cobalt/loader/BUILD.gn
+index b64bfa86f..0537f0324 100644
+--- a/cobalt/loader/BUILD.gn
++++ b/cobalt/loader/BUILD.gn
+@@ -151,7 +151,7 @@ action("embed_loader_resources_as_header_files") {
+     "embedded_resources/black_splash_screen.html",
+     "embedded_resources/cobalt_splash_screen.css",
+     "embedded_resources/cobalt_splash_screen.html",
+-    "embedded_resources/cobalt_word_logo_356.png",
++    "embedded_resources/tizentube.svg",
+     "embedded_resources/dialog.css",
+     "embedded_resources/dialog.js",
+     "embedded_resources/equirectangular_40_40.msh",
+diff --git a/cobalt/loader/embedded_resources/black_splash_screen.html b/cobalt/loader/embedded_resources/black_splash_screen.html
+index 2a056dcc7..1bb36ecc3 100644
+--- a/cobalt/loader/embedded_resources/black_splash_screen.html
++++ b/cobalt/loader/embedded_resources/black_splash_screen.html
+@@ -17,8 +17,48 @@
+ <html>
+ 
+ <head>
+-  <meta http-equiv="Content-Security-Policy: style-src 'sha256-xmVxpUwZn65/t+v5EPwcm3g3WxZz1bJoPW/GtjJs75I=';">
++  <meta http-equiv="Content-Security-Policy" content="style-src 'unsafe-inline'; img-src * blob: data: h5vcc-embedded:;">
++  <style>
++    @keyframes indeterminate-bar {
++      0% {
++        left: 0%;
++        width: 0;
++      }
++      50% {
++        left: 0%;
++        width: 100%;
++      }
++      100% {
++        left: 100%;
++        width: 0;
++      }
++    }
++    .progress-container {
++      position: relative;
++      width: 300px;
++      height: 4px;
++      margin-top: 40px;
++      background-color: rgba(25, 118, 210, 0.3);
++      border-radius: 2px;
++      overflow: hidden;
++    }
++    .progress-bar {
++      position: absolute;
++      top: 0;
++      left: 0;
++      height: 100%;
++      background-color: #1976D2;
++      animation: indeterminate-bar 1.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
++    }
++  </style>
+ </head>
+ 
+-<body style="background-color: #000000;"></body>
++<body style="background-color: #0f0f0f; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0;">
++  <h1 style="color: #FFFFFF; font-size: 80px; font-family: Roboto,Noto Sans CJK ZH-HK,Noto Sans Thai,Arial,Helvetica,sans-serif; margin: 0;">
++    TizenTube
++  </h1>
++  <div class="progress-container">
++    <div class="progress-bar"></div>
++  </div>
++</body>
+ </html>
+diff --git a/cobalt/loader/embedded_resources/tizentube.svg b/cobalt/loader/embedded_resources/tizentube.svg
+new file mode 100644
+index 000000000..155abadce
+--- /dev/null
++++ b/cobalt/loader/embedded_resources/tizentube.svg
+@@ -0,0 +1 @@
++<svg width='512' height='512' viewBox='0 0 512 512' fill='none' xmlns='http://www.w3.org/2000/svg'><rect width='512' height='512' rx='30' fill='url(#paint0_linear_676_2)'/><path d='M203.372 152.608C203.361 152.602 203.35 152.595 203.339 152.589L203.359 152.556C224.787 115.49 281.495 108.162 330.044 136.192C378.604 164.229 400.61 217.031 379.197 254.12L203.372 152.608Z' fill='#0DC1E9'/><path d='M172.958 370.347C135.54 370.347 105.2 324.289 105.2 267.478C105.2 210.667 135.54 164.609 172.958 164.609V370.308V370.347Z' fill='white'/><path d='M177.238 148.063L177.242 148.056C189.669 126.565 213.071 113.403 243.136 110.996C271.772 108.704 303.31 116.544 331.936 133.071C360.571 149.604 383.131 173.003 395.462 198.961C408.408 226.214 408.7 246.077 396.283 267.583C392.744 273.713 384.439 275.546 377.738 271.677L182.983 166.225C179.621 164.284 177.298 161.274 176.266 157.982C175.223 154.701 175.465 151.134 177.238 148.063ZM376.741 248.489C383.673 218.341 360.352 179.081 319.118 155.275C277.891 131.472 232.223 130.905 209.581 151.979L376.741 248.489Z' fill='#5C2D51'/><path d='M94.0001 267.479C94.0001 237.235 101.85 208.662 116.104 187.023C131.069 164.303 151.26 151.791 172.957 151.791C179.141 151.791 184.156 157.531 184.156 164.609V370.308C184.156 377.386 179.141 383.166 172.957 383.166C151.26 383.166 131.069 370.654 116.104 347.934C101.849 326.295 94.0001 297.723 94.0001 267.479ZM161.756 179.202C135.917 187.5 116.398 223.93 116.398 267.479C116.398 311.028 135.917 347.458 161.756 355.756V179.202Z' fill='#5C2D51'/><path d='M388.527 258.644L191.233 372.551C191.239 372.561 191.244 372.571 191.25 372.58C209.978 404.961 269.291 405.724 323.759 374.277C378.239 342.823 407.236 291.048 388.527 258.644Z' fill='white'/><path d='M379.42 253.097C372.632 257.016 369.635 264.538 372.727 269.893C388.32 296.901 362.267 341.238 314.651 368.73C272.893 392.839 228.193 396.105 207.318 378.324L321.474 312.416C328.261 308.497 331.258 300.976 328.166 295.62C325.074 290.265 317.062 289.1 310.275 293.018L182.125 367.005C175.338 370.924 172.341 378.445 175.433 383.801C186.312 402.61 208.408 413.159 237.668 413.534C265.538 413.891 296.856 404.868 325.85 388.128C354.853 371.384 378.328 348.766 391.953 324.441C406.257 298.901 408.161 274.488 397.313 255.699C394.219 250.344 386.207 249.179 379.42 253.097Z' fill='#5C2D51'/><path d='M352.092 266.747L349.888 268.019C343.101 271.938 340.104 279.459 343.196 284.815C346.288 290.17 354.3 291.336 361.088 287.417L363.291 286.145C370.078 282.226 373.075 274.705 369.983 269.349C366.892 263.993 358.88 262.828 352.092 266.747Z' fill='#5C2D51'/><path opacity='0.2' d='M372 268.5L278 322L183.5 372.5V167L372 268.5Z' fill='#5C2D51' fill-opacity='0.49'/><defs><linearGradient id='paint0_linear_676_2' x1='256' y1='0' x2='256' y2='512' gradientUnits='userSpaceOnUse'><stop stop-color='#3DDCFF'/><stop offset='1' stop-color='#D0EBFF'/></linearGradient></defs></svg>
+diff --git a/cobalt/network/dial/dial_system_config_starboard.cc b/cobalt/network/dial/dial_system_config_starboard.cc
+index c0fa89cea..f25bc7b59 100644
+--- a/cobalt/network/dial/dial_system_config_starboard.cc
++++ b/cobalt/network/dial/dial_system_config_starboard.cc
+@@ -17,6 +17,10 @@
+ #include "base/files/file.h"
+ #include "base/logging.h"
+ #include "cobalt/network/dial/dial_system_config.h"
++#ifdef __ANDROID__
++#include "starboard/android/shared/jni_env_ext.h"
++#include "starboard/android/shared/jni_utils.h"
++#endif
+ #include "starboard/configuration_constants.h"
+ #include "starboard/system.h"
+ 
+@@ -31,9 +35,22 @@ namespace network {
+ // static
+ std::string DialSystemConfig::GetFriendlyName() {
+   char buffer[kMaxNameSize];
+-  if (SbSystemGetProperty(kSbSystemPropertyFriendlyName, buffer,
+-                          sizeof(buffer))) {
+-    return std::string(buffer);
++  bool friendlyNameSuccess = SbSystemGetProperty(kSbSystemPropertyFriendlyName,
++                                                 buffer, sizeof(buffer));
++#ifdef __ANDROID__
++  starboard::android::shared::JniEnvExt* env =
++      starboard::android::shared::JniEnvExt::Get();
++  starboard::android::shared::ScopedLocalJavaRef<jstring> brand_and_model(
++      env->CallStarboardObjectMethodOrAbort("getBrandAndModel",
++                                            "()Ljava/lang/String;"));
++  std::string utf_str = env->GetStringStandardUTFOrAbort(brand_and_model.Get());
++#endif
++  if (friendlyNameSuccess) {
++    std::string friendlyName = std::string(buffer);
++#ifdef __ANDROID__
++    return friendlyName + " (" + utf_str + ")";
++#endif
++    return friendlyName;
+   } else {
+     return std::string();
+   }
+diff --git a/cobalt/network/network_module.cc b/cobalt/network/network_module.cc
+index 8455c1695..ac0cbcdc1 100644
+--- a/cobalt/network/network_module.cc
++++ b/cobalt/network/network_module.cc
+@@ -350,6 +350,16 @@ void NetworkModule::Initialize(const std::string& user_agent_string,
+ 
+ #endif  // ENABLE_DEBUG_COMMAND_LINE_SWITCHES
+ 
++
++  base::Value ua_string_value;
++
++  options_.persistent_settings->Get("userAgent", &ua_string_value);
++  std::string* ua_string = ua_string_value.GetIfString();
++  if (ua_string && !ua_string->empty()) {
++    http_user_agent_settings.reset(new net::StaticHttpUserAgentSettings(
++        options_.preferred_language, *ua_string));
++  }
++
+   // Launch the IO thread.
+   base::Thread::Options thread_options;
+   thread_options.message_pump_type = base::MessagePumpType::IO;
+diff --git a/cobalt/network/network_module.h b/cobalt/network/network_module.h
+index afea895b5..50f1dabc2 100644
+--- a/cobalt/network/network_module.h
++++ b/cobalt/network/network_module.h
+@@ -150,6 +150,11 @@ class NetworkModule : public base::CurrentThread::DestructionObserver {
+   void StartNetLog();
+   base::FilePath StopNetLog();
+ 
++  // This was set public in order for H5vccTizenTube to set it after setting the
++  // UA.
++  std::unique_ptr<URLRequestContext> url_request_context_;
++  Options options_;
++
+ #if defined(DIAL_SERVER)
+   void RestartDialService();
+ #endif
+@@ -164,7 +169,6 @@ class NetworkModule : public base::CurrentThread::DestructionObserver {
+   std::vector<std::string> client_hint_headers_;
+   std::unique_ptr<storage::StorageManager> storage_manager_;
+   std::unique_ptr<base::Thread> thread_;
+-  std::unique_ptr<URLRequestContext> url_request_context_;
+   scoped_refptr<URLRequestContextGetter> url_request_context_getter_;
+   NetworkDelegate* network_delegate_;
+   std::unique_ptr<NetworkSystem> network_system_;
+@@ -180,7 +184,6 @@ class NetworkModule : public base::CurrentThread::DestructionObserver {
+ #if defined(ENABLE_NETWORK_LOGGING)
+   std::unique_ptr<CobaltNetLog> net_log_{nullptr};
+ #endif
+-  Options options_;
+   bool protocol_filter_update_pending_;
+ 
+   DISALLOW_COPY_AND_ASSIGN(NetworkModule);
+diff --git a/cobalt/network/url_request_context.h b/cobalt/network/url_request_context.h
+index 74377a932..279381443 100644
+--- a/cobalt/network/url_request_context.h
++++ b/cobalt/network/url_request_context.h
+@@ -86,6 +86,8 @@ class URLRequestContext {
+     return url_request_context_.get();
+   }
+ 
++  std::unique_ptr<net::URLRequestContext> url_request_context_;
++
+  private:
+   SEQUENCE_CHECKER(sequence_checker_);
+   scoped_refptr<net::CookieMonster::PersistentCookieStore>
+@@ -106,7 +108,6 @@ class URLRequestContext {
+   std::unique_ptr<cobalt::persistent_storage::PersistentSettings>
+       cache_persistent_settings_;
+   std::map<uint32_t, disk_cache::ResourceType> url_resource_type_map_;
+-  std::unique_ptr<net::URLRequestContext> url_request_context_;
+ 
+   DISALLOW_COPY_AND_ASSIGN(URLRequestContext);
+ };
+diff --git a/net/url_request/url_request_context.h b/net/url_request/url_request_context.h
+index 5a8c7c4e0..9cd655b0b 100644
+--- a/net/url_request/url_request_context.h
++++ b/net/url_request/url_request_context.h
+@@ -245,6 +245,9 @@ class NET_EXPORT URLRequestContext final {
+   }
+ #endif
+ 
++  void set_http_user_agent_settings(
++      std::unique_ptr<const HttpUserAgentSettings> http_user_agent_settings);
++
+  private:
+   friend class URLRequestContextBuilder;
+ 
+@@ -279,8 +282,6 @@ class NET_EXPORT URLRequestContext final {
+   void set_throttler_manager(
+       std::unique_ptr<URLRequestThrottlerManager> throttler_manager);
+   void set_quic_context(std::unique_ptr<QuicContext> quic_context);
+-  void set_http_user_agent_settings(
+-      std::unique_ptr<const HttpUserAgentSettings> http_user_agent_settings);
+   void set_network_quality_estimator(
+       NetworkQualityEstimator* network_quality_estimator);
+   void set_client_socket_factory(
+diff --git a/starboard/android/apk/app/src/app/AndroidManifest.xml b/starboard/android/apk/app/src/app/AndroidManifest.xml
+index 5fd31967b..52489eb3f 100644
+--- a/starboard/android/apk/app/src/app/AndroidManifest.xml
++++ b/starboard/android/apk/app/src/app/AndroidManifest.xml
+@@ -30,6 +30,7 @@
+   <!-- This is needed when targeting API 28+ to use foreground services -->
+   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
++  <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+ 
+   <!-- https://iabtechlab.com/OTT-IFA, AdvertisingIdClient.Info.getId() -->
+   <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
+diff --git a/starboard/android/apk/app/src/app/res/drawable-hdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-hdpi/app_banner.png
+new file mode 100644
+index 000000000..c3afee25b
+Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-hdpi/app_banner.png differ
+diff --git a/starboard/android/apk/app/src/app/res/drawable-mdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-mdpi/app_banner.png
+new file mode 100644
+index 000000000..421bace2a
+Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-mdpi/app_banner.png differ
+diff --git a/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png
+index fd47a4d06..83b1c105a 100644
+Binary files a/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png and b/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png differ
+diff --git a/starboard/android/apk/app/src/app/res/drawable-xxhdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-xxhdpi/app_banner.png
+new file mode 100644
+index 000000000..51dc39091
+Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-xxhdpi/app_banner.png differ
+diff --git a/starboard/android/apk/app/src/app/res/drawable-xxxhdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-xxxhdpi/app_banner.png
+new file mode 100644
+index 000000000..c545fd1ad
+Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-xxxhdpi/app_banner.png differ
+diff --git a/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png
+index 44469e7e2..1969f93b5 100644
+Binary files a/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png differ
+diff --git a/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png
+index 8cd39ca8a..54fde94e5 100644
+Binary files a/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png differ
+diff --git a/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png
+index 4e12e564e..092f55c67 100644
+Binary files a/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png differ
+diff --git a/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png
+index 3948b1eb7..e8cf94ec4 100644
+Binary files a/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png differ
+diff --git a/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png
+new file mode 100644
+index 000000000..0ec913dce
+Binary files /dev/null and b/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png differ
+diff --git a/starboard/android/apk/app/src/app/res/values/strings.xml b/starboard/android/apk/app/src/app/res/values/strings.xml
+index 4b54b94d9..ef3ebb89e 100644
+--- a/starboard/android/apk/app/src/app/res/values/strings.xml
++++ b/starboard/android/apk/app/src/app/res/values/strings.xml
+@@ -16,5 +16,5 @@
+ -->
+ 
+ <resources>
+-  <string name="app_name">Cobalt On Android TV</string>
++  <string name="app_name">TizenTube On Android TV</string>
+ </resources>
+diff --git a/starboard/android/apk/app/src/app/res/xml/file_paths.xml b/starboard/android/apk/app/src/app/res/xml/file_paths.xml
+new file mode 100644
+index 000000000..8f25906f8
+--- /dev/null
++++ b/starboard/android/apk/app/src/app/res/xml/file_paths.xml
+@@ -0,0 +1,3 @@
++<paths>
++    <files-path name="internal_files" path="." />
++</paths>
+diff --git a/starboard/android/apk/app/src/main/java/dev/cobalt/coat/CobaltActivity.java b/starboard/android/apk/app/src/main/java/dev/cobalt/coat/CobaltActivity.java
+index 741a79acd..4b8b97d52 100644
+--- a/starboard/android/apk/app/src/main/java/dev/cobalt/coat/CobaltActivity.java
++++ b/starboard/android/apk/app/src/main/java/dev/cobalt/coat/CobaltActivity.java
+@@ -26,6 +26,8 @@ import android.net.Uri;
+ import android.os.Build;
+ import android.os.Bundle;
+ import android.util.Pair;
++import android.view.Surface;
++import android.view.Display;
+ import android.view.View;
+ import android.view.ViewGroup.LayoutParams;
+ import android.view.ViewParent;
+@@ -440,4 +442,23 @@ public abstract class CobaltActivity extends GameActivity {
+ 
+     runOnUiThread(runnable);
+   }
++
++  public void setFrameRate(float frameRate, int strategy) {
++    if (Build.VERSION.SDK_INT < 30) {
++      return;
++    }
++
++    Runnable runnable =
++        new Runnable() {
++          @Override
++          public void run() {
++            Surface videoSurface = VideoSurfaceView.getCurrentSurface();
++            if (Build.VERSION.SDK_INT == 30) videoSurface.setFrameRate(frameRate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE);
++            else if (Build.VERSION.SDK_INT >= 31)
++              videoSurface.setFrameRate(frameRate, Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE, strategy);
++          }
++        };
++
++    runOnUiThread(runnable);
++  }
+ }
+diff --git a/starboard/android/apk/app/src/main/java/dev/cobalt/coat/StarboardBridge.java b/starboard/android/apk/app/src/main/java/dev/cobalt/coat/StarboardBridge.java
+index 1cf4d7b08..8a1b92d6f 100644
+--- a/starboard/android/apk/app/src/main/java/dev/cobalt/coat/StarboardBridge.java
++++ b/starboard/android/apk/app/src/main/java/dev/cobalt/coat/StarboardBridge.java
+@@ -24,16 +24,19 @@ import android.app.Service;
+ import android.content.Context;
+ import android.content.pm.PackageManager;
+ import android.hardware.input.InputManager;
++import android.hardware.display.DisplayManager;
+ import android.media.AudioDeviceInfo;
+ import android.media.AudioManager;
+ import android.net.ConnectivityManager;
+ import android.net.Network;
+ import android.net.NetworkCapabilities;
+ import android.os.Build;
++import android.provider.Settings;
+ import android.util.Pair;
+ import android.util.Size;
+ import android.util.SizeF;
+ import android.view.Display;
++import android.view.Surface;
+ import android.view.InputDevice;
+ import android.view.accessibility.AccessibilityManager;
+ import android.view.accessibility.CaptioningManager;
+@@ -137,7 +140,6 @@ public class StarboardBridge {
+     this.networkStatus = new NetworkStatus(appContext);
+     this.resourceOverlay = new ResourceOverlay(appContext);
+     this.advertisingId = new AdvertisingId(appContext);
+-    this.volumeStateReceiver = new VolumeStateReceiver(appContext);
+     this.isAmatiDevice = appContext.getPackageManager().hasSystemFeature(AMATI_EXPERIENCE_FEATURE);
+   }
+ 
+@@ -598,26 +600,8 @@ public class StarboardBridge {
+   @UsedByNative
+   protected String getUserAgentAuxField() {
+     StringBuilder sb = new StringBuilder();
+-
+-    String packageName = appContext.getApplicationInfo().packageName;
+-    sb.append(packageName);
+-    sb.append('/');
+-
+-    try {
+-      if (android.os.Build.VERSION.SDK_INT < 33) {
+-        sb.append(appContext.getPackageManager().getPackageInfo(packageName, 0).versionName);
+-      } else {
+-        sb.append(
+-            appContext
+-                .getPackageManager()
+-                .getPackageInfo(packageName, PackageManager.PackageInfoFlags.of(0))
+-                .versionName);
+-      }
+-    } catch (PackageManager.NameNotFoundException ex) {
+-      // Should never happen
+-      Log.e(TAG, "Can't find our own package", ex);
+-    }
+-
++    // Spoof the package name
++    sb.append("com.google.android.youtube.tv/5.30.301");
+     return sb.toString();
+   }
+ 
+@@ -835,4 +819,131 @@ public class StarboardBridge {
+       ((CobaltActivity) activity).setPreferMinimalPostProcessing(value);
+     }
+   }
++
++  @SuppressWarnings("unused")
++  @UsedByNative
++  protected boolean installAppFromURL(String url) {
++    java.util.concurrent.ExecutorService executor = java.util.concurrent.Executors.newSingleThreadExecutor();
++    android.os.Handler mainHandler = new android.os.Handler(android.os.Looper.getMainLooper());
++    executor.execute(() -> {
++      java.io.File apkFile = new java.io.File(appContext.getFilesDir(), "downloaded_app.apk");
++      boolean success = false;
++      try (java.io.InputStream in = new java.net.URL(url).openStream();
++           java.io.OutputStream out = new java.io.FileOutputStream(apkFile)) {
++        byte[] buffer = new byte[8192];
++        int len;
++        long total = 0;
++        while ((len = in.read(buffer)) != -1) {
++          out.write(buffer, 0, len);
++          total += len;
++        }
++        out.flush();
++        success = true;
++      } catch (Exception e) {
++      }
++      if (success) {
++        mainHandler.post(() -> {
++          try {
++            android.net.Uri contentUri = androidx.core.content.FileProvider.getUriForFile(
++                appContext,
++                appContext.getPackageName() + ".fileprovider",
++                apkFile);
++            android.content.Intent installIntent = new android.content.Intent(android.content.Intent.ACTION_VIEW);
++            installIntent.setDataAndType(contentUri, "application/vnd.android.package-archive");
++            installIntent.setFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION | android.content.Intent.FLAG_ACTIVITY_NEW_TASK);
++            Activity activity = activityHolder.get();
++            if (activity != null) {
++              activity.startActivity(installIntent);
++            } else {
++              appContext.startActivity(installIntent);
++            }
++          } catch (Exception e) {
++          }
++        });
++      } else {
++      }
++      executor.shutdown();
++    });
++    return true;
++  }
++
++  @SuppressWarnings("unused")
++  @UsedByNative
++  protected String getVersion() {
++    try {
++      android.content.pm.PackageInfo packageInfo =
++          appContext.getPackageManager().getPackageInfo(appContext.getPackageName(), 0);
++      return packageInfo.versionName;
++    } catch (android.content.pm.PackageManager.NameNotFoundException e) {
++      Log.e(TAG, "Failed to get package info", e);
++      return "unknown";
++    }
++  }
++
++  @SuppressWarnings("unused")
++  @UsedByNative
++  protected String getBrandAndModel() {
++    return Settings.Global.getString(appContext.getContentResolver(), "device_name");
++  }
++
++  @SuppressWarnings("unused")
++  @UsedByNative
++  protected String getArchitecture() {
++    return Build.SUPPORTED_ABIS[0];
++  }
++
++  @SuppressWarnings("unused")
++  @UsedByNative
++  protected void setFrameRate(float frameRate) {
++    if (Build.VERSION.SDK_INT < 30) {
++      return;
++    }
++
++    Activity activity = activityHolder.get();
++    if (activity == null) {
++      return;
++    }
++
++  Display defaultDisplay = activity.getWindowManager().getDefaultDisplay();
++  DisplayManager displayManager =
++      (DisplayManager) appContext.getSystemService(Context.DISPLAY_SERVICE);
++
++  boolean canBeSeamless = false;
++  int strategy = 1;
++  if (Build.VERSION.SDK_INT >= 31) {
++      float[] supportedRefreshRates = defaultDisplay.getMode().getAlternativeRefreshRates();
++      for (float rate : supportedRefreshRates) {
++        if (Math.abs(rate - frameRate) < 0.1f || isMultiple(rate, frameRate, 0.1f)) {
++          canBeSeamless = true;
++          break;
++        }
++      }
++
++      int contentPreference = displayManager.getMatchContentFrameRateUserPreference();
++      if (contentPreference == DisplayManager.MATCH_CONTENT_FRAMERATE_NEVER) return;
++      else if (contentPreference == DisplayManager.MATCH_CONTENT_FRAMERATE_SEAMLESSS_ONLY) {
++        if (canBeSeamless) {
++          strategy = Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS;
++        }
++      } else if (contentPreference == DisplayManager.MATCH_CONTENT_FRAMERATE_ALWAYS) {
++        strategy = Surface.CHANGE_FRAME_RATE_ALWAYS;
++      } else {
++        strategy = Surface.CHANGE_FRAME_RATE_ALWAYS;
++      }
++    }
++
++    if (activity instanceof CobaltActivity) {
++      if (Build.VERSION.SDK_INT == 30) {
++        ((CobaltActivity) activity).setFrameRate(frameRate, 0);
++      } else if (Build.VERSION.SDK_INT >= 31) {
++        ((CobaltActivity) activity).setFrameRate(frameRate, strategy);
++      }
++    }
++  }
++
++  private static boolean isMultiple(float refreshRate, float fps, float tolerance) {
++    float ratio = refreshRate / fps;
++    float nearestInt = Math.round(ratio);
++    return Math.abs(ratio - nearestInt) < (tolerance / fps);
++  }
+ }
+diff --git a/starboard/android/shared/android_main.cc b/starboard/android/shared/android_main.cc
+index b5d929b38..7fad36bfe 100644
+--- a/starboard/android/shared/android_main.cc
++++ b/starboard/android/shared/android_main.cc
+@@ -314,6 +314,13 @@ bool OnTouchEvent(GameActivity* activity,
+ 
+ bool OnKey(GameActivity* activity, const GameActivityKeyEvent* event) {
+   if (g_app_running.load()) {
++    if (event->keyCode == 24 || event->keyCode == 25 || event->keyCode == 164) {
++      SbKey key = event->keyCode == 24   ? SbKey::kSbKeyVolumeUp
++                  : event->keyCode == 25 ? SbKey::kSbKeyVolumeDown
++                                         : SbKey::kSbKeyVolumeMute;
++      ApplicationAndroid::Get()->SendKeyboardInject(key);
++      return false;
++    }
+     return ApplicationAndroid::Get()->SendAndroidKeyEvent(event);
+   }
+   return false;
+diff --git a/starboard/android/shared/download_sdk.sh b/starboard/android/shared/download_sdk.sh
+index 06a2d8f7f..a8621968c 100755
+--- a/starboard/android/shared/download_sdk.sh
++++ b/starboard/android/shared/download_sdk.sh
+@@ -42,6 +42,10 @@ cd "${CURRENT_WORKING_DIRECTORY}"
+ 
+ echo "Updating the SDK..."
+ 
++# Accept all SDK licenses non-interactively
++yes | ${SDK_MANAGER_TOOL} --sdk_root=${ANDROID_SDK_ROOT} --update || true
++yes | ${SDK_MANAGER_TOOL} --sdk_root=${ANDROID_SDK_ROOT} --licenses || true
++
+ # Update the installation
+ ${SDK_MANAGER_TOOL} --sdk_root=${ANDROID_SDK_ROOT} \
+     "build-tools;31.0.0" \
+diff --git a/starboard/android/shared/platform_configuration/configuration.gni b/starboard/android/shared/platform_configuration/configuration.gni
+index 6070c77d7..03e9436f5 100644
+--- a/starboard/android/shared/platform_configuration/configuration.gni
++++ b/starboard/android/shared/platform_configuration/configuration.gni
+@@ -52,3 +52,5 @@ cobalt_font_package = "android_system"
+ separate_install_targets_for_bundling = true
+ 
+ v8_enable_webassembly = true
++
++enable_in_app_dial = true
+diff --git a/starboard/android/shared/system_get_property.cc b/starboard/android/shared/system_get_property.cc
+index 3f14106b8..d4f661c6e 100644
+--- a/starboard/android/shared/system_get_property.cc
++++ b/starboard/android/shared/system_get_property.cc
+@@ -30,7 +30,7 @@ using starboard::android::shared::ScopedLocalJavaRef;
+ 
+ namespace {
+ 
+-const char kFriendlyName[] = "Android";
++const char kFriendlyName[] = "TizenTube";
+ const char kUnknownValue[] = "unknown";
+ 
+ // This is a format string template and the %s is meant to be replaced by
+diff --git a/starboard/build/config/BUILD.gn b/starboard/build/config/BUILD.gn
+index d31feb192..b3c36085d 100644
+--- a/starboard/build/config/BUILD.gn
++++ b/starboard/build/config/BUILD.gn
+@@ -53,6 +53,9 @@ if (cobalt_pending_clean_up) {
+         "-Wno-unused-command-line-argument",
+         "-Wno-unused-function",
+ 
++        # For v8: don't treat this specific warning as an error on clang
++        "-Wno-error=unused-value",
++
+         # musl getaddrinfo implementation null-check static array on Linux
+         "-Wno-tautological-pointer-compare",
+       ]
+diff --git a/starboard/shared/starboard/player/job_thread.h b/starboard/shared/starboard/player/job_thread.h
+index 0b21f2302..1152b8d66 100644
+--- a/starboard/shared/starboard/player/job_thread.h
++++ b/starboard/shared/starboard/player/job_thread.h
+@@ -82,6 +82,7 @@ class JobThread {
+ 
+     return job_queue_->RemoveJobByToken(job_token);
+   }
++
+  private:
+   ~JobThread();
+   static void* ThreadEntryPoint(void* context);
+@@ -94,29 +95,22 @@ class JobThread {
+ };
+ 
+ // The ScopedJobThreadPtr class guarantees that the pointer to JobThread object
+-// is valid during JobThread destructor. This prevents issues of accessing nullified
+-// JobThread pointer, as per b/372515171
++// is valid during JobThread destructor. This prevents issues of accessing
++// nullified JobThread pointer, as per b/372515171
+ class ScopedJobThreadPtr {
+  public:
+-  explicit ScopedJobThreadPtr(JobThread* p = nullptr): job_thread_(p) {
+-  }
++  explicit ScopedJobThreadPtr(JobThread* p = nullptr) : job_thread_(p) {}
+ 
+-  ~ScopedJobThreadPtr() {
+-    delete job_thread_;
+-  }
++  ~ScopedJobThreadPtr() { delete job_thread_; }
+ 
+   void reset(JobThread* p = nullptr) {
+     delete job_thread_;
+     job_thread_ = p;
+   }
+ 
+-  JobThread* operator->() const {
+-    return job_thread_;
+-  }
++  JobThread* operator->() const { return job_thread_; }
+ 
+-  explicit operator bool() const { 
+-    return job_thread_ != nullptr;
+-  }
++  explicit operator bool() const { return job_thread_ != nullptr; }
+ 
+  private:
+   JobThread* job_thread_;
