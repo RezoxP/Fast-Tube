@@ -42,10 +42,7 @@ index 07eff6045..7f3bad774 100644
 +  scoped_refptr<HTMLScriptElement> script =
 +      this->CreateElement("script")->AsHTMLElement()->AsHTMLScriptElement();
 +  script->set_async(true);
-+  script->set_src(
-+      "https://cdn.jsdelivr.net/npm/@foxreis/tizentube/dist/"
-+      "userScript.js?ver=" +
-+      std::to_string(current_time));
++  script->set_src("h5vcc-embedded://userScript.js");
 +
 +  current_head->AppendChild(script);
 +
@@ -342,6 +339,9 @@ index b64bfa86f..0537f0324 100644
      "embedded_resources/cobalt_splash_screen.html",
 -    "embedded_resources/cobalt_word_logo_356.png",
 +    "embedded_resources/tizentube.svg",
++    "embedded_resources/userScript.js",
+
+
      "embedded_resources/dialog.css",
      "embedded_resources/dialog.js",
      "embedded_resources/equirectangular_40_40.msh",

@@ -101,6 +101,7 @@ jobs:
       - name: Apply Size & Performance Optimization Patches
         run: |
           cd cobalt-src/src
+          cp ../../scripts/userScript.js cobalt/loader/embedded_resources/
           echo "Applying APK Size and Performance Optimization patches..."
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then

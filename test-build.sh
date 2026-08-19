@@ -28,6 +28,7 @@ node scripts/verify-patches.js || bun scripts/verify-patches.js
 
 if [ -d "cobalt-src/src" ]; then
     echo "Validating patches against live cobalt-src..."
+    cp scripts/userScript.js cobalt-src/src/cobalt/loader/embedded_resources/
     cd cobalt-src/src
     for patch in ../../patches/*.patch; do
         if [ -f "$patch" ]; then
