@@ -28,7 +28,7 @@ diff --git a/cobalt/dom/document.cc b/cobalt/dom/document.cc
 index 07eff6045..7f3bad774 100644
 --- a/cobalt/dom/document.cc
 +++ b/cobalt/dom/document.cc
-@@ -1234,6 +1234,20 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
+@@ -1234,6 +1234,17 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
  void Document::DispatchOnLoadEvent() {
    TRACE_EVENT0("cobalt::dom", "Document::DispatchOnLoadEvent()");
  
@@ -36,9 +36,6 @@ index 07eff6045..7f3bad774 100644
 +  // Inject TizenTube.
 +  scoped_refptr<HTMLHeadElement> current_head = this->head();
 +
-+  // Get the current unix time in seconds.
-+  // This is used to not cache the user script.
-+  int64_t current_time = base::Time::Now().ToJavaTime() / 1000;
 +  scoped_refptr<HTMLScriptElement> script =
 +      this->CreateElement("script")->AsHTMLElement()->AsHTMLScriptElement();
 +  script->set_async(true);
