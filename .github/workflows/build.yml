@@ -5,12 +5,18 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_COMPRESS: 1
-  CCACHE_COMPRESSLEVEL: 5
+  CCACHE_COMPRESSLEVEL: 1
   CCACHE_MAXSIZE: 10G
-  CCACHE_SLOPPINESS: time_macros,include_file_mtime,file_macro
+  CCACHE_DIRECT: 1
+  CCACHE_NOHASHDIR: 1
+  CCACHE_SLOPPINESS: time_macros,include_file_mtime,file_macro,locale_specific
   CCACHE_BASEDIR: ${{ github.workspace }}
   NINJA_STATUS: "[%f/%t %e] "
 
@@ -34,6 +40,8 @@ jobs:
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
 
       - name: Set up JDK 17
         uses: actions/setup-java@v4
@@ -55,21 +63,22 @@ jobs:
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ccache ninja-build python3 python-is-python3 xz-utils curl git pkg-config gperf generate-ninja gcc-multilib g++-multilib libc6-dev-i386
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends ccache gperf generate-ninja gcc-multilib g++-multilib libc6-dev-i386
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ github.sha }}
+          key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ hashFiles('patches/**') }}-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ hashFiles('patches/**') }}-
             ${{ runner.os }}-ccache-${{ matrix.platform }}-
             ${{ runner.os }}-ccache-
 
       - name: Setup depot_tools
         run: |
-          git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git
+          git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
 
       - name: Fetch Cobalt Source (gclient)
@@ -80,23 +89,16 @@ jobs:
           gclient sync --revision src@25.lts.1+ --no-history --shallow -j 8
           bash src/starboard/tools/download_clang.sh
 
-      - name: Apply VacuumTube & Size Optimization Patches
+      - name: Apply Size & Performance Optimization Patches
         run: |
           cd cobalt-src/src
-          echo "Applying Adblock, SponsorBlock, and Size Optimization patches..."
+          echo "Applying APK Size and Performance Optimization patches..."
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
               echo "Applying $patch..."
               patch --batch -p1 < "$patch" || { echo "Failed to apply $patch"; exit 1; }
             fi
           done
-          
-          # Copy injected JS files
-          cp -r ../../scripts/injection cobalt/browser/
-          mkdir -p starboard/android/apk/app/src/app/assets
-          mkdir -p starboard/android/apk/app/src/app/assets/web
-          cp -r ../../scripts/injection/* starboard/android/apk/app/src/app/assets/
-          cp -r ../../scripts/injection/* starboard/android/apk/app/src/app/assets/web/
 
       - name: Configure Build (Size & Speed Optimized)
         run: |
@@ -126,38 +128,34 @@ jobs:
           v8_enable_webassembly = false
           sb_enable_benchmark = false
           enable_base_tracing = false
+          extra_cflags = [
+            "-Os",
+            "-fno-asynchronous-unwind-tables",
+            "-fno-unwind-tables",
+            "-fomit-frame-pointer",
+            "-fno-math-errno",
+            "-fvisibility=hidden",
+            "-fvisibility-inlines-hidden",
+          ]
           EOF
           
           # Regenerate ninja files
           PYTHONPATH=$PWD gn gen out/${{ matrix.platform }}_gold
 
-      - name: Build Native Library & Pre-Strip
+      - name: Build APK (Compressed, Stripped & Minified)
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
+          export GRADLE_OPTS="-Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx2048m -XX:+UseParallelGC'"
           
           echo "=== Ccache Status Before Build ==="
           ccache -s || true
           
-          # Build native library using available CPU cores
-          autoninja -C out/${{ matrix.platform }}_gold cobalt
-          
-          # Pre-strip unneeded debug and unused symbols from the compiled library
-          STRIP_TOOL="$ANDROID_HOME/ndk/25.2.9519653/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip"
-          if [ -f "$STRIP_TOOL" ]; then
-            echo "Pre-stripping native library before APK packaging..."
-            $STRIP_TOOL --strip-unneeded out/${{ matrix.platform }}_gold/libcobalt.so || true
-          fi
-          
-          echo "=== Ccache Status After Native Build ==="
-          ccache -s || true
-
-      - name: Build APK (Compressed & Minified)
-        run: |
-          cd cobalt-src/src
-          export PYTHONPATH="$PWD"
-          export GRADLE_OPTS="-Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.jvmargs='-Xmx2048m -XX:+UseParallelGC'"
+          # Build target APK directly (includes libcobalt.so and native stripping)
           autoninja -C out/${{ matrix.platform }}_gold cobalt.apk
+          
+          echo "=== Ccache Status After Build ==="
+          ccache -s || true
           
           # Collect and standardize APK output name
           mkdir -p ${{ github.workspace }}/release-apks

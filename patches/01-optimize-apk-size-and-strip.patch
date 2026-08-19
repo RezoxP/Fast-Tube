@@ -110,16 +110,18 @@ diff --git a/starboard/android/apk/app/src/app/AndroidManifest.xml b/starboard/a
 index 5fd31967b..6d6620f86 100644
 --- a/starboard/android/apk/app/src/app/AndroidManifest.xml
 +++ b/starboard/android/apk/app/src/app/AndroidManifest.xml
-@@ -38,7 +38,7 @@
+@@ -38,7 +38,9 @@
      android:icon="@mipmap/ic_app"
      android:banner="@drawable/app_banner"
      android:label="${applicationName}"
 -    android:extractNativeLibs="${evergreenCompatible}">
-+    android:extractNativeLibs="true">
++    android:extractNativeLibs="true"
++    android:largeHeap="true"
++    android:hardwareAccelerated="true">
  
      <activity android:name="dev.cobalt.app.MainActivity"
        android:exported="true"
-@@ -47,7 +47,7 @@
+@@ -47,7 +49,7 @@
        android:screenOrientation="sensorLandscape"
        android:theme="@style/CobaltTheme">
        <meta-data android:name="cobalt.APP_URL" android:value="https://www.youtube.com/tv"/>
@@ -177,7 +179,7 @@ index 4b54b94d9..c48edf62c 100644
 -  <string name="app_name">Cobalt On Android TV</string>
 +  <string name="app_name">Fast-Tube</string>
  </resources>
-diff --git a/starboard/android/apk/app/src/main/res/values/colors.xml b/starboard/android/apk/app/src/main/res/values/colors.xml
+ diff --git a/starboard/android/apk/app/src/main/res/values/colors.xml b/starboard/android/apk/app/src/main/res/values/colors.xml
 index 30fde0cea..626efac23 100644
 --- a/starboard/android/apk/app/src/main/res/values/colors.xml
 +++ b/starboard/android/apk/app/src/main/res/values/colors.xml
@@ -188,9 +190,9 @@ index 30fde0cea..626efac23 100644
 -  <color name="cobalt_blue">#ff16396b</color>
 -  <color name="primary">@color/cobalt_blue</color>
 +  <color name="cobalt_blue">#ff000000</color>
-+  <color name="primary">#ff000000</color>
+  <color name="primary">#ff000000</color>
  </resources>
-diff --git a/starboard/android/arm/toolchain/BUILD.gn b/starboard/android/arm/toolchain/BUILD.gn
+ diff --git a/starboard/android/arm/toolchain/BUILD.gn b/starboard/android/arm/toolchain/BUILD.gn
 index 6b167d172..5dc5844d8 100644
 --- a/starboard/android/arm/toolchain/BUILD.gn
 +++ b/starboard/android/arm/toolchain/BUILD.gn
@@ -256,16 +258,17 @@ diff --git a/starboard/android/shared/platform_configuration/BUILD.gn b/starboar
 index f63891448..0351d7c60 100644
 --- a/starboard/android/shared/platform_configuration/BUILD.gn
 +++ b/starboard/android/shared/platform_configuration/BUILD.gn
-@@ -160,6 +160,8 @@ config("platform_configuration") {
+@@ -160,6 +160,9 @@ config("platform_configuration") {
      "-Wl,--warn-shared-textrel",
      "-Wl,--fatal-warnings",
      "-Wl,--gc-sections",
 +    "-Wl,--icf=all",
 +    "-Wl,-O3",
++    "-Wl,--pack-dyn-relocs=android",
      "-Wl,-z,nocopyreloc",
  
      # Wrapper synchronizes punch-out video bounds with the UI frame.
-@@ -178,7 +180,11 @@ config("platform_configuration") {
+@@ -178,7 +181,15 @@ config("platform_configuration") {
  }
  
  config("size") {
@@ -274,6 +277,10 @@ index f63891448..0351d7c60 100644
 +    "-Os",
 +    "-fno-asynchronous-unwind-tables",
 +    "-fno-unwind-tables",
++    "-fomit-frame-pointer",
++    "-fno-math-errno",
++    "-fvisibility=hidden",
++    "-fvisibility-inlines-hidden",
 +  ]
  }
  
