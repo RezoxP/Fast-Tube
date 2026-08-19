@@ -590,17 +590,6 @@ diff --git a/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png b/s
 new file mode 100644
 index 000000000..0ec913dce
 Binary files /dev/null and b/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png differ
-diff --git a/starboard/android/apk/app/src/app/res/values/strings.xml b/starboard/android/apk/app/src/app/res/values/strings.xml
-index 4b54b94d9..ef3ebb89e 100644
---- a/starboard/android/apk/app/src/app/res/values/strings.xml
-+++ b/starboard/android/apk/app/src/app/res/values/strings.xml
-@@ -16,5 +16,5 @@
- -->
- 
- <resources>
--  <string name="app_name">Cobalt On Android TV</string>
-+  <string name="app_name">TizenTube On Android TV</string>
- </resources>
 diff --git a/starboard/android/apk/app/src/app/res/xml/file_paths.xml b/starboard/android/apk/app/src/app/res/xml/file_paths.xml
 new file mode 100644
 index 000000000..8f25906f8
