@@ -11,12 +11,13 @@ concurrency:
 
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_COMPILERCHECK: content
   CCACHE_COMPRESS: 1
   CCACHE_COMPRESSLEVEL: 1
   CCACHE_MAXSIZE: 10G
   CCACHE_DIRECT: 1
   CCACHE_NOHASHDIR: 1
-  CCACHE_SLOPPINESS: time_macros,include_file_mtime,file_macro,locale_specific
+  CCACHE_SLOPPINESS: time_macros,include_file_mtime,file_macro,locale_specific,modules
   NINJA_STATUS: "[%f/%t %e] "
 
 jobs:
@@ -69,9 +70,8 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ hashFiles('patches/**') }}-${{ github.sha }}
+          key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ hashFiles('patches/**', '.github/workflows/build.yml') }}
           restore-keys: |
-            ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ hashFiles('patches/**') }}-
             ${{ runner.os }}-ccache-${{ matrix.platform }}-
             ${{ runner.os }}-ccache-
 
@@ -139,6 +139,8 @@ jobs:
           enable_base_tracing = false
           cobalt_enable_webdriver = false
           enable_debugger = false
+          enable_mdns = false
+          enable_all_dialogs = false
           EOF
           
           # Regenerate ninja files
@@ -148,16 +150,13 @@ jobs:
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
-          export CCACHE_BASEDIR="$PWD"
-          export CCACHE_NOHASHDIR=1
-          export CCACHE_DIRECT=1
           export GRADLE_OPTS="-Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx2048m -XX:+UseParallelGC'"
           
           echo "=== Ccache Status Before Build ==="
           ccache -s || true
           
           # Build target APK directly with multi-job concurrency for fast ccache resolution
-          autoninja -C out/${{ matrix.platform }}_gold cobalt.apk -j 8
+          ninja -C out/${{ matrix.platform }}_gold cobalt.apk -j 16
           
           echo "=== Ccache Status After Build ==="
           ccache -s || true
