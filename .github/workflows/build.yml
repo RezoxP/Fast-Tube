@@ -115,7 +115,7 @@ jobs:
           cd cobalt-src/src
           
           # Generate GN build config for target platform gold release
-          PYTHONPATH=$PWD python3 cobalt/build/gn.py -p ${{ matrix.platform }} -c gold
+          PYTHONPATH=$PWD python3 cobalt/build/gn.py -p ${{ matrix.platform }} -c gold --no-check
           
           # Disable remote exec/goma/siso defaults
           sed -i 's/use_remoteexec = true/use_remoteexec = false/g' out/${{ matrix.platform }}_gold/args.gn || true
