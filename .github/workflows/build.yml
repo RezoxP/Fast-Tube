@@ -17,7 +17,6 @@ env:
   CCACHE_DIRECT: 1
   CCACHE_NOHASHDIR: 1
   CCACHE_SLOPPINESS: time_macros,include_file_mtime,file_macro,locale_specific
-  CCACHE_BASEDIR: ${{ github.workspace }}
   NINJA_STATUS: "[%f/%t %e] "
 
 jobs:
@@ -76,6 +75,16 @@ jobs:
             ${{ runner.os }}-ccache-${{ matrix.platform }}-
             ${{ runner.os }}-ccache-
 
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
       - name: Setup depot_tools
         run: |
           git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
@@ -128,15 +137,8 @@ jobs:
           v8_enable_webassembly = false
           sb_enable_benchmark = false
           enable_base_tracing = false
-          extra_cflags = [
-            "-Os",
-            "-fno-asynchronous-unwind-tables",
-            "-fno-unwind-tables",
-            "-fomit-frame-pointer",
-            "-fno-math-errno",
-            "-fvisibility=hidden",
-            "-fvisibility-inlines-hidden",
-          ]
+          cobalt_enable_webdriver = false
+          enable_debugger = false
           EOF
           
           # Regenerate ninja files
@@ -146,13 +148,16 @@ jobs:
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
+          export CCACHE_BASEDIR="$PWD"
+          export CCACHE_NOHASHDIR=1
+          export CCACHE_DIRECT=1
           export GRADLE_OPTS="-Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx2048m -XX:+UseParallelGC'"
           
           echo "=== Ccache Status Before Build ==="
           ccache -s || true
           
-          # Build target APK directly (includes libcobalt.so and native stripping)
-          autoninja -C out/${{ matrix.platform }}_gold cobalt.apk
+          # Build target APK directly with multi-job concurrency for fast ccache resolution
+          autoninja -C out/${{ matrix.platform }}_gold cobalt.apk -j 8
           
           echo "=== Ccache Status After Build ==="
           ccache -s || true
