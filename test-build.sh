@@ -28,6 +28,10 @@ node scripts/verify-patches.js || bun scripts/verify-patches.js
 
 if [ -d "cobalt-src/src" ]; then
     echo "Validating patches against live cobalt-src..."
+    cd scripts/src
+    npm install
+    npx rollup -c rollup.config.js
+    cd ../..
     npm install -g terser && terser scripts/userScript.js -c -m --toplevel --ecma 2020 -o scripts/userScript.min.js && cp scripts/userScript.min.js cobalt-src/src/cobalt/loader/embedded_resources/userScript.js
     cd cobalt-src/src
     for patch in ../../patches/*.patch; do

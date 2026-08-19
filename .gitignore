@@ -9,3 +9,4 @@ actionlint
 *.png
 node_modules/
 scripts/userScript.min.js
+scripts/userScript.js
