@@ -69,7 +69,7 @@ jobs:
           sudo killall apt-get apt dpkg || true
           while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 1; done
           sudo apt-get update -qq || true
-          sudo apt-get install -y --no-install-recommends ccache gperf ninja-build gcc-multilib g++-multilib libc6-dev-i386
+          sudo apt-get install -y --no-install-recommends ccache gperf generate-ninja gcc-multilib g++-multilib libc6-dev-i386
 
       - name: Cache ccache
         uses: actions/cache@v4
