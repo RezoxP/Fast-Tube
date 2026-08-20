@@ -552,41 +552,6 @@ index 5fd31967b..52489eb3f 100644
  
    <!-- https://iabtechlab.com/OTT-IFA, AdvertisingIdClient.Info.getId() -->
    <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
-diff --git a/starboard/android/apk/app/src/app/res/drawable-hdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-hdpi/app_banner.png
-new file mode 100644
-index 000000000..c3afee25b
-Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-hdpi/app_banner.png differ
-diff --git a/starboard/android/apk/app/src/app/res/drawable-mdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-mdpi/app_banner.png
-new file mode 100644
-index 000000000..421bace2a
-Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-mdpi/app_banner.png differ
-diff --git a/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png
-index fd47a4d06..83b1c105a 100644
-Binary files a/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png and b/starboard/android/apk/app/src/app/res/drawable-xhdpi/app_banner.png differ
-diff --git a/starboard/android/apk/app/src/app/res/drawable-xxhdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-xxhdpi/app_banner.png
-new file mode 100644
-index 000000000..51dc39091
-Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-xxhdpi/app_banner.png differ
-diff --git a/starboard/android/apk/app/src/app/res/drawable-xxxhdpi/app_banner.png b/starboard/android/apk/app/src/app/res/drawable-xxxhdpi/app_banner.png
-new file mode 100644
-index 000000000..c545fd1ad
-Binary files /dev/null and b/starboard/android/apk/app/src/app/res/drawable-xxxhdpi/app_banner.png differ
-diff --git a/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png
-index 44469e7e2..1969f93b5 100644
-Binary files a/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-hdpi/ic_app.png differ
-diff --git a/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png
-index 8cd39ca8a..54fde94e5 100644
-Binary files a/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-mdpi/ic_app.png differ
-diff --git a/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png
-index 4e12e564e..092f55c67 100644
-Binary files a/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-xhdpi/ic_app.png differ
-diff --git a/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png
-index 3948b1eb7..e8cf94ec4 100644
-Binary files a/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png and b/starboard/android/apk/app/src/app/res/mipmap-xxhdpi/ic_app.png differ
-diff --git a/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png b/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png
-new file mode 100644
-index 000000000..0ec913dce
-Binary files /dev/null and b/starboard/android/apk/app/src/app/res/mipmap-xxxhdpi/ic_app.png differ
 diff --git a/starboard/android/apk/app/src/app/res/xml/file_paths.xml b/starboard/android/apk/app/src/app/res/xml/file_paths.xml
 new file mode 100644
 index 000000000..8f25906f8
