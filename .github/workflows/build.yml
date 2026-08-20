@@ -11,6 +11,7 @@ concurrency:
 
 env:
   CCACHE_DIR: ${{ github.workspace }}/.ccache
+  CCACHE_BASEDIR: ${{ github.workspace }}
   CCACHE_COMPILERCHECK: content
   CCACHE_COMPRESS: 1
   CCACHE_COMPRESSLEVEL: 1
@@ -44,7 +45,7 @@ jobs:
           fetch-depth: 1
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: '17'
           distribution: 'temurin'
@@ -62,15 +63,19 @@ jobs:
           fi
 
       - name: Install dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y --no-install-recommends ccache gperf generate-ninja gcc-multilib g++-multilib libc6-dev-i386
+          sudo killall apt-get apt dpkg || true
+          while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 1; done
+          sudo apt-get update -qq || true
+          sudo apt-get install -y --no-install-recommends ccache gperf ninja-build gcc-multilib g++-multilib libc6-dev-i386
 
       - name: Cache ccache
         uses: actions/cache@v4
         with:
           path: ${{ github.workspace }}/.ccache
-          key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ hashFiles('patches/**', '.github/workflows/build.yml') }}
+          key: ${{ runner.os }}-ccache-${{ matrix.platform }}-${{ github.sha }}
           restore-keys: |
             ${{ runner.os }}-ccache-${{ matrix.platform }}-
             ${{ runner.os }}-ccache-
@@ -90,12 +95,20 @@ jobs:
           git clone --depth 1 https://chromium.googlesource.com/chromium/tools/depot_tools.git
           echo "$GITHUB_WORKSPACE/depot_tools" >> $GITHUB_PATH
 
+      - name: Cache Cobalt Source
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/cobalt-src
+          key: cobalt-src-${{ hashFiles('patches/*.patch') }}
+          restore-keys: |
+            cobalt-src-
+
       - name: Fetch Cobalt Source (gclient)
         run: |
           mkdir -p cobalt-src && cd cobalt-src
           gclient config --name=src https://github.com/youtube/cobalt.git
           echo 'target_os = ["android"]' >> .gclient
-          gclient sync --revision src@25.lts.1+ --no-history --shallow -j 8
+          gclient sync --revision src@25.lts.1+ --no-history --shallow --reset --force -j 8
           bash src/starboard/tools/download_clang.sh
 
       - name: Apply Size & Performance Optimization Patches
