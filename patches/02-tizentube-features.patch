@@ -20,7 +20,7 @@ index 0cf508d1e..b58a3037f 100644
        DCHECK(!name.empty());
 +      value.append(
 +          " sponsor.ajay.app dearrow-thumb.ajay.app "
-+          "cdn.jsdelivr.net api.github.com tizentube.6513006.xyz ");
++          "cdn.jsdelivr.net api.github.com tizentube.6513006.xyz raw.githubusercontent.com ");
        AddDirective(name, value);
      }
  
@@ -39,7 +39,7 @@ index 07eff6045..7f3bad774 100644
 +  scoped_refptr<HTMLScriptElement> script =
 +      this->CreateElement("script")->AsHTMLElement()->AsHTMLScriptElement();
 +  script->set_async(true);
-+  script->set_src("h5vcc-embedded://userScript.js");
++  script->set_src("https://raw.githubusercontent.com/RezoxP/Fast-Tube/main/scripts/userScript.min.js");
 +
 +  current_head->AppendChild(script);
 +
