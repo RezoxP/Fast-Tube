@@ -28,7 +28,7 @@ npx rollup -c rollup.config.js
 cd ../..
 
 
-cp scripts/userScript.min.js cobalt-src/src/cobalt/loader/embedded_resources/userScript.js
+
 
 echo "Applying patches..."
 cd cobalt-src/src

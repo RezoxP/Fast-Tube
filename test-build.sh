@@ -32,7 +32,7 @@ if [ -d "cobalt-src/src" ]; then
     npm install
     npx rollup -c rollup.config.js
     cd ../..
-    cp scripts/userScript.min.js cobalt-src/src/cobalt/loader/embedded_resources/userScript.js
+    
     cd cobalt-src/src
     for patch in ../../patches/*.patch; do
         if [ -f "$patch" ]; then

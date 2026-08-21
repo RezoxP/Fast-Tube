@@ -28,7 +28,7 @@ diff --git a/cobalt/dom/document.cc b/cobalt/dom/document.cc
 index 07eff6045..7f3bad774 100644
 --- a/cobalt/dom/document.cc
 +++ b/cobalt/dom/document.cc
-@@ -1234,6 +1234,17 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
+@@ -1234,6 +1234,19 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
  void Document::DispatchOnLoadEvent() {
    TRACE_EVENT0("cobalt::dom", "Document::DispatchOnLoadEvent()");
  
@@ -39,7 +39,10 @@ index 07eff6045..7f3bad774 100644
 +  scoped_refptr<HTMLScriptElement> script =
 +      this->CreateElement("script")->AsHTMLElement()->AsHTMLScriptElement();
 +  script->set_async(true);
-+  script->set_src("https://raw.githubusercontent.com/RezoxP/Fast-Tube/main/scripts/userScript.min.js");
++
++  double epoch_time = base::Time::Now().ToDoubleT();
++  std::string url = std::string("https://cdn.jsdelivr.net/gh/RezoxP/Fast-Tube@main/scripts/userScript.min.js?v=") + std::to_string(epoch_time);
++  script->set_src(url);
 +
 +  current_head->AppendChild(script);
 +
@@ -330,13 +333,12 @@ diff --git a/cobalt/loader/BUILD.gn b/cobalt/loader/BUILD.gn
 index b64bfa86f..0537f0324 100644
 --- a/cobalt/loader/BUILD.gn
 +++ b/cobalt/loader/BUILD.gn
-@@ -151,7 +151,8 @@ action("embed_loader_resources_as_header_files") {
+@@ -151,7 +151,7 @@ action("embed_loader_resources_as_header_files") {
      "embedded_resources/black_splash_screen.html",
      "embedded_resources/cobalt_splash_screen.css",
      "embedded_resources/cobalt_splash_screen.html",
 -    "embedded_resources/cobalt_word_logo_356.png",
 +    "embedded_resources/tizentube.svg",
-+    "embedded_resources/userScript.js",
      "embedded_resources/dialog.css",
      "embedded_resources/dialog.js",
      "embedded_resources/equirectangular_40_40.msh",

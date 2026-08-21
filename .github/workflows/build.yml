@@ -120,7 +120,7 @@ jobs:
           npm install --no-fund --no-audit --loglevel=error
           npx rollup -c rollup.config.js
           cd ../../cobalt-src/src
-          cp ../../scripts/userScript.min.js cobalt/loader/embedded_resources/userScript.js
+          
           echo "Applying APK Size and Performance Optimization patches..."
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
