@@ -26,8 +26,8 @@ cd scripts/src
 npm install
 npx rollup -c rollup.config.js
 cd ../..
-npm install -g terser
-terser scripts/userScript.js -c -m --toplevel --ecma 2020 -o scripts/userScript.min.js
+
+
 cp scripts/userScript.min.js cobalt-src/src/cobalt/loader/embedded_resources/userScript.js
 
 echo "Applying patches..."

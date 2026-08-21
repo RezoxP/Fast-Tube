@@ -1,4 +1,6 @@
-import { configRead, configChangeEmitter } from "../config.js";
+const fs = require('fs');
+const afrPath = '/workspaces/Fast-Tube/scripts/src/features/autoFrameRate.js';
+fs.writeFileSync(afrPath, `import { configRead, configChangeEmitter } from "../config.js";
 
 function attachToVideoPlayer() {
     const player = document.querySelector('.html5-video-player');
@@ -10,7 +12,7 @@ function attachToVideoPlayer() {
             if (window.location.href.indexOf('watch') === -1) return;
             const statsForNerds = player.getStatsForNerds();
 
-            const resolutionMatch = statsForNerds.resolution.match(/(\d+)x(\d+)@([\d.]+)/);
+            const resolutionMatch = statsForNerds.resolution.match(/(\\d+)x(\\d+)@([\\d.]+)/);
             const pauseFor = configRead('autoFrameRatePauseVideoFor');
 
             if (resolutionMatch) {
@@ -54,3 +56,4 @@ function attachToVideoPlayer() {
 }
 
 attachToVideoPlayer();
+`);

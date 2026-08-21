@@ -7,12 +7,14 @@ configChangeEmitter.addEventListener('configChange', (e) => {
 });
 
 let actualClock;
+let clockInterval;
 
 function toggleClock(value) {
     const existingClock = document.getElementById('tizentube-clock');
     if (value && existingClock) return;
     if (!value && existingClock) {
         existingClock.remove();
+        if (clockInterval) clearInterval(clockInterval);
         return;
     }
     if (!value && !existingClock) {
@@ -56,7 +58,8 @@ function toggleClock(value) {
         }
 
         updateClock();
-        setInterval(updateClock, 1000);
+        if (clockInterval) clearInterval(clockInterval);
+        clockInterval = setInterval(updateClock, 1000);
     }
 }
 

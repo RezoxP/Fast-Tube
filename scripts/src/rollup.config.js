@@ -8,7 +8,10 @@ import json from '@rollup/plugin-json';
 
 export default {
     input: "userScript.js",
-    output: { file: "../userScript.js", format: "iife" },
+    output: [
+        { file: "../userScript.js", format: "iife" },
+        { file: "../userScript.min.js", format: "iife", plugins: [terser({ format: { ecma: 2020 }, compress: true, mangle: true })] }
+    ],
     plugins: [
         json(),
         string({
