@@ -28,7 +28,7 @@ diff --git a/cobalt/dom/document.cc b/cobalt/dom/document.cc
 index 07eff6045..7f3bad774 100644
 --- a/cobalt/dom/document.cc
 +++ b/cobalt/dom/document.cc
-@@ -1234,6 +1234,19 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
+@@ -1234,6 +1234,20 @@ void Document::OnRootElementUnableToProvideOffsetDimensions() {
  void Document::DispatchOnLoadEvent() {
    TRACE_EVENT0("cobalt::dom", "Document::DispatchOnLoadEvent()");
  
