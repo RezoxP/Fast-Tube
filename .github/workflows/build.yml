@@ -71,9 +71,6 @@ jobs:
 
       - name: Install dependencies
         env:
-  NODE_OPTIONS: "--no-deprecation"
-  PYTHONWARNINGS: "ignore"
-  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo killall apt-get apt dpkg || true
