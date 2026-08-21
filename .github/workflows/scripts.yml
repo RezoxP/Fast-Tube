@@ -39,3 +39,9 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git add scripts/userScript.min.js
           git diff --quiet && git diff --staged --quiet || (git commit -m "chore: auto-build userscript [skip ci]" && git push)
+
+      - name: Purge jsDelivr Cache
+        run: |
+          echo "Purging jsDelivr cache to ensure TVs get the latest script immediately..."
+          curl -s "https://purge.jsdelivr.net/gh/RezoxP/Fast-Tube@main/scripts/userScript.min.js"
+          curl -s "https://purge.jsdelivr.net/gh/RezoxP/Fast-Tube@main/scripts/userScript.js"
