@@ -4047,22 +4047,6 @@
         }
     }
 
-    function scrollPaneRenderer(items) {
-        return {
-            scrollPaneRenderer: {
-                content: scrollPaneItemListRenderer(items)
-            }
-        }
-    }
-
-    function scrollPaneItemListRenderer(items) {
-        return {
-            scrollPaneItemListRenderer: {
-                items
-            }
-        }
-    }
-
     function overlayMessageRenderer(simpleText) {
         return {
             overlayMessageRenderer: {
@@ -4110,22 +4094,6 @@
         }
     }
 
-    function QrCodeRenderer(url) {
-        return {
-            qrCodeRenderer: {
-                qrCodeImage: {
-                    thumbnails: [
-                        {
-                            url
-                        }
-                    ]
-                },
-                style: "QR_CODE_RENDERER_STYLE_ATA_SIDESHEET",
-                trackingParams: null
-            }
-        }
-    }
-
     function ButtonRenderer(disabled, text, iconType, command) {
         return {
             isDisabled: disabled,
@@ -4148,12 +4116,12 @@
     	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
     }
 
-    var qrcode$1 = {};
+    var qrcode = {};
 
     var hasRequiredQrcode;
 
     function requireQrcode () {
-    	if (hasRequiredQrcode) return qrcode$1;
+    	if (hasRequiredQrcode) return qrcode;
     	hasRequiredQrcode = 1;
     	//---------------------------------------------------------------------
     	//
@@ -4172,7 +4140,7 @@
     	//
     	//---------------------------------------------------------------------
 
-    	qrcode$1.qrcode = function() {
+    	qrcode.qrcode = function() {
 
     		//---------------------------------------------------------------------
     		// qrcode
@@ -5784,11 +5752,10 @@
 
     		return qrcode;
     	}();
-    	return qrcode$1;
+    	return qrcode;
     }
 
-    var qrcodeExports = requireQrcode();
-    var qrcode = /*@__PURE__*/getDefaultExportFromCjs(qrcodeExports);
+    requireQrcode();
 
     // This is only used for more subtitles feature, as adding polyfill for Intl.DisplayNames makes the user script way too big and slow to load.
     // Taken from @formatjs/intl-displaynames/locale-data/en.js
@@ -7149,89 +7116,8 @@
         "Fast-Tube Subtitle Localization: Module loaded, waiting for YouTube TV..."
     );
 
-    const qrcodes = {};
-
     function modernUI(update, parameters) {
         const settings = [
-            {
-                name: t('settings.supportTT.title'),
-                icon: 'MONEY_HEART',
-                value: null,
-                options: {
-                    title: t('settings.supportTT.title'),
-                    subtitle: t('settings.supportTT.subtitle'),
-                    content: scrollPaneRenderer([
-                        overlayMessageRenderer(t('settings.supportTT.content.1')),
-                        overlayMessageRenderer(t('settings.supportTT.content.2')),
-                        overlayMessageRenderer(t('settings.supportTT.content.3')),
-                        overlayMessageRenderer(t('settings.supportTT.content.4')),
-                        overlayMessageRenderer(t('settings.supportTT.content.5')),
-                        overlayMessageRenderer(t('settings.supportTT.content.6'))
-                    ])
-                }
-            },
-            {
-                name: t('settings.options.socialMedia.title'),
-                icon: 'PRIVACY_UNLISTED',
-                value: null,
-                options: [
-                    {
-                        name: 'GitHub',
-                        link: 'https://github.com/RezoxP/Fast-Tube',
-                    },
-                    {
-                        name: 'YouTube',
-                        link: 'https://www.youtube.com/@tizenbrew',
-                    },
-                    {
-                        name: 'Discord',
-                        link: 'https://discord.gg/m2P7v8Y2qR',
-                    },
-                    {
-                        name: 'Telegram (Announcements)',
-                        link: 'https://t.me/fasttubecobaltofficial',
-                    },
-                    {
-                        name: 'Telegram (Group)',
-                        link: 'https://t.me/fasttubeofficial',
-                    },
-                    {
-                        name: 'Website',
-                        link: 'https://fasttube.6513006.xyz',
-                    },
-                    {
-                        name: 'Buy Me A Coffee',
-                        link: 'https://www.buymeacoffee.com/RezoxP',
-                    },
-                    {
-                        name: 'GitHub Sponsors',
-                        link: 'https:///github.com/sponsors/RezoxP',
-                    }
-                ].map((option) => {
-                    if (!qrcodes[option.name]) {
-                        const qr = qrcode.qrcode(6, 'H');
-                        qr.addData(option.link);
-                        qr.make();
-
-                        const qrDataImgTag = qr.createImgTag(8, 8);
-                        const qrDataUrl = qrDataImgTag.match(/src="([^"]+)"/)[1];
-                        qrcodes[option.name] = qrDataUrl;
-                    }
-                    return {
-                        name: option.name,
-                        icon: 'OPEN_IN_NEW',
-                        value: null,
-                        options: {
-                            title: option.name,
-                            subtitle: option.link,
-                            content: overlayPanelItemListRenderer([
-                                overlayMessageRenderer(t('settings.options.socialMedia.qrCodeScanMessage', { name: option.name })),
-                                QrCodeRenderer(qrcodes[option.name])
-                            ])
-                        }
-                    }
-                })
-            },
             {
                 name: t('settings.options.adBlock'),
                 icon: 'DOLLAR_SIGN',
@@ -11583,33 +11469,23 @@
           if (keyTimeout) {
             clearTimeout(keyTimeout);
           }
-          document.getElementById('container').style.setProperty('opacity', '1', 'important');
+          const container = document.getElementById('container');
+          if (container) container.style.setProperty('opacity', '1', 'important');
           keyTimeout = setTimeout(() => {
             const videoPlayer = document.querySelector('.html5-video-player');
-            const playerStateObject = videoPlayer.getPlayerStateObject();
-            if (playerStateObject.isPlaying) return;
-            document.getElementById('container').style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
+            const playerStateObject = videoPlayer && typeof videoPlayer.getPlayerStateObject === 'function' ? videoPlayer.getPlayerStateObject() : null;
+            if (playerStateObject && playerStateObject.isPlaying) return;
+            if (container) container.style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
           }, configRead('dimmingTimeout') * 1000);
-        }
-        if (evt.keyCode == 403) {
-          console.info('Taking over!');
-          evt.preventDefault();
-          evt.stopPropagation();
-          if (evt.type === 'keydown') {
-            try {
-              if (uiContainer.style.display === 'none') {
-                console.info('Showing and focusing!');
-                uiContainer.style.display = 'block';
-                uiContainer.focus();
-              } else {
-                console.info('Hiding!');
-                uiContainer.style.display = 'none';
-                uiContainer.blur();
-              }
-            } catch (e) { }
+        } else {
+          if (keyTimeout) {
+            clearTimeout(keyTimeout);
+            keyTimeout = null;
           }
-          return false;
-        } else if (evt.keyCode == 404) {
+          const container = document.getElementById('container');
+          if (container) container.style.setProperty('opacity', '1', 'important');
+        }
+        if (evt.keyCode == 404) {
           if (evt.type === 'keydown') {
             modernUI();
           }

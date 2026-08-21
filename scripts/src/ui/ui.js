@@ -141,33 +141,23 @@ function execute_once_dom_loaded() {
       if (keyTimeout) {
         clearTimeout(keyTimeout);
       }
-      document.getElementById('container').style.setProperty('opacity', '1', 'important');
+      const container = document.getElementById('container');
+      if (container) container.style.setProperty('opacity', '1', 'important');
       keyTimeout = setTimeout(() => {
         const videoPlayer = document.querySelector('.html5-video-player');
-        const playerStateObject = videoPlayer.getPlayerStateObject();
-        if (playerStateObject.isPlaying) return;
-        document.getElementById('container').style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
+        const playerStateObject = videoPlayer && typeof videoPlayer.getPlayerStateObject === 'function' ? videoPlayer.getPlayerStateObject() : null;
+        if (playerStateObject && playerStateObject.isPlaying) return;
+        if (container) container.style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
       }, configRead('dimmingTimeout') * 1000);
-    }
-    if (evt.keyCode == 403) {
-      console.info('Taking over!');
-      evt.preventDefault();
-      evt.stopPropagation();
-      if (evt.type === 'keydown') {
-        try {
-          if (uiContainer.style.display === 'none') {
-            console.info('Showing and focusing!');
-            uiContainer.style.display = 'block';
-            uiContainer.focus();
-          } else {
-            console.info('Hiding!');
-            uiContainer.style.display = 'none';
-            uiContainer.blur();
-          }
-        } catch (e) { }
+    } else {
+      if (keyTimeout) {
+        clearTimeout(keyTimeout);
+        keyTimeout = null;
       }
-      return false;
-    } else if (evt.keyCode == 404) {
+      const container = document.getElementById('container');
+      if (container) container.style.setProperty('opacity', '1', 'important');
+    }
+    if (evt.keyCode == 404) {
       if (evt.type === 'keydown') {
         modernUI();
       }
