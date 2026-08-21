@@ -1,4 +1,4 @@
-// Picture in Picture Mode for TizenTube
+// Picture in Picture Mode for Fast-Tube
 
 import resolveCommand from "../resolveCommand.js";
 

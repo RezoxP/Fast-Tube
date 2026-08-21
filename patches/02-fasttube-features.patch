@@ -6,7 +6,7 @@ index 77116a71e..0db8ec882 100644
    "//cobalt/h5vcc/h5vcc_runtime.idl",
    "//cobalt/h5vcc/h5vcc_runtime_event_target.idl",
    "//cobalt/h5vcc/h5vcc_settings.idl",
-+  "//cobalt/h5vcc/h5vcc_tizen_tube.idl",
++  "//cobalt/h5vcc/h5vcc_fast_tube.idl",
    "//cobalt/h5vcc/h5vcc_storage.idl",
    "//cobalt/h5vcc/h5vcc_screen.idl",
    "//cobalt/h5vcc/h5vcc_system.idl",
@@ -20,7 +20,7 @@ index 0cf508d1e..b58a3037f 100644
        DCHECK(!name.empty());
 +      value.append(
 +          " sponsor.ajay.app dearrow-thumb.ajay.app "
-+          "cdn.jsdelivr.net api.github.com tizentube.6513006.xyz raw.githubusercontent.com ");
++          "cdn.jsdelivr.net api.github.com fasttube.6513006.xyz raw.githubusercontent.com ");
        AddDirective(name, value);
      }
  
@@ -33,7 +33,7 @@ index 07eff6045..7f3bad774 100644
    TRACE_EVENT0("cobalt::dom", "Document::DispatchOnLoadEvent()");
  
 +
-+  // Inject TizenTube.
++  // Inject FastTube.
 +  scoped_refptr<HTMLHeadElement> current_head = this->head();
 +
 +  scoped_refptr<HTMLScriptElement> script =
@@ -57,8 +57,8 @@ index 8220342a9..d1c6ab6ee 100644
      "h5vcc_storage.h",
      "h5vcc_system.cc",
      "h5vcc_system.h",
-+    "h5vcc_tizen_tube.cc",
-+    "h5vcc_tizen_tube.h",
++    "h5vcc_fast_tube.cc",
++    "h5vcc_fast_tube.h",
      "h5vcc_trace_event.cc",
      "h5vcc_trace_event.h",
    ]
@@ -71,8 +71,8 @@ index 07e8ecf66..a3d9882e9 100644
                          settings.user_agent_data, settings.global_environment,
                          settings.persistent_settings);
 +
-+  tizentube_ =
-+      new H5vccTizenTube(settings.network_module, settings.persistent_settings);
++  fasttube_ =
++      new H5vccFastTube(settings.network_module, settings.persistent_settings);
    storage_ =
        new H5vccStorage(settings.network_module, settings.persistent_settings);
    trace_event_ = new H5vccTraceEvent();
@@ -84,7 +84,7 @@ index 4c24702cd..ecd7605c9 100644
  #include "cobalt/h5vcc/h5vcc_settings.h"
  #include "cobalt/h5vcc/h5vcc_storage.h"
  #include "cobalt/h5vcc/h5vcc_system.h"
-+#include "cobalt/h5vcc/h5vcc_tizen_tube.h"
++#include "cobalt/h5vcc/h5vcc_fast_tube.h"
  #include "cobalt/h5vcc/h5vcc_trace_event.h"
  #include "cobalt/persistent_storage/persistent_settings.h"
  #include "cobalt/script/wrappable.h"
@@ -92,7 +92,7 @@ index 4c24702cd..ecd7605c9 100644
    const scoped_refptr<H5vccMetrics>& metrics() const { return metrics_; }
    const scoped_refptr<H5vccRuntime>& runtime() const { return runtime_; }
    const scoped_refptr<H5vccSettings>& settings() const { return settings_; }
-+  const scoped_refptr<H5vccTizenTube>& tizentube() const { return tizentube_; }
++  const scoped_refptr<H5vccFastTube>& fasttube() const { return fasttube_; }
    const scoped_refptr<H5vccStorage>& storage() const { return storage_; }
    const scoped_refptr<H5vccSystem>& system() const { return system_; }
    const scoped_refptr<H5vccTraceEvent>& trace_event() const {
@@ -100,7 +100,7 @@ index 4c24702cd..ecd7605c9 100644
    scoped_refptr<H5vccMetrics> metrics_;
    scoped_refptr<H5vccRuntime> runtime_;
    scoped_refptr<H5vccSettings> settings_;
-+  scoped_refptr<H5vccTizenTube> tizentube_;
++  scoped_refptr<H5vccFastTube> fasttube_;
    scoped_refptr<H5vccStorage> storage_;
    scoped_refptr<H5vccSystem> system_;
    scoped_refptr<H5vccTraceEvent> trace_event_;
@@ -112,15 +112,15 @@ index b70848aa9..72a2467cc 100644
    readonly attribute H5vccMetrics metrics;
    readonly attribute H5vccRuntime runtime;
    readonly attribute H5vccSettings settings;
-+  readonly attribute H5vccTizenTube tizentube;
++  readonly attribute H5vccFastTube fasttube;
    readonly attribute H5vccStorage storage;
    readonly attribute H5vccSystem system;
    readonly attribute H5vccTraceEvent traceEvent;
-diff --git a/cobalt/h5vcc/h5vcc_tizen_tube.cc b/cobalt/h5vcc/h5vcc_tizen_tube.cc
+diff --git a/cobalt/h5vcc/h5vcc_fast_tube.cc b/cobalt/h5vcc/h5vcc_fast_tube.cc
 new file mode 100644
 index 000000000..6a68f963e
 --- /dev/null
-+++ b/cobalt/h5vcc/h5vcc_tizen_tube.cc
++++ b/cobalt/h5vcc/h5vcc_fast_tube.cc
 @@ -0,0 +1,108 @@
 +// Copyright 2016 The Cobalt Authors. All Rights Reserved.
 +// Copyright 2025 Reis Can (reisxd). All Rights Reserved.
@@ -137,7 +137,7 @@ index 000000000..6a68f963e
 +// See the License for the specific language governing permissions and
 +// limitations under the License.
 +
-+#include "cobalt/h5vcc/h5vcc_tizen_tube.h"
++#include "cobalt/h5vcc/h5vcc_fast_tube.h"
 +
 +#include <string.h>
 +
@@ -157,13 +157,13 @@ index 000000000..6a68f963e
 +#endif
 +
 +
-+H5vccTizenTube::H5vccTizenTube(
++H5vccFastTube::H5vccFastTube(
 +    cobalt::network::NetworkModule* network_module,
 +    cobalt::persistent_storage::PersistentSettings* persistent_settings)
 +    : network_module_{network_module},
 +      persistent_settings_{persistent_settings} {}
 +
-+bool H5vccTizenTube::InstallAppFromURL(const std::string& url) const {
++bool H5vccFastTube::InstallAppFromURL(const std::string& url) const {
 +#if defined(ANDROID)
 +  JniEnvExt* env = JniEnvExt::Get();
 +  ScopedLocalJavaRef<jstring> j_url(
@@ -175,7 +175,7 @@ index 000000000..6a68f963e
 +  return false;
 +}
 +
-+std::string H5vccTizenTube::GetVersion() const {
++std::string H5vccFastTube::GetVersion() const {
 +#if defined(ANDROID)
 +  JniEnvExt* env = JniEnvExt::Get();
 +  ScopedLocalJavaRef<jstring> j_version(env->CallStarboardObjectMethodOrAbort(
@@ -188,7 +188,7 @@ index 000000000..6a68f963e
 +  return "";
 +}
 +
-+bool H5vccTizenTube::SetUserAgent(const std::string& user_agent) const {
++bool H5vccFastTube::SetUserAgent(const std::string& user_agent) const {
 +  persistent_settings_->Set("userAgent", base::Value(user_agent));
 +  network_module_->task_runner()->PostTask(
 +      FROM_HERE, base::Bind(
@@ -206,7 +206,7 @@ index 000000000..6a68f963e
 +  return true;
 +}
 +
-+std::string H5vccTizenTube::GetArchitecture() const {
++std::string H5vccFastTube::GetArchitecture() const {
 +#if defined(ANDROID)
 +  JniEnvExt* env = JniEnvExt::Get();
 +  ScopedLocalJavaRef<jstring> j_architecture(
@@ -221,7 +221,7 @@ index 000000000..6a68f963e
 +  return "";
 +}
 +
-+void H5vccTizenTube::SetFrameRate(float frame_rate) const {
++void H5vccFastTube::SetFrameRate(float frame_rate) const {
 +#if defined(ANDROID)
 +  JniEnvExt* env = JniEnvExt::Get();
 +  env->CallStarboardVoidMethodOrAbort("setFrameRate", "(F)V", frame_rate);
@@ -230,11 +230,11 @@ index 000000000..6a68f963e
 +
 +}  // namespace h5vcc
 +}  // namespace cobalt
-diff --git a/cobalt/h5vcc/h5vcc_tizen_tube.h b/cobalt/h5vcc/h5vcc_tizen_tube.h
+diff --git a/cobalt/h5vcc/h5vcc_fast_tube.h b/cobalt/h5vcc/h5vcc_fast_tube.h
 new file mode 100644
 index 000000000..21beb4879
 --- /dev/null
-+++ b/cobalt/h5vcc/h5vcc_tizen_tube.h
++++ b/cobalt/h5vcc/h5vcc_fast_tube.h
 @@ -0,0 +1,66 @@
 +// Copyright 2016 The Cobalt Authors. All Rights Reserved.
 +// Copyright 2025 Reis Can (reisxd). All Rights Reserved.
@@ -251,8 +251,8 @@ index 000000000..21beb4879
 +// See the License for the specific language governing permissions and
 +// limitations under the License.
 +
-+#ifndef COBALT_H5VCC_H5VCC_TIZEN_TUBE_H_
-+#define COBALT_H5VCC_H5VCC_TIZEN_TUBE_H_
++#ifndef COBALT_H5VCC_H5VCC_FAST_TUBE_H_
++#define COBALT_H5VCC_H5VCC_FAST_TUBE_H_
 +
 +#include <string>
 +
@@ -272,14 +272,14 @@ index 000000000..21beb4879
 +namespace cobalt {
 +namespace h5vcc {
 +
-+// This class is used for internal methods for TizenTube Cobalt.
-+class H5vccTizenTube : public script::Wrappable {
++// This class is used for internal methods for FastTube Cobalt.
++class H5vccFastTube : public script::Wrappable {
 + public:
-+  explicit H5vccTizenTube(
++  explicit H5vccFastTube(
 +      cobalt::network::NetworkModule* network_module,
 +      cobalt::persistent_storage::PersistentSettings* persistent_settings);
 +
-+  H5vccTizenTube();
++  H5vccFastTube();
 +
 +  // Calls a Java method in order to download the APK
 +  // and install it.
@@ -289,24 +289,24 @@ index 000000000..21beb4879
 +  std::string GetArchitecture() const;
 +  void SetFrameRate(float frame_rate) const;
 +
-+  DEFINE_WRAPPABLE_TYPE(H5vccTizenTube);
++  DEFINE_WRAPPABLE_TYPE(H5vccFastTube);
 +
 + private:
 +  cobalt::network::NetworkModule* network_module_ = nullptr;
 +  cobalt::persistent_storage::PersistentSettings* persistent_settings_ =
 +      nullptr;
-+  DISALLOW_COPY_AND_ASSIGN(H5vccTizenTube);
++  DISALLOW_COPY_AND_ASSIGN(H5vccFastTube);
 +};
 +
 +}  // namespace h5vcc
 +}  // namespace cobalt
 +
-+#endif  // COBALT_H5VCC_H5VCC_TIZEN_TUBE_H_
-diff --git a/cobalt/h5vcc/h5vcc_tizen_tube.idl b/cobalt/h5vcc/h5vcc_tizen_tube.idl
++#endif  // COBALT_H5VCC_H5VCC_FAST_TUBE_H_
+diff --git a/cobalt/h5vcc/h5vcc_fast_tube.idl b/cobalt/h5vcc/h5vcc_fast_tube.idl
 new file mode 100644
 index 000000000..5b1aa8556
 --- /dev/null
-+++ b/cobalt/h5vcc/h5vcc_tizen_tube.idl
++++ b/cobalt/h5vcc/h5vcc_fast_tube.idl
 @@ -0,0 +1,21 @@
 +// Copyright 2016 The Cobalt Authors. All Rights Reserved.
 +// Copyright 2025 Reis Can (reisxd). All Rights Reserved.
@@ -322,7 +322,7 @@ index 000000000..5b1aa8556
 +// See the License for the specific language governing permissions and
 +// limitations under the License.
 +
-+interface H5vccTizenTube {
++interface H5vccFastTube {
 +    boolean InstallAppFromURL(DOMString url);
 +    DOMString GetVersion();
 +    boolean SetUserAgent(DOMString user_agent);
@@ -338,7 +338,7 @@ index b64bfa86f..0537f0324 100644
      "embedded_resources/cobalt_splash_screen.css",
      "embedded_resources/cobalt_splash_screen.html",
 -    "embedded_resources/cobalt_word_logo_356.png",
-+    "embedded_resources/tizentube.svg",
++    "embedded_resources/fasttube.svg",
      "embedded_resources/dialog.css",
      "embedded_resources/dialog.js",
      "embedded_resources/equirectangular_40_40.msh",
@@ -390,18 +390,18 @@ index 2a056dcc7..1bb36ecc3 100644
 -<body style="background-color: #000000;"></body>
 +<body style="background-color: #0f0f0f; display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; margin: 0;">
 +  <h1 style="color: #FFFFFF; font-size: 80px; font-family: Roboto,Noto Sans CJK ZH-HK,Noto Sans Thai,Arial,Helvetica,sans-serif; margin: 0;">
-+    TizenTube
++    FastTube
 +  </h1>
 +  <div class="progress-container">
 +    <div class="progress-bar"></div>
 +  </div>
 +</body>
  </html>
-diff --git a/cobalt/loader/embedded_resources/tizentube.svg b/cobalt/loader/embedded_resources/tizentube.svg
+diff --git a/cobalt/loader/embedded_resources/fasttube.svg b/cobalt/loader/embedded_resources/fasttube.svg
 new file mode 100644
 index 000000000..155abadce
 --- /dev/null
-+++ b/cobalt/loader/embedded_resources/tizentube.svg
++++ b/cobalt/loader/embedded_resources/fasttube.svg
 @@ -0,0 +1 @@
 +<svg width='512' height='512' viewBox='0 0 512 512' fill='none' xmlns='http://www.w3.org/2000/svg'><rect width='512' height='512' rx='30' fill='url(#paint0_linear_676_2)'/><path d='M203.372 152.608C203.361 152.602 203.35 152.595 203.339 152.589L203.359 152.556C224.787 115.49 281.495 108.162 330.044 136.192C378.604 164.229 400.61 217.031 379.197 254.12L203.372 152.608Z' fill='#0DC1E9'/><path d='M172.958 370.347C135.54 370.347 105.2 324.289 105.2 267.478C105.2 210.667 135.54 164.609 172.958 164.609V370.308V370.347Z' fill='white'/><path d='M177.238 148.063L177.242 148.056C189.669 126.565 213.071 113.403 243.136 110.996C271.772 108.704 303.31 116.544 331.936 133.071C360.571 149.604 383.131 173.003 395.462 198.961C408.408 226.214 408.7 246.077 396.283 267.583C392.744 273.713 384.439 275.546 377.738 271.677L182.983 166.225C179.621 164.284 177.298 161.274 176.266 157.982C175.223 154.701 175.465 151.134 177.238 148.063ZM376.741 248.489C383.673 218.341 360.352 179.081 319.118 155.275C277.891 131.472 232.223 130.905 209.581 151.979L376.741 248.489Z' fill='#5C2D51'/><path d='M94.0001 267.479C94.0001 237.235 101.85 208.662 116.104 187.023C131.069 164.303 151.26 151.791 172.957 151.791C179.141 151.791 184.156 157.531 184.156 164.609V370.308C184.156 377.386 179.141 383.166 172.957 383.166C151.26 383.166 131.069 370.654 116.104 347.934C101.849 326.295 94.0001 297.723 94.0001 267.479ZM161.756 179.202C135.917 187.5 116.398 223.93 116.398 267.479C116.398 311.028 135.917 347.458 161.756 355.756V179.202Z' fill='#5C2D51'/><path d='M388.527 258.644L191.233 372.551C191.239 372.561 191.244 372.571 191.25 372.58C209.978 404.961 269.291 405.724 323.759 374.277C378.239 342.823 407.236 291.048 388.527 258.644Z' fill='white'/><path d='M379.42 253.097C372.632 257.016 369.635 264.538 372.727 269.893C388.32 296.901 362.267 341.238 314.651 368.73C272.893 392.839 228.193 396.105 207.318 378.324L321.474 312.416C328.261 308.497 331.258 300.976 328.166 295.62C325.074 290.265 317.062 289.1 310.275 293.018L182.125 367.005C175.338 370.924 172.341 378.445 175.433 383.801C186.312 402.61 208.408 413.159 237.668 413.534C265.538 413.891 296.856 404.868 325.85 388.128C354.853 371.384 378.328 348.766 391.953 324.441C406.257 298.901 408.161 274.488 397.313 255.699C394.219 250.344 386.207 249.179 379.42 253.097Z' fill='#5C2D51'/><path d='M352.092 266.747L349.888 268.019C343.101 271.938 340.104 279.459 343.196 284.815C346.288 290.17 354.3 291.336 361.088 287.417L363.291 286.145C370.078 282.226 373.075 274.705 369.983 269.349C366.892 263.993 358.88 262.828 352.092 266.747Z' fill='#5C2D51'/><path opacity='0.2' d='M372 268.5L278 322L183.5 372.5V167L372 268.5Z' fill='#5C2D51' fill-opacity='0.49'/><defs><linearGradient id='paint0_linear_676_2' x1='256' y1='0' x2='256' y2='512' gradientUnits='userSpaceOnUse'><stop stop-color='#3DDCFF'/><stop offset='1' stop-color='#D0EBFF'/></linearGradient></defs></svg>
 diff --git a/cobalt/network/dial/dial_system_config_starboard.cc b/cobalt/network/dial/dial_system_config_starboard.cc
@@ -474,7 +474,7 @@ index afea895b5..50f1dabc2 100644
    void StartNetLog();
    base::FilePath StopNetLog();
  
-+  // This was set public in order for H5vccTizenTube to set it after setting the
++  // This was set public in order for H5vccFastTube to set it after setting the
 +  // UA.
 +  std::unique_ptr<URLRequestContext> url_request_context_;
 +  Options options_;
@@ -845,7 +845,7 @@ index 3f14106b8..d4f661c6e 100644
  namespace {
  
 -const char kFriendlyName[] = "Android";
-+const char kFriendlyName[] = "TizenTube";
++const char kFriendlyName[] = "FastTube";
  const char kUnknownValue[] = "unknown";
  
  // This is a format string template and the %s is meant to be replaced by

@@ -33,10 +33,10 @@ echo "------------------------------------------------"
 read -p "Press ENTER to generate the new perfectly-formatted patch..."
 
 echo "[3/3] Generating clean, perfectly-formatted patch file..."
-# Assuming most active feature development goes into 02-tizentube-features.patch
+# Assuming most active feature development goes into 02-fasttube-features.patch
 # We exclude the optimize patch changes if possible, or just bundle them. 
 # For safety, we just regenerate the 02 patch based on the diff.
-git diff > ../../patches/02-tizentube-features.patch
+git diff > ../../patches/02-fasttube-features.patch
 
-echo "🎉 Success! patches/02-tizentube-features.patch has been regenerated with exact line numbers and headers."
+echo "🎉 Success! patches/02-fasttube-features.patch has been regenerated with exact line numbers and headers."
 echo "You can now safely commit the updated patch to git."

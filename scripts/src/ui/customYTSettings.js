@@ -2,9 +2,9 @@ import { SettingActionRenderer, SettingsCategory } from './ytUI.js';
 import { t } from 'i18next';
 
 function PatchSettings(settingsObject) {
-    const tizentubeOpenAction = SettingActionRenderer(
+    const fasttubeOpenAction = SettingActionRenderer(
         t('settings.ttSettings.title'),
-        'tizentube_open_action',
+        'fasttube_open_action',
         {
             customAction: {
                 action: 'TT_SETTINGS_SHOW',
@@ -15,12 +15,12 @@ function PatchSettings(settingsObject) {
         'https://www.gstatic.com/ytlr/img/parent_code.png'
     )
 
-    const tizenTubeCategory = SettingsCategory(
-        'tizentube_category',
-        [tizentubeOpenAction]
+    const fasttubeCategory = SettingsCategory(
+        'fasttube_category',
+        [fasttubeOpenAction]
     );
     // Add it as the first item in the settings object
-    settingsObject.items.unshift(tizenTubeCategory);
+    settingsObject.items.unshift(fasttubeCategory);
 
 }
 

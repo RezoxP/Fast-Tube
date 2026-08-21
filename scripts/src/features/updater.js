@@ -1,12 +1,12 @@
-// TizenTube Cobalt Update Checker
+// Fast-Tube Cobalt Update Checker
 
 import { buttonItem, showModal, showToast, overlayPanelItemListRenderer, scrollPaneRenderer, overlayMessageRenderer } from '../ui/ytUI.js';
 import { configRead } from '../config.js';
 
-// If TizenTube is not running on Cobalt, do nothing
+// If Fast-Tube is not running on Cobalt, do nothing
 // Add a timeout since reloading the home page while the updater pop up is shown causes the pop up to instantly disappear.
 setTimeout(() => {
-    if (window.h5vcc && window.h5vcc.tizentube && configRead('enableUpdater')) {
+    if (window.h5vcc && window.h5vcc.fasttube && configRead('enableUpdater')) {
         const currentEpoch = Math.floor(Date.now() / 1000);
         if (configRead('dontCheckUpdateUntil') > currentEpoch) {
             console.info('Skipping update check until', new Date(configRead('dontCheckUpdateUntil') * 1000).toLocaleString());
@@ -25,7 +25,7 @@ function getLatestRelease() {
 }
 
 function checkForUpdates(showNoUpdateToast) {
-    const currentAppVersion = window.h5vcc.tizentube.GetVersion();
+    const currentAppVersion = window.h5vcc.fasttube.GetVersion();
     const currentEpoch = Math.floor(Date.now() / 1000);
 
     getLatestRelease()
@@ -36,8 +36,8 @@ function checkForUpdates(showNoUpdateToast) {
             let architecture;
             let downloadUrl;
 
-            if (window.h5vcc.tizentube.GetArchitecture) {
-                architecture = window.h5vcc.tizentube.GetArchitecture();
+            if (window.h5vcc.fasttube.GetArchitecture) {
+                architecture = window.h5vcc.fasttube.GetArchitecture();
             }
 
             if (architecture) {
@@ -96,22 +96,22 @@ function checkForUpdates(showNoUpdateToast) {
                 showModal(
                     {
                         title: 'Update Available',
-                        subtitle: `A new version of TizenTube Cobalt is available: ${latestVersion}, current: ${currentAppVersion}`
+                        subtitle: `A new version of Fast-Tube Cobalt is available: ${latestVersion}, current: ${currentAppVersion}`
                     },
                     overlayPanelItemListRenderer(buttons),
                     'tt-update-modal',
                     false
                 )
             } else {
-                console.info('You are using the latest version of TizenTube.');
+                console.info('You are using the latest version of Fast-Tube.');
                 if (showNoUpdateToast) {
-                    showToast('TizenTube is up to date', `You are using the latest version (${currentAppVersion}) of TizenTube Cobalt.`, null);
+                    showToast('Fast-Tube is up to date', `You are using the latest version (${currentAppVersion}) of Fast-Tube Cobalt.`, null);
                 }
             }
         })
         .catch(error => {
             console.error('Error fetching the latest release:', error);
-            showToast('TizenTube update check failed', 'Could not check for updates.', null);
+            showToast('Fast-Tube update check failed', 'Could not check for updates.', null);
         });
 }
 

@@ -15,9 +15,9 @@ function attachToVideoPlayer() {
 
             if (resolutionMatch) {
                 const fps = resolutionMatch[3];
-                if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate) {
+                if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
                     if (!configRead('autoFrameRate')) {
-                        window.h5vcc.tizentube.SetFrameRate(0);
+                        window.h5vcc.fasttube.SetFrameRate(0);
                         return;
                     }
                     if (pauseFor > 0) {
@@ -26,7 +26,7 @@ function attachToVideoPlayer() {
                             video.play();
                         }, pauseFor);
                     }
-                    window.h5vcc.tizentube.SetFrameRate(parseFloat(fps));
+                    window.h5vcc.fasttube.SetFrameRate(parseFloat(fps));
                 }
             }
         } catch (e) {
@@ -35,8 +35,8 @@ function attachToVideoPlayer() {
     });
 
     const resetFrameRate = () => {
-        if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate) {
-            window.h5vcc.tizentube.SetFrameRate(0);
+        if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
+            window.h5vcc.fasttube.SetFrameRate(0);
         }
     };
 

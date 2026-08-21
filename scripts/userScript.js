@@ -109,10 +109,78 @@
         });
     }
 
-    if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetUserAgent) {
-        if (localStorage.getItem('userAgent')) {
-            localStorage.removeItem('userAgent');
-            window.h5vcc.tizentube.SetUserAgent("");
+    const deviceProfiles = [
+        {
+            architecture: 'Linux arm64-v8a',
+            os: 'Android 10',
+            rasterizer: 'gles',
+            manufacturer: 'Sony',
+            deviceType: 'ATV',
+            chipsetModel: 'sdm845',
+            modelYear: 13140765,
+            firmwareVersion: '52.1.C.0.268',
+            brand: 'KDDI',
+            model: 'SOV38'
+        },
+        {
+            architecture: 'Linux armeabi-v7a',
+            os: 'Android 14',
+            rasterizer: 'gles',
+            manufacturer: 'Google',
+            deviceType: 'ATV',
+            chipsetModel: 'sabrina',
+            modelYear: 2020,
+            firmwareVersion: 'UTTC.250917.004',
+            brand: 'google',
+            model: 'Chromecast'
+        },
+        {
+            architecture: 'Linux armeabi-v7a',
+            os: 'Android 12',
+            rasterizer: 'gles',
+            manufacturer: 'TCL',
+            deviceType: 'ATV',
+            chipsetModel: 'merak',
+            modelYear: 2023,
+            firmwareVersion: 'STT2.221228.001',
+            brand: 'TCL',
+            model: 'Smart TV Pro'
+        },
+        {
+            architecture: 'Linux armeabi-v7a',
+            os: 'Android 7.1.2',
+            rasterizer: 'gles',
+            manufacturer: 'Amazon',
+            deviceType: 'ATV',
+            chipsetModel: 'mt8695',
+            modelYear: 0,
+            firmwareVersion: 'NS6294',
+            brand: 'Amazon',
+            model: 'AFTMM'
+        }
+    ];
+
+    const cobaltVersion = '25.lts.30.1034958-gold';
+    const v8Version = 'v8/8.8.278.17-jit';
+    const starboardVersion = '15';
+    const auxField = 'com.google.android.youtube.tv/5.30.301';
+
+    function generateUserAgent(profile) {
+        return `Mozilla/5.0 (${profile.architecture}; ${profile.os}) Cobalt/${cobaltVersion} (unlike Gecko) ${v8Version} ${profile.rasterizer} Starboard/${starboardVersion}, ${profile.manufacturer}_${profile.deviceType}_${profile.chipsetModel}_${profile.modelYear}/${profile.firmwareVersion} (${profile.brand}, ${profile.model}) ${auxField}`;
+    }
+
+    if (document.querySelector('.content-container') && window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetUserAgent) {
+        if (!sessionStorage.getItem('ua_spoofed')) {
+            sessionStorage.setItem('ua_spoofed', 'true');
+            
+            let ua = localStorage.getItem('userAgent');
+            if (!ua) {
+                const randomProfile = deviceProfiles[Math.floor(Math.random() * deviceProfiles.length)];
+                ua = generateUserAgent(randomProfile);
+                localStorage.setItem('userAgent', ua);
+            }
+            
+            window.h5vcc.fasttube.SetUserAgent(ua);
             location.reload();
         }
     }
@@ -3153,7 +3221,7 @@
     				},
     				launchToOnStartup: {
     					title: "Launch To on Startup",
-    					subtitle: "Choose the default page TizenTube opens to on startup"
+    					subtitle: "Choose the default page Fast-Tube opens to on startup"
     				},
     				sortSubscriptionsByAlphabet: "Sort Subscriptions Alphabetically",
     				disableChannelsOnSidebar: "Disable Channels on Sidebar",
@@ -3169,8 +3237,8 @@
     			}
     		},
     		updater: {
-    			title: "TizenTube Cobalt Updater",
-    			menuSubtitle: "Manage TizenTube Cobalt updates",
+    			title: "Fast-Tube Cobalt Updater",
+    			menuSubtitle: "Manage Fast-Tube Cobalt updates",
     			versionSubtitle: "Current version: {{version}}",
     			options: {
     				checkForUpdates: "Check for updates",
@@ -3179,17 +3247,17 @@
     		}
     	},
     	ttSettings: {
-    		title: "TizenTube Settings",
+    		title: "Fast-Tube Settings",
     		madeByText: "Made by RezoxP with ❤️",
-    		summary: "Open TizenTube Settings"
+    		summary: "Open Fast-Tube Settings"
     	},
     	supportTT: {
-    		title: "Support TizenTube",
-    		subtitle: "❤️ Show support for TizenTube and its development",
+    		title: "Support Fast-Tube",
+    		subtitle: "❤️ Show support for Fast-Tube and its development",
     		content: {
-    			"1": "If you enjoy using TizenTube and would like to support its development, consider the following:",
+    			"1": "If you enjoy using Fast-Tube and would like to support its development, consider the following:",
     			"2": "1. Star the GitHub repository to help increase its visibility.",
-    			"3": "2. Share TizenTube with others.",
+    			"3": "2. Share Fast-Tube with others.",
     			"4": "If you would like to contribute financially, consider donating:",
     			"5": "- Buy Me A Coffee: https://www.buymeacoffee.com/RezoxP (preferably)",
     			"6": "- GitHub Sponsors: https://github.com/sponsors/RezoxP"
@@ -3197,8 +3265,8 @@
     	}
     };
     var welcomeMsg = {
-    	title: "Welcome to TizenTube",
-    	subtitle: "Go to settings and click on TizenTube Settings for settings."
+    	title: "Welcome to Fast-Tube",
+    	subtitle: "Go to settings and click on Fast-Tube Settings for settings."
     };
     var sponsorblock = {
     	segments: {
@@ -3373,7 +3441,7 @@
       enableDeArrowThumbnails: false,
       focusContainerColor: '#0f0f0f',
       routeColor: '#0f0f0f',
-      enableFixedUI: (window.h5vcc && window.h5vcc.tizentube) ? false : true,
+      enableFixedUI: (window.h5vcc && window.h5vcc.fasttube) ? false : true,
       enableHqThumbnails: false,
       enableChapters: true,
       enableLongPress: true,
@@ -3464,7 +3532,7 @@
       }
     };
 
-    // Picture in Picture Mode for TizenTube
+    // Picture in Picture Mode for Fast-Tube
 
 
     window.isPipPlaying = false;
@@ -6704,7 +6772,7 @@
         }
     };
 
-    // TizenTube Subtitle Localization Mod
+    // Fast-Tube Subtitle Localization Mod
     // Automatically adds user's local language to subtitle auto-translate menu if not present
 
 
@@ -6763,7 +6831,7 @@
 
             return { code: lang, name };
         } catch (e) {
-            console.warn("TizenTube Subtitle Localization: Could not infer language for country", countryCode, e);
+            console.warn("Fast-Tube Subtitle Localization: Could not infer language for country", countryCode, e);
             return null;
         }
     }
@@ -6779,12 +6847,12 @@
             }
 
             console.warn(
-                "TizenTube Subtitle Localization: Could not determine user country code"
+                "Fast-Tube Subtitle Localization: Could not determine user country code"
             );
             return null;
         } catch (error) {
             console.error(
-                "TizenTube Subtitle Localization: Error getting country code:",
+                "Fast-Tube Subtitle Localization: Error getting country code:",
                 error
             );
             return null;
@@ -6915,10 +6983,10 @@
         ) {
             if (!yttvInstance) {
                 console.error(
-                    "TizenTube Subtitle Localization: Could not find resolveCommand instance."
+                    "Fast-Tube Subtitle Localization: Could not find resolveCommand instance."
                 );
             } else {
-                console.log("TizenTube Subtitle Localization: Already patched.");
+                console.log("Fast-Tube Subtitle Localization: Already patched.");
             }
             return;
         }
@@ -6959,7 +7027,7 @@
                             !languageExistsInMenu(items, userLanguage.code, userLanguage.name)
                         ) {
                             console.log(
-                                `%c[TizenTube Subtitle Localization] Adding user's local language: ${userLanguage.name} (${userLanguage.code})`,
+                                `%c[Fast-Tube Subtitle Localization] Adding user's local language: ${userLanguage.name} (${userLanguage.code})`,
                                 "background: #2196F3; color: #ffffff; font-size: 14px; font-weight: bold;"
                             );
 
@@ -7009,13 +7077,13 @@
                             }
                         } else {
                             console.log(
-                                `%c[TizenTube Subtitle Localization] User's language ${userLanguage.name} already exists in menu`,
+                                `%c[Fast-Tube Subtitle Localization] User's language ${userLanguage.name} already exists in menu`,
                                 "background: #4CAF50; color: #ffffff; font-size: 12px;"
                             );
                         }
                     } else {
                         console.warn(
-                            `TizenTube Subtitle Localization: No language mapping found for country code: ${userCountryCode}`
+                            `Fast-Tube Subtitle Localization: No language mapping found for country code: ${userCountryCode}`
                         );
                     }
                 }
@@ -7028,7 +7096,7 @@
 
                     if (missingLanguages.length > 0) {
                         console.log(
-                            `%c[TizenTube Subtitle Localization] Adding "Tizen Languages" section with ${missingLanguages.length} additional languages`,
+                            `%c[Fast-Tube Subtitle Localization] Adding "Tizen Languages" section with ${missingLanguages.length} additional languages`,
                             "background: #FF9800; color: #ffffff; font-size: 12px;"
                         );
 
@@ -7041,12 +7109,12 @@
                         });
 
                         console.log(
-                            `%c[TizenTube Subtitle Localization] Added "Tizen Languages" section`,
+                            `%c[Fast-Tube Subtitle Localization] Added "Tizen Languages" section`,
                             "background: #FF9800; color: #ffffff; font-size: 12px;"
                         );
                     } else {
                         console.log(
-                            `%c[TizenTube Subtitle Localization] All languages already present in menu`,
+                            `%c[Fast-Tube Subtitle Localization] All languages already present in menu`,
                             "background: #4CAF50; color: #ffffff; font-size: 12px;"
                         );
                     }
@@ -7058,7 +7126,7 @@
         };
 
         yttvInstance.instance.resolveCommand.isPatchedBySubtitleLocalization = true;
-        console.log("TizenTube Subtitle Localization: Patch successful!");
+        console.log("Fast-Tube Subtitle Localization: Patch successful!");
         isPatched = true;
     }
 
@@ -7078,7 +7146,7 @@
     }
 
     console.log(
-        "TizenTube Subtitle Localization: Module loaded, waiting for YouTube TV..."
+        "Fast-Tube Subtitle Localization: Module loaded, waiting for YouTube TV..."
     );
 
     const qrcodes = {};
@@ -7121,15 +7189,15 @@
                     },
                     {
                         name: 'Telegram (Announcements)',
-                        link: 'https://t.me/tizentubecobaltofficial',
+                        link: 'https://t.me/fasttubecobaltofficial',
                     },
                     {
                         name: 'Telegram (Group)',
-                        link: 'https://t.me/tizentubeofficial',
+                        link: 'https://t.me/fasttubeofficial',
                     },
                     {
                         name: 'Website',
-                        link: 'https://tizentube.6513006.xyz',
+                        link: 'https://fasttube.6513006.xyz',
                     },
                     {
                         name: 'Buy Me A Coffee',
@@ -7505,12 +7573,12 @@
                             }
                         })
                     },
-                    window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate ? {
+                    window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
                         name: t('settings.options.videoPlayer.options.afr'),
                         icon: 'SLOW_MOTION_VIDEO',
                         value: 'autoFrameRate'
                     } : null,
-                    window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate ? {
+                    window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
                         name: t('settings.options.videoPlayer.options.afrPauseDuration.title'),
                         icon: 'TIMER',
                         value: null,
@@ -7875,7 +7943,7 @@
                     }
                 ]
             },
-            window.h5vcc && window.h5vcc.tizentube ?
+            window.h5vcc && window.h5vcc.fasttube ?
                 {
                     name: t('settings.options.updater.title'),
                     icon: 'SYSTEM_UPDATE',
@@ -7884,7 +7952,7 @@
                         title: t('settings.options.updater.title'),
                         subtitle: t('settings.options.updater.menuSubtitle')
                     },
-                    subtitle:  t('settings.options.updater.versionSubtitle', { version: window.h5vcc.tizentube.GetVersion() }),
+                    subtitle:  t('settings.options.updater.versionSubtitle', { version: window.h5vcc.fasttube.GetVersion() }),
                     options: [
                         buttonItem(
                             { title: t('settings.options.updater.options.checkForUpdates') },
@@ -8124,7 +8192,7 @@
             }
         }
 
-        showModal(parameters.menuHeader ? parameters.menuHeader : 'TizenTube Settings', overlayPanelItemListRenderer(buttons, parameters.selectedIndex), parameters.menuId || 'tt-settings-options', update);
+        showModal(parameters.menuHeader ? parameters.menuHeader : 'Fast-Tube Settings', overlayPanelItemListRenderer(buttons, parameters.selectedIndex), parameters.menuId || 'tt-settings-options', update);
     }
 
     const interval$2 = setInterval(() => {
@@ -8237,13 +8305,13 @@
         showModal('Playback Speed', overlayPanelItemListRenderer(buttons, selectedIndex), 'tt-speed');
     }
 
-    // TizenTube Cobalt Update Checker
+    // Fast-Tube Cobalt Update Checker
 
 
-    // If TizenTube is not running on Cobalt, do nothing
+    // If Fast-Tube is not running on Cobalt, do nothing
     // Add a timeout since reloading the home page while the updater pop up is shown causes the pop up to instantly disappear.
     setTimeout(() => {
-        if (window.h5vcc && window.h5vcc.tizentube && configRead('enableUpdater')) {
+        if (window.h5vcc && window.h5vcc.fasttube && configRead('enableUpdater')) {
             const currentEpoch = Math.floor(Date.now() / 1000);
             if (configRead('dontCheckUpdateUntil') > currentEpoch) {
                 console.info('Skipping update check until', new Date(configRead('dontCheckUpdateUntil') * 1000).toLocaleString());
@@ -8262,7 +8330,7 @@
     }
 
     function checkForUpdates(showNoUpdateToast) {
-        const currentAppVersion = window.h5vcc.tizentube.GetVersion();
+        const currentAppVersion = window.h5vcc.fasttube.GetVersion();
         const currentEpoch = Math.floor(Date.now() / 1000);
 
         getLatestRelease()
@@ -8273,8 +8341,8 @@
                 let architecture;
                 let downloadUrl;
 
-                if (window.h5vcc.tizentube.GetArchitecture) {
-                    architecture = window.h5vcc.tizentube.GetArchitecture();
+                if (window.h5vcc.fasttube.GetArchitecture) {
+                    architecture = window.h5vcc.fasttube.GetArchitecture();
                 }
 
                 if (architecture) {
@@ -8333,22 +8401,22 @@
                     showModal(
                         {
                             title: 'Update Available',
-                            subtitle: `A new version of TizenTube Cobalt is available: ${latestVersion}, current: ${currentAppVersion}`
+                            subtitle: `A new version of Fast-Tube Cobalt is available: ${latestVersion}, current: ${currentAppVersion}`
                         },
                         overlayPanelItemListRenderer(buttons),
                         'tt-update-modal',
                         false
                     );
                 } else {
-                    console.info('You are using the latest version of TizenTube.');
+                    console.info('You are using the latest version of Fast-Tube.');
                     if (showNoUpdateToast) {
-                        showToast('TizenTube is up to date', `You are using the latest version (${currentAppVersion}) of TizenTube Cobalt.`, null);
+                        showToast('Fast-Tube is up to date', `You are using the latest version (${currentAppVersion}) of Fast-Tube Cobalt.`, null);
                     }
                 }
             })
             .catch(error => {
                 console.error('Error fetching the latest release:', error);
-                showToast('TizenTube update check failed', 'Could not check for updates.', null);
+                showToast('Fast-Tube update check failed', 'Could not check for updates.', null);
             });
     }
 
@@ -8363,7 +8431,7 @@
         }
     }
 
-    // Patch resolveCommand to be able to change TizenTube settings
+    // Patch resolveCommand to be able to change Fast-Tube settings
 
     function patchResolveCommand() {
         for (const key in window._yttv) {
@@ -8372,7 +8440,7 @@
                 const ogResolve = window._yttv[key].instance.resolveCommand;
                 window._yttv[key].instance.resolveCommand = function (cmd, _) {
                     if (cmd.setClientSettingEndpoint) {
-                        // Command to change client settings. Use TizenTube configuration to change settings.
+                        // Command to change client settings. Use Fast-Tube configuration to change settings.
                         for (const settings of cmd.setClientSettingEndpoint.settingDatas) {
                             if (!settings.clientSettingEnum.item.includes('_')) {
                                 for (const setting of cmd.setClientSettingEndpoint.settingDatas) {
@@ -8414,11 +8482,11 @@
                         customAction(cmd.playlistEditEndpoint.customAction.action, cmd.playlistEditEndpoint.customAction.parameters);
                         return true;
                     } else if (cmd?.openPopupAction?.uniqueId === 'playback-settings') {
-                        // Patch the playback settings popup to use TizenTube speed settings
+                        // Patch the playback settings popup to use Fast-Tube speed settings
                         const items = cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items;
                         for (const item of items) {
                             if (item?.compactLinkRenderer?.icon?.iconType === 'SLOW_MOTION_VIDEO') {
-                                item.compactLinkRenderer.subtitle && (item.compactLinkRenderer.subtitle.simpleText = 'with TizenTube');
+                                item.compactLinkRenderer.subtitle && (item.compactLinkRenderer.subtitle.simpleText = 'with Fast-Tube');
                                 item.compactLinkRenderer.serviceEndpoint = {
                                     clickTrackingParams: "null",
                                     signalAction: {
@@ -8443,8 +8511,8 @@
                             ])
                         );
 
-                        if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.HasSystemFeature && 
-                            window.h5vcc.tizentube.HasSystemFeature('android.software.picture_in_picture')) {
+                        if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.HasSystemFeature && 
+                            window.h5vcc.fasttube.HasSystemFeature('android.software.picture_in_picture')) {
                             cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(3, 0,
                                 buttonItem(
                                     { title: 'Picture in Picture' },
@@ -8532,8 +8600,8 @@
                 configWrite('dontCheckUpdateUntil', parameters);
                 break;
             case 'UPDATE_DOWNLOAD':
-                window.h5vcc.tizentube.InstallAppFromURL(parameters);
-                showToast('TizenTube Update', 'Downloading update, please wait...');
+                window.h5vcc.fasttube.InstallAppFromURL(parameters);
+                showToast('Fast-Tube Update', 'Downloading update, please wait...');
                 break;
             case 'SET_PLAYER_SPEED':
                 const speed = Number(parameters);
@@ -8543,18 +8611,18 @@
                 enablePip();
                 break;
             case 'ENTER_PIP':
-                window.h5vcc.tizentube.EnterPIP();
+                window.h5vcc.fasttube.EnterPIP();
                 break;
             case 'SHOW_TOAST':
-                showToast('TizenTube', parameters);
+                showToast('Fast-Tube', parameters);
                 break;
             case 'ADD_TO_QUEUE':
                 window.queuedVideos.videos.push(parameters);
-                showToast('TizenTube', 'Video added to queue.');
+                showToast('Fast-Tube', 'Video added to queue.');
                 break;
             case 'CLEAR_QUEUE':
                 window.queuedVideos.videos = [];
-                showToast('TizenTube', 'Video queue cleared.');
+                showToast('Fast-Tube', 'Video queue cleared.');
                 break;
             case 'CHECK_FOR_UPDATES':
                 checkForUpdates(true);
@@ -8563,9 +8631,9 @@
     }
 
     function PatchSettings(settingsObject) {
-        const tizentubeOpenAction = SettingActionRenderer(
+        const fasttubeOpenAction = SettingActionRenderer(
             t('settings.ttSettings.title'),
-            'tizentube_open_action',
+            'fasttube_open_action',
             {
                 customAction: {
                     action: 'TT_SETTINGS_SHOW',
@@ -8576,12 +8644,12 @@
             'https://www.gstatic.com/ytlr/img/parent_code.png'
         );
 
-        const tizenTubeCategory = SettingsCategory(
-            'tizentube_category',
-            [tizentubeOpenAction]
+        const fasttubeCategory = SettingsCategory(
+            'fasttube_category',
+            [fasttubeOpenAction]
         );
         // Add it as the first item in the settings object
-        settingsObject.items.unshift(tizenTubeCategory);
+        settingsObject.items.unshift(fasttubeCategory);
 
     }
 
@@ -11482,7 +11550,7 @@
 
       try {
         uiContainer.innerHTML = `
-<h1>TizenTube Theme Configuration</h1>
+<h1>Fast-Tube Theme Configuration</h1>
 <label for="__barColor">Navigation Bar Color: <input type="text" id="__barColor"/></label>
 <label for="__routeColor">Main Content Color: <input type="text" id="__routeColor"/></label>
 <div><small>Sponsor segments skipping - https://sponsor.ajay.app</small></div>
@@ -19304,7 +19372,7 @@
     var estraverseExports = requireEstraverse();
     var estraverse = /*@__PURE__*/getDefaultExportFromCjs(estraverseExports);
 
-    // AST Parser for TizenTube, used for finding code patterns
+    // AST Parser for Fast-Tube, used for finding code patterns
     // You may call me insane for this.
 
 
@@ -19605,9 +19673,9 @@
 
                 if (resolutionMatch) {
                     const fps = resolutionMatch[3];
-                    if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate) {
+                    if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
                         if (!configRead('autoFrameRate')) {
-                            window.h5vcc.tizentube.SetFrameRate(0);
+                            window.h5vcc.fasttube.SetFrameRate(0);
                             return;
                         }
                         if (pauseFor > 0) {
@@ -19616,7 +19684,7 @@
                                 video.play();
                             }, pauseFor);
                         }
-                        window.h5vcc.tizentube.SetFrameRate(parseFloat(fps));
+                        window.h5vcc.fasttube.SetFrameRate(parseFloat(fps));
                     }
                 }
             } catch (e) {
@@ -19625,8 +19693,8 @@
         });
 
         const resetFrameRate = () => {
-            if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate) {
-                window.h5vcc.tizentube.SetFrameRate(0);
+            if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
+                window.h5vcc.fasttube.SetFrameRate(0);
             }
         };
 
@@ -19645,20 +19713,42 @@
 
     attachToVideoPlayer();
 
-    configChangeEmitter.addEventListener('configChange', (e) => {
-        if (e.detail.key === 'enableClock') {
-            toggleClock(e.detail.value);
-        }
-    });
-
     let actualClock;
     let clockInterval;
 
+    configChangeEmitter.addEventListener('configChange', (e) => {
+        if (e.detail.key === 'enableClock') {
+            toggleClock(e.detail.value);
+        } else if (e.detail.key === 'isClock12HourFormat' || e.detail.key === 'clockShowSeconds') {
+            if (configRead('enableClock')) {
+                // Force a quick update so changes are visible instantly
+                updateClock();
+            }
+        }
+    });
+
+    function updateClock() {
+        if (!actualClock) return;
+        const now = new Date();
+        const is12HourFormat = configRead('isClock12HourFormat');
+        const secondsEnabled = configRead('clockShowSeconds');
+
+        let hours = now.getHours();
+        if (is12HourFormat) {
+            hours = hours % 12 || 12;
+        }
+
+        hours = hours.toString().padStart(2, '0');
+        const minutes = now.getMinutes().toString().padStart(2, '0');
+        const seconds = now.getSeconds().toString().padStart(2, '0');
+        actualClock.textContent = `${hours}:${minutes}${secondsEnabled ? `:${seconds}` : ''}${is12HourFormat ? (now.getHours() >= 12 ? ' PM' : ' AM') : ''}`;
+    }
+
     function toggleClock(value) {
-        const existingClock = document.getElementById('tizentube-clock');
+        const existingClock = document.getElementById('fasttube-clock');
         if (value && existingClock) return;
         if (!value && existingClock) {
-            existingClock.remove();
+            existingClock.parentNode.removeChild(existingClock);
             if (clockInterval) clearInterval(clockInterval);
             return;
         }
@@ -19667,7 +19757,7 @@
         } else {
             const clock = document.createElement('div');
      
-            clock.id = 'tizentube-clock';
+            clock.id = 'fasttube-clock';
             clock.style.height = '45rem';
             clock.style.width = '80rem';
             clock.style.position = 'absolute';
@@ -19685,22 +19775,6 @@
             actualClock.style.fontSize = '1.5em';
             clock.appendChild(actualClock);
             document.body.appendChild(clock);
-
-            function updateClock() {
-                const now = new Date();
-                const is12HourFormat = configRead('isClock12HourFormat');
-                const secondsEnabled = configRead('clockShowSeconds');
-
-                let hours = now.getHours();
-                if (is12HourFormat) {
-                    hours = hours % 12 || 12;
-                }
-
-                hours = hours.toString().padStart(2, '0');
-                const minutes = now.getMinutes().toString().padStart(2, '0');
-                const seconds = now.getSeconds().toString().padStart(2, '0');
-                actualClock.textContent = `${hours}:${minutes}${secondsEnabled ? `:${seconds}` : ''}${is12HourFormat ? (now.getHours() >= 12 ? ' PM' : ' AM') : ''}`;
-            }
 
             updateClock();
             if (clockInterval) clearInterval(clockInterval);

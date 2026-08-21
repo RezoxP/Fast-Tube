@@ -58,22 +58,18 @@ function generateUserAgent(profile) {
     return `Mozilla/5.0 (${profile.architecture}; ${profile.os}) Cobalt/${cobaltVersion} (unlike Gecko) ${v8Version} ${profile.rasterizer} Starboard/${starboardVersion}, ${profile.manufacturer}_${profile.deviceType}_${profile.chipsetModel}_${profile.modelYear}/${profile.firmwareVersion} (${profile.brand}, ${profile.model}) ${auxField}`;
 }
 
-if (document.querySelector('.content-container') && window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetUserAgent) {
-    const currentSpoofedUa = localStorage.getItem('userAgent');
-    
-    // Only set user agent and reload if we haven't already spoofed it for this session.
-    // If currentSpoofedUa is in localStorage, check if navigator.userAgent matches it.
-    // If it doesn't match, the app was just launched or the spoof hasn't taken effect.
-    if (currentSpoofedUa) {
-        if (navigator.userAgent !== currentSpoofedUa) {
-            window.h5vcc.tizentube.SetUserAgent(currentSpoofedUa);
-            location.reload();
+if (document.querySelector('.content-container') && window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetUserAgent) {
+    if (!sessionStorage.getItem('ua_spoofed')) {
+        sessionStorage.setItem('ua_spoofed', 'true');
+        
+        let ua = localStorage.getItem('userAgent');
+        if (!ua) {
+            const randomProfile = deviceProfiles[Math.floor(Math.random() * deviceProfiles.length)];
+            ua = generateUserAgent(randomProfile);
+            localStorage.setItem('userAgent', ua);
         }
-    } else {
-        const randomProfile = deviceProfiles[Math.floor(Math.random() * deviceProfiles.length)];
-        const spoofedUserAgent = generateUserAgent(randomProfile);
-        localStorage.setItem('userAgent', spoofedUserAgent);
-        window.h5vcc.tizentube.SetUserAgent(spoofedUserAgent);
+        
+        window.h5vcc.fasttube.SetUserAgent(ua);
         location.reload();
     }
 }

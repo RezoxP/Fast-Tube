@@ -32,10 +32,10 @@ function updateClock() {
 }
 
 function toggleClock(value) {
-    const existingClock = document.getElementById('tizentube-clock');
+    const existingClock = document.getElementById('fasttube-clock');
     if (value && existingClock) return;
     if (!value && existingClock) {
-        existingClock.remove();
+        existingClock.parentNode.removeChild(existingClock);
         if (clockInterval) clearInterval(clockInterval);
         return;
     }
@@ -44,7 +44,7 @@ function toggleClock(value) {
     } else {
         const clock = document.createElement('div');
  
-        clock.id = 'tizentube-clock';
+        clock.id = 'fasttube-clock';
         clock.style.height = '45rem';
         clock.style.width = '80rem';
         clock.style.position = 'absolute';

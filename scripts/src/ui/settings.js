@@ -44,15 +44,15 @@ export default function modernUI(update, parameters) {
                 },
                 {
                     name: 'Telegram (Announcements)',
-                    link: 'https://t.me/tizentubecobaltofficial',
+                    link: 'https://t.me/fasttubecobaltofficial',
                 },
                 {
                     name: 'Telegram (Group)',
-                    link: 'https://t.me/tizentubeofficial',
+                    link: 'https://t.me/fasttubeofficial',
                 },
                 {
                     name: 'Website',
-                    link: 'https://tizentube.6513006.xyz',
+                    link: 'https://fasttube.6513006.xyz',
                 },
                 {
                     name: 'Buy Me A Coffee',
@@ -428,12 +428,12 @@ export default function modernUI(update, parameters) {
                         }
                     })
                 },
-                window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate ? {
+                window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
                     name: t('settings.options.videoPlayer.options.afr'),
                     icon: 'SLOW_MOTION_VIDEO',
                     value: 'autoFrameRate'
                 } : null,
-                window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.SetFrameRate ? {
+                window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
                     name: t('settings.options.videoPlayer.options.afrPauseDuration.title'),
                     icon: 'TIMER',
                     value: null,
@@ -798,7 +798,7 @@ export default function modernUI(update, parameters) {
                 }
             ]
         },
-        window.h5vcc && window.h5vcc.tizentube ?
+        window.h5vcc && window.h5vcc.fasttube ?
             {
                 name: t('settings.options.updater.title'),
                 icon: 'SYSTEM_UPDATE',
@@ -807,7 +807,7 @@ export default function modernUI(update, parameters) {
                     title: t('settings.options.updater.title'),
                     subtitle: t('settings.options.updater.menuSubtitle')
                 },
-                subtitle:  t('settings.options.updater.versionSubtitle', { version: window.h5vcc.tizentube.GetVersion() }),
+                subtitle:  t('settings.options.updater.versionSubtitle', { version: window.h5vcc.fasttube.GetVersion() }),
                 options: [
                     buttonItem(
                         { title: t('settings.options.updater.options.checkForUpdates') },
@@ -1047,5 +1047,5 @@ export function optionShow(parameters, update) {
         }
     }
 
-    showModal(parameters.menuHeader ? parameters.menuHeader : 'TizenTube Settings', overlayPanelItemListRenderer(buttons, parameters.selectedIndex), parameters.menuId || 'tt-settings-options', update);
+    showModal(parameters.menuHeader ? parameters.menuHeader : 'Fast-Tube Settings', overlayPanelItemListRenderer(buttons, parameters.selectedIndex), parameters.menuId || 'tt-settings-options', update);
 }

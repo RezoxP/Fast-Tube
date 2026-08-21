@@ -137,7 +137,7 @@
                     },
                     "launchToOnStartup": {
                         "title": "Launch To on Startup",
-                        "subtitle": "Choose the default page TizenTube opens to on startup"
+                        "subtitle": "Choose the default page Fast-Tube opens to on startup"
                     },
                     "sortSubscriptionsByAlphabet": "Sort Subscriptions Alphabetically",
                     "disableChannelsOnSidebar": "Disable Channels on Sidebar",
@@ -153,8 +153,8 @@
                 }
             },
             "updater": {
-                "title": "TizenTube Cobalt Updater",
-                "menuSubtitle": "Manage TizenTube Cobalt updates",
+                "title": "Fast-Tube Cobalt Updater",
+                "menuSubtitle": "Manage Fast-Tube Cobalt updates",
                 "versionSubtitle": "Current version: {{version}}",
                 "options": {
                     "checkForUpdates": "Check for updates",
@@ -163,17 +163,17 @@
             }
         },
         "ttSettings": {
-            "title": "TizenTube Settings",
+            "title": "Fast-Tube Settings",
             "madeByText": "Made by RezoxP with ❤️",
-            "summary": "Open TizenTube Settings"
+            "summary": "Open Fast-Tube Settings"
         },
         "supportTT": {
-            "title": "Support TizenTube",
-            "subtitle": "❤️ Show support for TizenTube and its development",
+            "title": "Support Fast-Tube",
+            "subtitle": "❤️ Show support for Fast-Tube and its development",
             "content": {
-                "1": "If you enjoy using TizenTube and would like to support its development, consider the following:",
+                "1": "If you enjoy using Fast-Tube and would like to support its development, consider the following:",
                 "2": "1. Star the GitHub repository to help increase its visibility.",
-                "3": "2. Share TizenTube with others.",
+                "3": "2. Share Fast-Tube with others.",
                 "4": "If you would like to contribute financially, consider donating:",
                 "5": "- Buy Me A Coffee: https://www.buymeacoffee.com/RezoxP (preferably)",
                 "6": "- GitHub Sponsors: https://github.com/sponsors/RezoxP"
@@ -181,8 +181,8 @@
         }
     },
     "welcomeMsg": {
-        "title": "Welcome to TizenTube",
-        "subtitle": "Go to settings and click on TizenTube Settings for settings."
+        "title": "Welcome to Fast-Tube",
+        "subtitle": "Go to settings and click on Fast-Tube Settings for settings."
     },
     "sponsorblock": {
         "segments": {

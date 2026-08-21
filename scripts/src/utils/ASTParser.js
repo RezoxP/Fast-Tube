@@ -1,4 +1,4 @@
-// AST Parser for TizenTube, used for finding code patterns
+// AST Parser for Fast-Tube, used for finding code patterns
 // You may call me insane for this.
 
 import esprima from 'esprima';

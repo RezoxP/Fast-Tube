@@ -24,7 +24,7 @@ export function findFunction(funcName) {
     }
 }
 
-// Patch resolveCommand to be able to change TizenTube settings
+// Patch resolveCommand to be able to change Fast-Tube settings
 
 export function patchResolveCommand() {
     for (const key in window._yttv) {
@@ -33,7 +33,7 @@ export function patchResolveCommand() {
             const ogResolve = window._yttv[key].instance.resolveCommand;
             window._yttv[key].instance.resolveCommand = function (cmd, _) {
                 if (cmd.setClientSettingEndpoint) {
-                    // Command to change client settings. Use TizenTube configuration to change settings.
+                    // Command to change client settings. Use Fast-Tube configuration to change settings.
                     for (const settings of cmd.setClientSettingEndpoint.settingDatas) {
                         if (!settings.clientSettingEnum.item.includes('_')) {
                             for (const setting of cmd.setClientSettingEndpoint.settingDatas) {
@@ -75,11 +75,11 @@ export function patchResolveCommand() {
                     customAction(cmd.playlistEditEndpoint.customAction.action, cmd.playlistEditEndpoint.customAction.parameters);
                     return true;
                 } else if (cmd?.openPopupAction?.uniqueId === 'playback-settings') {
-                    // Patch the playback settings popup to use TizenTube speed settings
+                    // Patch the playback settings popup to use Fast-Tube speed settings
                     const items = cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items;
                     for (const item of items) {
                         if (item?.compactLinkRenderer?.icon?.iconType === 'SLOW_MOTION_VIDEO') {
-                            item.compactLinkRenderer.subtitle && (item.compactLinkRenderer.subtitle.simpleText = 'with TizenTube');
+                            item.compactLinkRenderer.subtitle && (item.compactLinkRenderer.subtitle.simpleText = 'with Fast-Tube');
                             item.compactLinkRenderer.serviceEndpoint = {
                                 clickTrackingParams: "null",
                                 signalAction: {
@@ -104,8 +104,8 @@ export function patchResolveCommand() {
                         ])
                     );
 
-                    if (window.h5vcc && window.h5vcc.tizentube && window.h5vcc.tizentube.HasSystemFeature && 
-                        window.h5vcc.tizentube.HasSystemFeature('android.software.picture_in_picture')) {
+                    if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.HasSystemFeature && 
+                        window.h5vcc.fasttube.HasSystemFeature('android.software.picture_in_picture')) {
                         cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(3, 0,
                             buttonItem(
                                 { title: 'Picture in Picture' },
@@ -193,8 +193,8 @@ function customAction(action, parameters) {
             configWrite('dontCheckUpdateUntil', parameters);
             break;
         case 'UPDATE_DOWNLOAD':
-            window.h5vcc.tizentube.InstallAppFromURL(parameters);
-            showToast('TizenTube Update', 'Downloading update, please wait...');
+            window.h5vcc.fasttube.InstallAppFromURL(parameters);
+            showToast('Fast-Tube Update', 'Downloading update, please wait...');
             break;
         case 'SET_PLAYER_SPEED':
             const speed = Number(parameters);
@@ -204,18 +204,18 @@ function customAction(action, parameters) {
             enablePip();
             break;
         case 'ENTER_PIP':
-            window.h5vcc.tizentube.EnterPIP();
+            window.h5vcc.fasttube.EnterPIP();
             break;
         case 'SHOW_TOAST':
-            showToast('TizenTube', parameters);
+            showToast('Fast-Tube', parameters);
             break;
         case 'ADD_TO_QUEUE':
             window.queuedVideos.videos.push(parameters);
-            showToast('TizenTube', 'Video added to queue.');
+            showToast('Fast-Tube', 'Video added to queue.');
             break;
         case 'CLEAR_QUEUE':
             window.queuedVideos.videos = [];
-            showToast('TizenTube', 'Video queue cleared.');
+            showToast('Fast-Tube', 'Video queue cleared.');
             break;
         case 'CHECK_FOR_UPDATES':
             checkForUpdates(true);
