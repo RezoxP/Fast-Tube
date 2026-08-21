@@ -23,7 +23,7 @@ JSON.parse = function () {
 
     if (r?.playbackContext?.contentPlaybackContext) {
       // Handle inline playback without ads
-      console.log(r.playbackContext.contentPlaybackContext);
+      
     }
 
     if (r.adPlacements && adBlockEnabled) {
@@ -317,7 +317,7 @@ function addPreviews(items) {
   for (const item of items) {
     if (item.tileRenderer) {
       const watchEndpoint = item.tileRenderer.onSelectCommand;
-      const copiedEndpoint = JSON.parse(JSON.stringify(watchEndpoint));
+      const copiedEndpoint = { ...watchEndpoint }; // Shallow clone is enough and much faster
       if (item.tileRenderer?.onFocusCommand?.playbackEndpoint) continue;
       if (item.tileRenderer?.onFocusCommand?.commandExecutorCommand) continue;
       item.tileRenderer.onFocusCommand = {
@@ -337,35 +337,45 @@ function addPreviews(items) {
 }
 
 function deArrowify(items) {
-  for (const item of items) {
+  const isDeArrowEnabled = configRead('enableDeArrow');
+  const isDeArrowThumbnailsEnabled = configRead('enableDeArrowThumbnails');
+  
+  // Iterate in reverse because we are splicing the array
+  for (let i = items.length - 1; i >= 0; i--) {
+    const item = items[i];
     if (item.adSlotRenderer) {
-      const index = items.indexOf(item);
-      items.splice(index, 1);
+      items.splice(i, 1);
       continue;
     }
-    if (!item.tileRenderer) continue;
-    if (configRead('enableDeArrow')) {
-      const videoID = item.tileRenderer.contentId;
-      fetch(`https://sponsor.ajay.app/api/branding?videoID=${videoID}`).then(res => res.json()).then(data => {
-        if (data.titles.length > 0) {
-          const mostVoted = data.titles.reduce((max, title) => max.votes > title.votes ? max : title);
-          item.tileRenderer.metadata.tileMetadataRenderer.title.simpleText = mostVoted.title;
-        }
+    if (!isDeArrowEnabled || !item.tileRenderer) continue;
+    
+    const videoID = item.tileRenderer.contentId;
+    if (!videoID) continue;
 
-        if (data.thumbnails.length > 0 && configRead('enableDeArrowThumbnails')) {
-          const mostVotedThumbnail = data.thumbnails.reduce((max, thumbnail) => max.votes > thumbnail.votes ? max : thumbnail);
-          if (mostVotedThumbnail.timestamp) {
-            item.tileRenderer.header.tileHeaderRenderer.thumbnail.thumbnails = [
-              {
-                url: `https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=${videoID}&time=${mostVotedThumbnail.timestamp}`,
-                width: 1280,
-                height: 640
-              }
-            ]
+    // Delay the fetch to prevent blocking the JS thread on low-end TVs
+    setTimeout(() => {
+        fetch(`https://sponsor.ajay.app/api/branding?videoID=${videoID}`).then(res => res.json()).then(data => {
+          if (data.titles && data.titles.length > 0) {
+            const mostVoted = data.titles.reduce((max, title) => max.votes > title.votes ? max : title);
+            if (item.tileRenderer && item.tileRenderer.metadata && item.tileRenderer.metadata.tileMetadataRenderer && item.tileRenderer.metadata.tileMetadataRenderer.title) {
+                item.tileRenderer.metadata.tileMetadataRenderer.title.simpleText = mostVoted.title;
+            }
           }
-        }
-      }).catch(() => { });
-    }
+
+          if (isDeArrowThumbnailsEnabled && data.thumbnails && data.thumbnails.length > 0) {
+            const mostVotedThumbnail = data.thumbnails.reduce((max, thumbnail) => max.votes > thumbnail.votes ? max : thumbnail);
+            if (mostVotedThumbnail.timestamp && item.tileRenderer && item.tileRenderer.header && item.tileRenderer.header.tileHeaderRenderer && item.tileRenderer.header.tileHeaderRenderer.thumbnail) {
+              item.tileRenderer.header.tileHeaderRenderer.thumbnail.thumbnails = [
+                {
+                  url: `https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=${videoID}&time=${mostVotedThumbnail.timestamp}`,
+                  width: 1280,
+                  height: 640
+                }
+              ];
+            }
+          }
+        }).catch(() => { });
+    }, 500 + Math.random() * 2000); // Stagger network requests over 2.5 seconds
   }
 }
 
@@ -395,7 +405,7 @@ function addLongPress(items) {
     if (!item.tileRenderer) continue;
     if (item.tileRenderer.style !== 'TILE_STYLE_YTLR_DEFAULT') continue;
     if (item.tileRenderer.onLongPressCommand?.showMenuCommand?.menu?.menuRenderer?.items) {
-        const copiedItem = JSON.parse(JSON.stringify(item));
+        const copiedItem = { ...item, tileRenderer: { ...item.tileRenderer, onLongPressCommand: undefined } };
         item.tileRenderer.onLongPressCommand.showMenuCommand.menu.menuRenderer.items.push(MenuServiceItemRenderer('Add to Queue', {
           clickTrackingParams: null,
           playlistEditEndpoint: {
@@ -411,7 +421,8 @@ function addLongPress(items) {
     if (!item.tileRenderer?.metadata?.tileMetadataRenderer) continue;
     if (!item.tileRenderer?.header?.tileHeaderRenderer?.thumbnail?.thumbnails) continue;
     if (!item.tileRenderer.onSelectCommand?.watchEndpoint) continue;
-    const copiedItem = JSON.parse(JSON.stringify(item));
+    // Break circular references without heavy JSON parsing
+    const copiedItem = { ...item, tileRenderer: { ...item.tileRenderer, onLongPressCommand: undefined } };
     const subtitleNode = copiedItem.tileRenderer.metadata.tileMetadataRenderer.lines?.[0]?.lineRenderer?.items?.[0]?.lineItemRenderer?.text;
     if (!subtitleNode) continue;
     const subtitle = subtitleNode;
@@ -428,17 +439,27 @@ function addLongPress(items) {
 }
 
 function hideVideo(items) {
+  const pages = configRead('hideWatchedVideosPages');
+  if (!pages || !pages.length) return items;
+  const hash = location.hash.substring(1);
+  const pageName = hash === '/' ? 'home' : hash.startsWith('/search') ? 'search' : hash.split('?')[1]?.split('&')[0]?.split('=')[1]?.replace('FE', '')?.replace('topics_', '') ?? '';
+  if (!pages.includes(pageName)) return items;
+  const threshold = configRead('hideWatchedVideosThreshold');
+
   return items.filter(item => {
     if (!item.tileRenderer) return true;
-    const progressBar = item.tileRenderer.header?.tileHeaderRenderer?.thumbnailOverlays?.find(overlay => overlay.thumbnailOverlayResumePlaybackRenderer)?.thumbnailOverlayResumePlaybackRenderer;
+    if (!item.tileRenderer.header || !item.tileRenderer.header.tileHeaderRenderer || !item.tileRenderer.header.tileHeaderRenderer.thumbnailOverlays) return true;
+    const overlays = item.tileRenderer.header.tileHeaderRenderer.thumbnailOverlays;
+    let progressBar = null;
+    for (let i = 0; i < overlays.length; i++) {
+        if (overlays[i].thumbnailOverlayResumePlaybackRenderer) {
+            progressBar = overlays[i].thumbnailOverlayResumePlaybackRenderer;
+            break;
+        }
+    }
     if (!progressBar) return true;
-    const pages = configRead('hideWatchedVideosPages');
-    if (!pages.length) return true;
-    const hash = location.hash.substring(1);
-    const pageName = hash === '/' ? 'home' : hash.startsWith('/search') ? 'search' : hash.split('?')[1]?.split('&')[0]?.split('=')[1]?.replace('FE', '')?.replace('topics_', '') ?? '';
-    if (!pages.includes(pageName)) return true;
 
     const percentWatched = (progressBar.percentDurationWatched || 0);
-    return percentWatched <= configRead('hideWatchedVideosThreshold');
+    return percentWatched <= threshold;
   });
 }

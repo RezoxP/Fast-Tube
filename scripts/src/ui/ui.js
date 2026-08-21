@@ -130,13 +130,7 @@ function execute_once_dom_loaded() {
 
   var eventHandler = (evt) => {
     // We handle key events ourselves.
-    console.info(
-      'Key event:',
-      evt.type,
-      evt.keyCode,
-      evt.keyCode,
-      evt.defaultPrevented
-    );
+    // console.info('Key event:', evt.type, evt.keyCode); // Removed for performance
     if (configRead('enableScreenDimming')) {
       if (keyTimeout) {
         clearTimeout(keyTimeout);

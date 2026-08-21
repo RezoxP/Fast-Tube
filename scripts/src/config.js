@@ -15,7 +15,7 @@ const defaultConfig = {
   enableSponsorBlockHighlight: true,
   videoSpeed: 1,
   preferredVideoQuality: 'auto',
-  enableDeArrow: true,
+  enableDeArrow: false,
   enableDeArrowThumbnails: false,
   focusContainerColor: '#0f0f0f',
   routeColor: '#0f0f0f',
