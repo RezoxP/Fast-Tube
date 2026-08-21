@@ -3,6 +3,8 @@ name: Build Fast-Tube (Cobalt TV)
 on:
   push:
     branches: [ main ]
+    paths-ignore:
+      - "scripts/**"
   workflow_dispatch:
 
 concurrency:
@@ -116,10 +118,6 @@ jobs:
       - name: Apply Size & Performance Optimization Patches
         run: |
           cd cobalt-src/src
-          cd ../../scripts/src
-          npm install --no-fund --no-audit --loglevel=error
-          npx rollup -c rollup.config.js
-          cd ../../cobalt-src/src
           
           echo "Applying APK Size and Performance Optimization patches..."
           for patch in ../../patches/*.patch; do
