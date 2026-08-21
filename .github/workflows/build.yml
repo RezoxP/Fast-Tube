@@ -119,6 +119,9 @@ jobs:
         run: |
           cd cobalt-src/src
           
+          git reset --hard HEAD
+          git clean -fd
+
           echo "Applying APK Size and Performance Optimization patches..."
           for patch in ../../patches/*.patch; do
             if [ -f "$patch" ]; then
