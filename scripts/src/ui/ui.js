@@ -1,7 +1,7 @@
 /*global navigate*/
 import '../spatial-navigation-polyfill.js';
 import css from './ui.css';
-import { configRead, configWrite } from '../config.js';
+import { configRead, configWrite, configChangeEmitter } from '../config.js';
 import updateStyle from './theme.js';
 import { showToast } from './ytUI.js';
 import modernUI from './settings.js';
@@ -227,3 +227,24 @@ function execute_once_dom_loaded() {
     } catch (e) { }
   }
 }
+configChangeEmitter.addEventListener('configChange', (e) => {
+    if (e.detail.key === 'enableScreenDimming') {
+        if (!e.detail.value) {
+            if (keyTimeout) clearTimeout(keyTimeout);
+            const container = document.getElementById('container');
+            if (container) container.style.setProperty('opacity', '1', 'important');
+        }
+    } else if (e.detail.key === 'dimmingOpacity' || e.detail.key === 'dimmingTimeout') {
+        if (configRead('enableScreenDimming')) {
+            if (keyTimeout) clearTimeout(keyTimeout);
+            const container = document.getElementById('container');
+            if (container) container.style.setProperty('opacity', '1', 'important');
+            keyTimeout = setTimeout(() => {
+                const videoPlayer = document.querySelector('.html5-video-player');
+                const playerStateObject = videoPlayer ? videoPlayer.getPlayerStateObject() : null;
+                if (playerStateObject && playerStateObject.isPlaying) return;
+                if (container) container.style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
+            }, configRead('dimmingTimeout') * 1000);
+        }
+    }
+});
