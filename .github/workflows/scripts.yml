@@ -11,6 +11,8 @@ jobs:
   build-scripts:
     name: Build JS and Auto-Commit
     runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: "--no-deprecation"
     permissions:
       contents: write
 

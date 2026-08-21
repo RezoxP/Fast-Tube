@@ -12,6 +12,9 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  NODE_OPTIONS: "--no-deprecation"
+  PYTHONWARNINGS: "ignore"
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
   CCACHE_DIR: ${{ github.workspace }}/.ccache
   CCACHE_BASEDIR: ${{ github.workspace }}
   CCACHE_COMPILERCHECK: content
@@ -68,6 +71,9 @@ jobs:
 
       - name: Install dependencies
         env:
+  NODE_OPTIONS: "--no-deprecation"
+  PYTHONWARNINGS: "ignore"
+  ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION: true
           DEBIAN_FRONTEND: noninteractive
         run: |
           sudo killall apt-get apt dpkg || true
@@ -171,6 +177,10 @@ jobs:
         run: |
           cd cobalt-src/src
           export PYTHONPATH="$PWD"
+          export PYTHONWARNINGS="ignore"
+          mkdir -p ~/.gradle
+          echo "android.suppressUnsupportedCompileSdk=34,33,32" >> ~/.gradle/gradle.properties
+          echo "android.injected.build.model.only.versioned=3" >> ~/.gradle/gradle.properties
           export GRADLE_OPTS="-Dorg.gradle.parallel=true -Dorg.gradle.caching=true -Dorg.gradle.daemon=false -Dorg.gradle.jvmargs='-Xmx2048m -XX:+UseParallelGC'"
           
           echo "=== Ccache Status Before Build ==="
