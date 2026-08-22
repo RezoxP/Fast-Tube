@@ -75,50 +75,46 @@ class SponsorBlockHandler {
   }
 
   async init() {
-    const videoHash = sha256(this.videoID).substring(0, 4);
-    const categories = [
-      'sponsor',
-      'intro',
-      'outro',
-      'interaction',
-      'selfpromo',
-      'preview',
-      'filler',
-      'music_offtopic',
-      'poi_highlight'
-    ];
-    const resp = await fetch(
-      `${sponsorblockAPI}/skipSegments/${videoHash}?categories=${encodeURIComponent(
-        JSON.stringify(categories)
-      )}`
-    );
-    const results = await resp.json();
+    try {
+      const videoHash = sha256(this.videoID).substring(0, 4);
+      const categories = [
+        'sponsor',
+        'intro',
+        'outro',
+        'interaction',
+        'selfpromo',
+        'preview',
+        'filler',
+        'music_offtopic',
+        'poi_highlight'
+      ];
+      const resp = await fetch(
+        `${sponsorblockAPI}/skipSegments/${videoHash}?categories=${encodeURIComponent(
+          JSON.stringify(categories)
+        )}`
+      );
+      if (!resp.ok) return;
+      const results = await resp.json();
 
-    const result = results.find((v) => v.videoID === this.videoID);
-    console.info(this.videoID, 'Got it:', result);
+      if (!this.active) return;
+      const result = results.find((v) => v.videoID === this.videoID);
 
-    if (!result || !result.segments || !result.segments.length) {
-      console.info(this.videoID, 'No segments found.');
-      return;
-    }
-
-    this.segments = result.segments;
-    this.manualSkippableCategories = configRead('sponsorBlockManualSkips');
-    this.skippableCategories = this.getSkippableCategories();
-
-    this.scheduleSkipHandler = () => {
-      const slider = document.querySelector('div[idomkey="slider"]');
-      const sliderRect = slider?.getBoundingClientRect();
-      const isOldUI = !document.querySelector('div[idomkey="Metadata-Section"]');
-      if (isOldUI && sliderRect) {
-        this.segmentsoverlay.style.setProperty('top', `${sliderRect.top}px`, 'important');
+      if (!result || !result.segments || !result.segments.length) {
+        return;
       }
-      this.scheduleSkip();
-    }
-    this.durationChangeHandler = () => this.buildOverlay();
 
-    this.attachVideo();
-    this.buildOverlay();
+      this.segments = result.segments;
+      this.manualSkippableCategories = configRead('sponsorBlockManualSkips');
+      this.skippableCategories = this.getSkippableCategories();
+
+      this.scheduleSkipHandler = () => {
+        this.scheduleSkip();
+      };
+      this.durationChangeHandler = () => this.buildOverlay();
+
+      this.attachVideo();
+      this.buildOverlay();
+    } catch (_) {}
   }
 
   getSkippableCategories() {
@@ -156,12 +152,9 @@ class SponsorBlockHandler {
 
     this.video = document.querySelector('video');
     if (!this.video) {
-      console.info(this.videoID, 'No video yet...');
-      this.attachVideoTimeout = setTimeout(() => this.attachVideo(), 100);
+      this.attachVideoTimeout = setTimeout(() => this.attachVideo(), 250);
       return;
     }
-
-    console.info(this.videoID, 'Video found, binding...');
 
     this.video.addEventListener('play', this.scheduleSkipHandler);
     this.video.addEventListener('pause', this.scheduleSkipHandler);
@@ -170,19 +163,12 @@ class SponsorBlockHandler {
   }
 
   buildOverlay() {
-    if (this.segmentsoverlay) {
-      console.info('Overlay already built');
-      return;
-    }
-
-    if (!this.video || !this.video.duration) {
-      console.info('No video duration yet');
-      return;
-    }
+    if (this.segmentsoverlay) return;
+    if (!this.video || !this.video.duration || !this.segments) return;
 
     const videoDuration = this.video.duration;
     const slider = document.querySelector('div[idomkey="slider"]');
-    if (!slider) return setTimeout(() => this.buildOverlay(), 100);
+    if (!slider) return setTimeout(() => this.buildOverlay(), 250);
 
     this.segmentsoverlay = document.createElement('div');
 
@@ -216,27 +202,26 @@ class SponsorBlockHandler {
       elm.style.setProperty('width', `${segment.category === 'poi_highlight' ? 1 : widthPercent}%`, 'important');
       elm.style.setProperty('left', `${leftPercent}%`, 'important');
       elm.style.setProperty('position', 'absolute', 'important');
-      console.info('Generated element', elm, 'from', segment);
       this.segmentsoverlay.appendChild(elm);
     });
 
     this.observer = new MutationObserver((mutations) => {
-      mutations.forEach((m) => {
+      for (const m of mutations) {
         if (m.removedNodes) {
           for (const node of m.removedNodes) {
-            if (node === this.segmentsoverlay) {
-              console.info('bringing back segments overlay');
+            if (node === this.segmentsoverlay && this.slider) {
               this.slider.appendChild(this.segmentsoverlay);
             }
           }
         }
 
-        if (document.querySelector('ytlr-progress-bar').getAttribute('hybridnavfocusable') === 'false') {
+        const progressBar = document.querySelector('ytlr-progress-bar');
+        if (progressBar && progressBar.getAttribute('hybridnavfocusable') === 'false') {
           this.segmentsoverlay.style.setProperty('display', 'none', 'important');
         } else {
           this.segmentsoverlay.style.setProperty('display', 'block', 'important');
         }
-      });
+      }
     });
 
     this.sliderInterval = setInterval(() => {
@@ -246,7 +231,7 @@ class SponsorBlockHandler {
         this.sliderInterval = null;
         this.observer.observe(this.slider, {
           childList: true,
-          subtree: true
+          subtree: false
         });
         this.slider.appendChild(this.segmentsoverlay);
       }
@@ -257,60 +242,37 @@ class SponsorBlockHandler {
     clearTimeout(this.nextSkipTimeout);
     this.nextSkipTimeout = null;
 
-    if (!this.active) {
-      console.info(this.videoID, 'No longer active, ignoring...');
+    if (!this.active || !this.video || this.video.paused || !this.segments) {
       return;
     }
 
-    if (this.video.paused) {
-      console.info(this.videoID, 'Currently paused, ignoring...');
-      return;
-    }
-
-    // Sometimes timeupdate event (that calls scheduleSkip) gets fired right before
-    // already scheduled skip routine below. Let's just look back a little bit
-    // and, in worst case, perform a skip at negative interval (immediately)...
+    const currentTime = this.video.currentTime;
     const nextSegments = this.segments.filter(
       (seg) =>
-        seg.segment[0] > this.video.currentTime - 0.3 &&
-        seg.segment[1] > this.video.currentTime - 0.3
+        seg.segment[0] > currentTime - 0.3 &&
+        seg.segment[1] > currentTime - 0.3
     );
-    nextSegments.sort((s1, s2) => s1.segment[0] - s2.segment[0]);
 
     if (!nextSegments.length) {
-      console.info(this.videoID, 'No more segments');
       return;
     }
+
+    nextSegments.sort((s1, s2) => s1.segment[0] - s2.segment[0]);
 
     const [segment] = nextSegments;
     const [start, end] = segment.segment;
-    console.info(
-      this.videoID,
-      'Scheduling skip of',
-      segment,
-      'in',
-      start - this.video.currentTime
-    );
 
     this.nextSkipTimeout = setTimeout(() => {
-      if (this.video.paused) {
-        console.info(this.videoID, 'Currently paused, ignoring...');
+      if (!this.video || this.video.paused) {
         return;
       }
       if (!this.skippableCategories.includes(segment.category)) {
-        console.info(
-          this.videoID,
-          'Segment',
-          segment.category,
-          'is not skippable, ignoring...'
-        );
         return;
       }
 
       const skipName = barTypes[segment.category]?.name || segment.category;
-      console.info(this.videoID, 'Skipping', segment);
       if (!this.manualSkippableCategories.includes(segment.category)) {
-        const wasSkippedBefore = this.skippedCategories.get(segment.UUID)
+        const wasSkippedBefore = this.skippedCategories.get(segment.UUID);
         if (wasSkippedBefore) {
           wasSkippedBefore.count++;
           wasSkippedBefore.lastSkipped = Date.now();
@@ -338,16 +300,16 @@ class SponsorBlockHandler {
           showToast('SponsorBlock', t('sponsorblock.toasts.skipping', { segment: skipName }));
         }
         if (this.video.duration - end < 1) {
-          this.video.currentTime = end - 1;
-        } else this.video.currentTime = end;
+          this.video.currentTime = Math.max(0, end - 1);
+        } else {
+          this.video.currentTime = end;
+        }
         this.scheduleSkip();
       }
-    }, (start - this.video.currentTime) * 1000);
+    }, Math.max(0, (start - this.video.currentTime) * 1000));
   }
 
   destroy() {
-    console.info(this.videoID, 'Destroying');
-
     this.active = false;
 
     if (this.nextSkipTimeout) {
@@ -389,47 +351,29 @@ class SponsorBlockHandler {
   }
 }
 
-// When this global variable was declared using let and two consecutive hashchange
-// events were fired (due to bubbling? not sure...) the second call handled below
-// would not see the value change from first call, and that would cause multiple
-// SponsorBlockHandler initializations... This has been noticed on Chromium 38.
-// This either reveals some bug in chromium/webpack/babel scope handling, or
-// shows my lack of understanding of javascript. (or both)
 window.sponsorblock = null;
 
 window.addEventListener(
   'hashchange',
   () => {
-    const newURL = new URL(location.hash.substring(1), location.href);
-    // A hack, but it works, so...
+    const hash = location.hash ? location.hash.substring(1) : '';
+    const newURL = new URL(hash, location.href);
     const videoID = newURL.search.replace('?v=', '').split('&')[0];
     const needsReload =
       videoID &&
-      (!window.sponsorblock || window.sponsorblock.videoID != videoID);
-
-    console.info(
-      'hashchange',
-      videoID,
-      window.sponsorblock,
-      window.sponsorblock ? window.sponsorblock.videoID : null,
-      needsReload
-    );
+      (!window.sponsorblock || window.sponsorblock.videoID !== videoID);
 
     if (needsReload) {
       if (window.sponsorblock) {
         try {
           window.sponsorblock.destroy();
-        } catch (err) {
-          console.warn('window.sponsorblock.destroy() failed!', err);
-        }
+        } catch (_) {}
         window.sponsorblock = null;
       }
 
       if (configRead('enableSponsorBlock')) {
         window.sponsorblock = new SponsorBlockHandler(videoID);
         window.sponsorblock.init();
-      } else {
-        console.info('SponsorBlock disabled, not loading');
       }
     }
   },

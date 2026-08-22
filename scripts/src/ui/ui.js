@@ -10,15 +10,29 @@ import { pipToFullscreen } from '../features/pictureInPicture.js';
 import getCommandExecutor from './customCommandExecution.js';
 import { t } from 'i18next';
 
-// It just works, okay?
-const interval = setInterval(() => {
-  const videoElement = document.querySelector('video');
-  if (videoElement) {
-    execute_once_dom_loaded();
-    patchResolveCommand();
-    clearInterval(interval);
+function tryInit() {
+  if (window._yttv) {
+    for (const key in window._yttv) {
+      if (window._yttv[key]?.instance?.resolveCommand) {
+        patchResolveCommand();
+        break;
+      }
+    }
   }
-}, 250);
+  if (document.body) {
+    execute_once_dom_loaded();
+    return true;
+  }
+  return false;
+}
+
+if (!tryInit()) {
+  const interval = setInterval(() => {
+    if (tryInit()) {
+      clearInterval(interval);
+    }
+  }, 100);
+}
 
 let keyTimeout = null;
 

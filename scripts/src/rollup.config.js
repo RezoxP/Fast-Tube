@@ -26,6 +26,7 @@ export default {
             transformMixedEsModules: true,
         }),
         replace({
+            preventAssignment: true,
             '\uFFFF': '\u0000',
         })
     ]

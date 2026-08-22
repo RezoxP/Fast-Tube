@@ -28,29 +28,34 @@ export function findFunction(funcName) {
 
 export function patchResolveCommand() {
     for (const key in window._yttv) {
-        if (window._yttv[key] && window._yttv[key].instance && window._yttv[key].instance.resolveCommand) {
-
+        if (window._yttv[key]?.instance?.resolveCommand) {
+            if (window._yttv[key].instance.resolveCommand.isFastTubePatched) continue;
             const ogResolve = window._yttv[key].instance.resolveCommand;
-            window._yttv[key].instance.resolveCommand = function (cmd, _) {
+            const patched = function (cmd, _) {
                 if (cmd.setClientSettingEndpoint) {
                     // Command to change client settings. Use Fast-Tube configuration to change settings.
-                    for (const settings of cmd.setClientSettingEndpoint.settingDatas) {
-                        if (!settings.clientSettingEnum.item.includes('_')) {
-                            for (const setting of cmd.setClientSettingEndpoint.settingDatas) {
-                                const valName = Object.keys(setting).find(key => key.includes('Value'));
+                    let handled = false;
+                    for (const setting of cmd.setClientSettingEndpoint.settingDatas) {
+                        if (setting.clientSettingEnum?.item && !setting.clientSettingEnum.item.includes('_')) {
+                            const valName = Object.keys(setting).find(key => key.includes('Value'));
+                            if (valName) {
                                 const value = valName === 'intValue' ? Number(setting[valName]) : setting[valName];
                                 if (valName === 'arrayValue') {
-                                    const arr = configRead(setting.clientSettingEnum.item);
-                                    if (arr.includes(value)) {
-                                        arr.splice(arr.indexOf(value), 1);
+                                    const arr = (configRead(setting.clientSettingEnum.item) || []).slice();
+                                    const idx = arr.indexOf(value);
+                                    if (idx !== -1) {
+                                        arr.splice(idx, 1);
                                     } else {
                                         arr.push(value);
                                     }
                                     configWrite(setting.clientSettingEnum.item, arr);
-                                } else configWrite(setting.clientSettingEnum.item, value);
+                                } else {
+                                    configWrite(setting.clientSettingEnum.item, value);
+                                }
+                                handled = true;
                             }
-                        } else if (settings.clientSettingEnum.item === 'I18N_LANGUAGE') {
-                            const lang = settings.stringValue;
+                        } else if (setting.clientSettingEnum?.item === 'I18N_LANGUAGE') {
+                            const lang = setting.stringValue;
                             const date = new Date();
                             date.setFullYear(date.getFullYear() + 10);
                             document.cookie = `PREF=hl=${lang}; expires=${date.toUTCString()};`;
@@ -62,6 +67,7 @@ export function patchResolveCommand() {
                             return true;
                         }
                     }
+                    if (handled) return true;
                 } else if (cmd.customAction) {
                     customAction(cmd.customAction.action, cmd.customAction.parameters);
                     return true;
@@ -161,7 +167,9 @@ export function patchResolveCommand() {
                 }
 
                 return ogResolve.call(this, cmd, _);
-            }
+            };
+            patched.isFastTubePatched = true;
+            window._yttv[key].instance.resolveCommand = patched;
         }
     }
 }

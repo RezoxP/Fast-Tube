@@ -100,7 +100,7 @@ fs.mkdirSync(tempDir, { recursive: true });
 
 try {
     // Initialize temporary git repo to test patch application
-    cp.execSync('git init && git config user.name "Test" && git config user.email "test@example.com"', { cwd: tempDir, stdio: 'pipe' });
+    cp.execSync('git init && git config core.autocrlf false && git config user.name "Test" && git config user.email "test@example.com"', { cwd: tempDir, stdio: 'pipe' });
     
     // Extract target files from patch
     const fileMatches = patchContent.match(/^--- a\/(.*)$/gm) || [];
@@ -119,18 +119,23 @@ try {
             // Fallback via powershell if curl is missing
             cp.execSync(`powershell -Command "Invoke-WebRequest -Uri '${rawUrl}' -OutFile '${fullPath}'"`, { stdio: 'pipe' });
         }
+        // Normalize LF
+        if (fs.existsSync(fullPath)) {
+            const raw = fs.readFileSync(fullPath, 'utf8').replace(/\r\n/g, '\n');
+            fs.writeFileSync(fullPath, raw, 'utf8');
+        }
     }
     
     cp.execSync('git add -A && git commit -m "initial cobalt 25.lts baseline"', { cwd: tempDir, stdio: 'pipe' });
     
-    // Write patch file and apply with git apply
+    // Write patch file with normalized LF and apply with git apply
     const testPatchPath = path.join(tempDir, 'test.patch');
-    fs.writeFileSync(testPatchPath, patchContent, 'utf8');
+    fs.writeFileSync(testPatchPath, patchContent.replace(/\r\n/g, '\n'), 'utf8');
     
-    cp.execSync('git apply --check test.patch', { cwd: tempDir, stdio: 'pipe' });
+    cp.execSync('git apply --check --whitespace=nowarn test.patch', { cwd: tempDir, stdio: 'pipe' });
     console.log(" ✓ 'git apply --check test.patch' PASSED with zero conflicts or malformed headers!");
     
-    cp.execSync('git apply test.patch', { cwd: tempDir, stdio: 'pipe' });
+    cp.execSync('git apply --whitespace=nowarn test.patch', { cwd: tempDir, stdio: 'pipe' });
     console.log(" ✓ Patch applied cleanly to all Cobalt 25.lts files!");
 } catch (err) {
     console.error("Patch application test failed:", err.message);

@@ -36,7 +36,11 @@ function toggleClock(value) {
     if (value && existingClock) return;
     if (!value && existingClock) {
         existingClock.parentNode.removeChild(existingClock);
-        if (clockInterval) clearInterval(clockInterval);
+        if (clockInterval) {
+            clearInterval(clockInterval);
+            clockInterval = null;
+        }
+        actualClock = null;
         return;
     }
     if (!value && !existingClock) {

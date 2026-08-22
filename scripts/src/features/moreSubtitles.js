@@ -14,8 +14,11 @@ const LANGUAGE_CODES = [
     "th", "tr", "uk", "ur", "uz", "vi", "cy", "yi", "yo", "zu"
 ];
 
+let cachedLanguageMap = null;
+
 // Return an object mapping language code -> localized language name.
 export function getComprehensiveLanguageList() {
+    if (cachedLanguageMap) return cachedLanguageMap;
     try {
         const map = {};
         LANGUAGE_CODES.forEach((code) => {
@@ -29,7 +32,8 @@ export function getComprehensiveLanguageList() {
                 map[code] = name;
             }
         });
-        return map;
+        cachedLanguageMap = map;
+        return cachedLanguageMap;
     } catch (e) {
         const fallback = {};
         LANGUAGE_CODES.forEach((c) => (fallback[c] = c));

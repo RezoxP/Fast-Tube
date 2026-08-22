@@ -1,67 +1,68 @@
-// AST Parser for Fast-Tube, used for finding code patterns
-// You may call me insane for this.
+// High-performance zero-dependency method & property extractor for Fast-Tube
+// Replaces heavy Esprima/Estraverse AST parser with a microsecond-fast tokenizer
 
-import esprima from 'esprima';
-import estraverse from 'estraverse';
-
-// Extract assignment RHS sources and inner returned functions (IIFEs)
 export function extractAssignedFunctions(code) {
-    const original = code;
-    let wrapOffset = 0;
-    let ast;
+    if (!code || typeof code !== 'string') return [];
 
-    try {
-        ast = esprima.parse(code, { range: true, tolerant: true, sourceType: 'script' });
-    } catch (e1) {
-        try {
-            const wrapped = '(' + code + ')';
-            ast = esprima.parse(wrapped, { range: true, tolerant: true, sourceType: 'script' });
-            wrapOffset = 1;
-        } catch (e2) {
-            try {
-                ast = esprima.parse(code, { range: true, tolerant: true, sourceType: 'module' });
-            } catch (e3) {
-                try {
-                    const wrapped2 = '(' + code + ')';
-                    ast = esprima.parse(wrapped2, { range: true, tolerant: true, sourceType: 'module' });
-                    wrapOffset = 1;
-                } catch (e4) {
-                    throw e1;
+    const results = [];
+    const assignRegex = /this\.([a-zA-Z0-9_$]+)\s*=\s*/g;
+    let match;
+
+    while ((match = assignRegex.exec(code)) !== null) {
+        const propName = match[1];
+        const startIdx = match.index + match[0].length;
+        let depthParen = 0;
+        let depthBrace = 0;
+        let depthBracket = 0;
+        let endIdx = startIdx;
+        let inString = false;
+        let strChar = '';
+
+        for (let i = startIdx; i < code.length; i++) {
+            const c = code[i];
+            if (inString) {
+                if (c === '\\') {
+                    i++; // skip escaped char
+                    continue;
+                }
+                if (c === strChar) inString = false;
+            } else if (c === '"' || c === "'" || c === '`') {
+                inString = true;
+                strChar = c;
+            } else if (c === '(') {
+                depthParen++;
+            } else if (c === ')') {
+                depthParen--;
+            } else if (c === '{') {
+                depthBrace++;
+            } else if (c === '}') {
+                depthBrace--;
+            } else if (c === '[') {
+                depthBracket++;
+            } else if (c === ']') {
+                depthBracket--;
+            } else if (c === ';' && depthParen <= 0 && depthBrace <= 0 && depthBracket <= 0) {
+                endIdx = i;
+                break;
+            } else if (c === '\n' && depthParen <= 0 && depthBrace <= 0 && depthBracket <= 0) {
+                // If followed by next this. assignment or class method
+                const remaining = code.slice(i).trim();
+                if (/^(?:this\.[a-zA-Z0-9_$]+\s*=|return\b|if\b|[a-zA-Z0-9_$]+\s*\()/.test(remaining)) {
+                    endIdx = i;
+                    break;
                 }
             }
         }
+
+        if (endIdx === startIdx) endIdx = code.length;
+        const rhs = code.slice(startIdx, endIdx).trim();
+
+        results.push({
+            left: 'this.' + propName,
+            rhs: rhs,
+            returned: rhs
+        });
     }
 
-    const out = [];
-
-    estraverse.traverse(ast, {
-        enter: function (node) {
-            if (node.type !== 'AssignmentExpression') return;
-            const rhs = node.right;
-            if (!rhs || !rhs.range) return;
-            const rhsSrc = original.slice(rhs.range[0] - wrapOffset, rhs.range[1] - wrapOffset);
-            let inner = null;
-
-            if (rhs.type === 'CallExpression' && rhs.callee && rhs.callee.type === 'FunctionExpression' && rhs.callee.body) {
-                let stm = rhs.callee.body.body || [];
-                for (let i = 0; i < stm.length; i++) {
-                    let s = stm[i];
-                    if (s.type === 'ReturnStatement' && s.argument && s.argument.range) {
-                        inner = original.slice(s.argument.range[0] - wrapOffset, s.argument.range[1] - wrapOffset);
-                        break;
-                    }
-                }
-            } else if (rhs.type === 'FunctionExpression' || rhs.type === 'ArrowFunctionExpression') {
-                inner = rhsSrc;
-            }
-
-            out.push({
-                left: node.left && node.left.range ? original.slice(node.left.range[0] - wrapOffset, node.left.range[1] - wrapOffset) : null,
-                rhs: rhsSrc,
-                returned: inner
-            });
-        }
-    });
-
-    return out;
+    return results;
 }
