@@ -8327,23 +8327,25 @@
                 window._yttv[key].instance.resolveCommand = function (cmd, _) {
                     if (cmd.setClientSettingEndpoint) {
                         // Command to change client settings. Use Fast-Tube configuration to change settings.
-                        for (const settings of cmd.setClientSettingEndpoint.settingDatas) {
-                            if (!settings.clientSettingEnum.item.includes('_')) {
-                                for (const setting of cmd.setClientSettingEndpoint.settingDatas) {
-                                    const valName = Object.keys(setting).find(key => key.includes('Value'));
-                                    const value = valName === 'intValue' ? Number(setting[valName]) : setting[valName];
-                                    if (valName === 'arrayValue') {
-                                        const arr = configRead(setting.clientSettingEnum.item);
-                                        if (arr.includes(value)) {
-                                            arr.splice(arr.indexOf(value), 1);
-                                        } else {
-                                            arr.push(value);
-                                        }
-                                        configWrite(setting.clientSettingEnum.item, arr);
-                                    } else configWrite(setting.clientSettingEnum.item, value);
+                        let handled = false;
+                        for (const setting of cmd.setClientSettingEndpoint.settingDatas) {
+                            if (!setting.clientSettingEnum.item.includes('_')) {
+                                const valName = Object.keys(setting).find(key => key.includes('Value'));
+                                const value = valName === 'intValue' ? Number(setting[valName]) : setting[valName];
+                                if (valName === 'arrayValue') {
+                                    const arr = [...(configRead(setting.clientSettingEnum.item) || [])];
+                                    if (arr.includes(value)) {
+                                        arr.splice(arr.indexOf(value), 1);
+                                    } else {
+                                        arr.push(value);
+                                    }
+                                    configWrite(setting.clientSettingEnum.item, arr);
+                                } else {
+                                    configWrite(setting.clientSettingEnum.item, value);
                                 }
-                            } else if (settings.clientSettingEnum.item === 'I18N_LANGUAGE') {
-                                const lang = settings.stringValue;
+                                handled = true;
+                            } else if (setting.clientSettingEnum.item === 'I18N_LANGUAGE') {
+                                const lang = setting.stringValue;
                                 const date = new Date();
                                 date.setFullYear(date.getFullYear() + 10);
                                 document.cookie = `PREF=hl=${lang}; expires=${date.toUTCString()};`;
@@ -8355,6 +8357,7 @@
                                 return true;
                             }
                         }
+                        if (handled) return true;
                     } else if (cmd.customAction) {
                         customAction(cmd.customAction.action, cmd.customAction.parameters);
                         return true;
@@ -8421,8 +8424,6 @@
                         const ytlrPlayerContainer = document.querySelector('ytlr-player-container');
                         ytlrPlayerContainer.style.removeProperty('z-index');
                     }
-
-                    if (cmd.customAction) return window._yttv[key].instance.resolveCommand(cmd, _);
 
                     if (cmd.commandExecutorCommand && cmd.commandExecutorCommand.commands) {
                         for (const command of cmd.commandExecutorCommand.commands) {
@@ -8765,12 +8766,15 @@
           r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = [];
         }
 
-        if (r?.transportControls?.transportControlsRenderer?.promotedActions && configRead('enableSponsorBlockHighlight')) {
+        if (r?.transportControls?.transportControlsRenderer && configRead('enableSponsorBlockHighlight')) {
           if (window?.sponsorblock?.segments) {
             const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
             if (category) {
+              if (!r.transportControls.transportControlsRenderer.promotedActions) {
+                r.transportControls.transportControlsRenderer.promotedActions = [];
+              }
               r.transportControls.transportControlsRenderer.promotedActions.push({
-                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT',
+                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
                 button: {
                   buttonRenderer: ButtonRenderer(
                     false,
@@ -19398,7 +19402,7 @@
                 "button": {
                     "buttonRenderer": ButtonRenderer(
                         false,
-                        configRead('enableSwapMPWithPIP') ? 'Picture in Picture' : 'Mini Player',
+                        configRead('enableSwapMPWithPIP') ? (t('player.pictureInPicture') || 'Picture in Picture') : (t('player.miniPlayer') || 'Mini Player'),
                         'CLEAR_COOKIES',
                         {
                             customAction: {
@@ -19411,12 +19415,10 @@
 
             const settingActionGroup = functions.find(func => {
                 return func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-            }).left.split('.')[1];
+            })?.left?.split('.')[1];
 
-            if (!settingActionGroup) return inst;
-
-            const origSettingActionGroup = inst[settingActionGroup];
-            if (configRead('enableMPButton')) {
+            if (settingActionGroup && configRead('enableMPButton')) {
+                const origSettingActionGroup = inst[settingActionGroup];
                 inst[settingActionGroup] = function () {
                     const res = origSettingActionGroup.apply(this, arguments);
                     const idx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
@@ -19425,7 +19427,7 @@
                 };
             }
 
-            const previousButtonName = functions.find(func => {
+            const previousButtonFunc = functions.find(func => {
                 if (func.rhs.includes('skipNextButton')) {
                     const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
                     const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
@@ -19433,9 +19435,10 @@
                         return true;
                     }
                 }
-            }).left.split('.')[1];
+            });
+            const previousButtonName = previousButtonFunc?.left?.split('.')[1];
 
-            const nextButtonName = functions.find(func => {
+            const nextButtonFunc = functions.find(func => {
                 if (func.rhs.includes('skipPreviousButton')) {
                     const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
                     const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
@@ -19443,51 +19446,65 @@
                         return true;
                     }
                 }
-            }).left.split('.')[1];
+            });
+            const nextButtonName = nextButtonFunc?.left?.split('.')[1];
 
-            const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions')).left.split('.')[1];
+            const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
 
-            if (engagementActionButton && configRead('enableSpeedControlsButton')) {
+            if (engagementActionButton) {
                 const origEngagementActionButton = inst[engagementActionButton];
                 inst[engagementActionButton] = function () {
-                    const res = origEngagementActionButton.apply(this, arguments);
-                    res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED') || res.push({
-                        type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED',
-                        button: {
-                            buttonRenderer: ButtonRenderer(
-                                false,
-                                "Speed Controls",
-                                'SLOW_MOTION_VIDEO',
-                                {
-                                    customAction:
-                                    {
-                                        action: 'TT_SPEED_SETTINGS_SHOW',
-                                    }
+                    let res = origEngagementActionButton.apply(this, arguments);
+                    if (configRead('enableSpeedControlsButton')) {
+                        if (!res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED')) {
+                            res.push({
+                                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED',
+                                button: {
+                                    buttonRenderer: ButtonRenderer(
+                                        false,
+                                        t('player.playbackSpeed.button') || "Speed Controls",
+                                        'SLOW_MOTION_VIDEO',
+                                        {
+                                            customAction: {
+                                                action: 'TT_SPEED_SETTINGS_SHOW',
+                                            }
+                                        }
+                                    )
                                 }
-                            )
+                            });
                         }
-                    });
+                    }
+                    if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
+                        const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
+                        if (category && !res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION' || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
+                            res.push({
+                                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
+                                button: {
+                                    buttonRenderer: ButtonRenderer(
+                                        false,
+                                        t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
+                                        'SKIP_NEXT',
+                                        {
+                                            clickTrackingParams: null,
+                                            customAction: {
+                                                action: 'SKIP',
+                                                parameters: {
+                                                    time: category.segment[0]
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            });
+                        }
+                    }
+                    if (!configRead('enableSuperThanksButton')) {
+                        res = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUPER_THANKS' && item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SHOPPING');
+                    }
+                    if (!configRead('enableAIAskButton')) {
+                        res = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_YOUCHAT_BUTTON');
+                    }
                     return res;
-                };
-            }
-
-            if (!configRead('enableSuperThanksButton')) {
-                const origEngagementActionButton = inst[engagementActionButton];
-                inst[engagementActionButton] = function () {
-                    const res = origEngagementActionButton.apply(this, arguments);
-                    const superThanksFiltered = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUPER_THANKS');
-                    const shoppingFiltered = superThanksFiltered.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SHOPPING');
-                    return shoppingFiltered;
-                };
-            }
-            
-            if (!configRead('enableAIAskButton')) {
-                const origEngagementActionButton = inst[engagementActionButton];
-                inst[engagementActionButton] = function () {
-                    const res = origEngagementActionButton.apply(this, arguments);
-                    const superThanksFiltered = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_YOUCHAT_BUTTON');
-                    const shoppingFiltered = superThanksFiltered.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_YOUCHAT_BUTTON');
-                    return shoppingFiltered;
                 };
             }
 
@@ -19531,11 +19548,7 @@
     }
 
 
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        applyPatches();
-    } else {
-        window.addEventListener('DOMContentLoaded', applyPatches);
-    }
+    applyPatches();
 
     const origParse = JSON.parse;
     JSON.parse = function () {

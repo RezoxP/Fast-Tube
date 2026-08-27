@@ -3,6 +3,7 @@
 import { extractAssignedFunctions } from "../utils/ASTParser.js";
 import { configRead } from "../config.js";
 import { ButtonRenderer } from "./ytUI.js";
+import { t } from "i18next";
 
 function applyPatches() {
     if (!window._yttv) return setTimeout(applyPatches, 250);
@@ -49,7 +50,7 @@ function applyPatches() {
             "button": {
                 "buttonRenderer": ButtonRenderer(
                     false,
-                    configRead('enableSwapMPWithPIP') ? 'Picture in Picture' : 'Mini Player',
+                    configRead('enableSwapMPWithPIP') ? (t('player.pictureInPicture') || 'Picture in Picture') : (t('player.miniPlayer') || 'Mini Player'),
                     'CLEAR_COOKIES',
                     {
                         customAction: {
@@ -62,12 +63,10 @@ function applyPatches() {
 
         const settingActionGroup = functions.find(func => {
             return func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-        }).left.split('.')[1];
+        })?.left?.split('.')[1];
 
-        if (!settingActionGroup) return inst;
-
-        const origSettingActionGroup = inst[settingActionGroup];
-        if (configRead('enableMPButton')) {
+        if (settingActionGroup && configRead('enableMPButton')) {
+            const origSettingActionGroup = inst[settingActionGroup];
             inst[settingActionGroup] = function () {
                 const res = origSettingActionGroup.apply(this, arguments);
                 const idx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
@@ -76,7 +75,7 @@ function applyPatches() {
             };
         }
 
-        const previousButtonName = functions.find(func => {
+        const previousButtonFunc = functions.find(func => {
             if (func.rhs.includes('skipNextButton')) {
                 const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
                 const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
@@ -84,9 +83,10 @@ function applyPatches() {
                     return true;
                 }
             }
-        }).left.split('.')[1];
+        });
+        const previousButtonName = previousButtonFunc?.left?.split('.')[1];
 
-        const nextButtonName = functions.find(func => {
+        const nextButtonFunc = functions.find(func => {
             if (func.rhs.includes('skipPreviousButton')) {
                 const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
                 const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
@@ -94,52 +94,66 @@ function applyPatches() {
                     return true;
                 }
             }
-        }).left.split('.')[1];
+        });
+        const nextButtonName = nextButtonFunc?.left?.split('.')[1];
 
-        const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions')).left.split('.')[1];
+        const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
 
-        if (engagementActionButton && configRead('enableSpeedControlsButton')) {
+        if (engagementActionButton) {
             const origEngagementActionButton = inst[engagementActionButton];
             inst[engagementActionButton] = function () {
-                const res = origEngagementActionButton.apply(this, arguments);
-                res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED') || res.push({
-                    type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED',
-                    button: {
-                        buttonRenderer: ButtonRenderer(
-                            false,
-                            "Speed Controls",
-                            'SLOW_MOTION_VIDEO',
-                            {
-                                customAction:
-                                {
-                                    action: 'TT_SPEED_SETTINGS_SHOW',
-                                }
+                let res = origEngagementActionButton.apply(this, arguments);
+                if (configRead('enableSpeedControlsButton')) {
+                    if (!res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED')) {
+                        res.push({
+                            type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED',
+                            button: {
+                                buttonRenderer: ButtonRenderer(
+                                    false,
+                                    t('player.playbackSpeed.button') || "Speed Controls",
+                                    'SLOW_MOTION_VIDEO',
+                                    {
+                                        customAction: {
+                                            action: 'TT_SPEED_SETTINGS_SHOW',
+                                        }
+                                    }
+                                )
                             }
-                        )
+                        });
                     }
-                });
+                }
+                if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
+                    const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
+                    if (category && !res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION' || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
+                        res.push({
+                            type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
+                            button: {
+                                buttonRenderer: ButtonRenderer(
+                                    false,
+                                    t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
+                                    'SKIP_NEXT',
+                                    {
+                                        clickTrackingParams: null,
+                                        customAction: {
+                                            action: 'SKIP',
+                                            parameters: {
+                                                time: category.segment[0]
+                                            }
+                                        }
+                                    }
+                                )
+                            }
+                        });
+                    }
+                }
+                if (!configRead('enableSuperThanksButton')) {
+                    res = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUPER_THANKS' && item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SHOPPING');
+                }
+                if (!configRead('enableAIAskButton')) {
+                    res = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_YOUCHAT_BUTTON');
+                }
                 return res;
-            }
-        }
-
-        if (!configRead('enableSuperThanksButton')) {
-            const origEngagementActionButton = inst[engagementActionButton];
-            inst[engagementActionButton] = function () {
-                const res = origEngagementActionButton.apply(this, arguments);
-                const superThanksFiltered = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUPER_THANKS');
-                const shoppingFiltered = superThanksFiltered.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_SHOPPING');
-                return shoppingFiltered;
-            }
-        }
-        
-        if (!configRead('enableAIAskButton')) {
-            const origEngagementActionButton = inst[engagementActionButton];
-            inst[engagementActionButton] = function () {
-                const res = origEngagementActionButton.apply(this, arguments);
-                const superThanksFiltered = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_YOUCHAT_BUTTON');
-                const shoppingFiltered = superThanksFiltered.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_YOUCHAT_BUTTON');
-                return shoppingFiltered;
-            }
+            };
         }
 
         if (configRead('enablePreviousNextButtons')) {
@@ -182,8 +196,4 @@ function applyPatches() {
 }
 
 
-if (document.readyState === 'complete' || document.readyState === 'interactive') {
-    applyPatches();
-} else {
-    window.addEventListener('DOMContentLoaded', applyPatches);
-}
+applyPatches();

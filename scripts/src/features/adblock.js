@@ -231,12 +231,15 @@ JSON.parse = function () {
       r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = [];
     }
 
-    if (r?.transportControls?.transportControlsRenderer?.promotedActions && configRead('enableSponsorBlockHighlight')) {
+    if (r?.transportControls?.transportControlsRenderer && configRead('enableSponsorBlockHighlight')) {
       if (window?.sponsorblock?.segments) {
         const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
         if (category) {
+          if (!r.transportControls.transportControlsRenderer.promotedActions) {
+            r.transportControls.transportControlsRenderer.promotedActions = [];
+          }
           r.transportControls.transportControlsRenderer.promotedActions.push({
-            type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT',
+            type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
             button: {
               buttonRenderer: ButtonRenderer(
                 false,
