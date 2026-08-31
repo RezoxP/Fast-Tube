@@ -19485,6 +19485,40 @@
                 };
             }
 
+            const promotedActionButton = functions.find(func => func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION'))?.left?.split('.')[1];
+
+            if (promotedActionButton) {
+                const origPromotedActionButton = inst[promotedActionButton];
+                inst[promotedActionButton] = function () {
+                    const res = origPromotedActionButton.apply(this, arguments);
+                    if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
+                        const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
+                        if (category && !res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION' || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
+                            res.push({
+                                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
+                                button: {
+                                    buttonRenderer: ButtonRenderer(
+                                        false,
+                                        t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
+                                        'SKIP_NEXT',
+                                        {
+                                            clickTrackingParams: null,
+                                            customAction: {
+                                                action: 'SKIP',
+                                                parameters: {
+                                                    time: category.segment[0]
+                                                }
+                                            }
+                                        }
+                                    )
+                                }
+                            });
+                        }
+                    }
+                    return res;
+                };
+            }
+
             if (configRead('enablePreviousNextButtons')) {
                 if (!previousButtonName || !nextButtonName) return inst;
                 inst[previousButtonName] = function () {
