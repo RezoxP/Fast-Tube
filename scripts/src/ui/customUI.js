@@ -9,7 +9,7 @@ function applyPatches() {
     if (!window._yttv) return setTimeout(applyPatches, 250);
     if (!document.querySelector('video')) return setTimeout(applyPatches, 250);
     const methods = Object.keys(window._yttv).filter(key => {
-        return typeof window._yttv[key] === 'function' && window._yttv[key].toString().includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION');
+        return typeof window._yttv[key] === 'function' && window._yttv[key].toString().includes('TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE');
     });
 
     if (methods.length === 0) {
@@ -99,7 +99,7 @@ function applyPatches() {
 
         const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
 
-        const promotedActionButton = (functions.find(func => func.rhs.includes('props.data.promotedActions')) || functions.find(func => func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION')))?.left?.split('.')[1];
+        const promotedActionButton = (functions.find(func => func.rhs.includes('props.data.promotedActions')) || functions.find(func => func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE')))?.left?.split('.')[1];
         const hasPromotedPatch = promotedActionButton && promotedActionButton !== engagementActionButton && typeof inst[promotedActionButton] === 'function';
 
         if (engagementActionButton) {
