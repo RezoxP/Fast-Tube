@@ -19361,7 +19361,9 @@
         if (!window._yttv) return setTimeout(applyPatches, 250);
         if (!document.querySelector('video')) return setTimeout(applyPatches, 250);
         const methods = Object.keys(window._yttv).filter(key => {
-            return typeof window._yttv[key] === 'function' && window._yttv[key].toString().includes('TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE');
+            if (typeof window._yttv[key] !== 'function') return false;
+            const src = window._yttv[key].toString();
+            return src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION') || src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
         });
 
         if (methods.length === 0) {
@@ -19451,9 +19453,6 @@
 
             const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
 
-            const promotedActionButton = (functions.find(func => func.rhs.includes('props.data.promotedActions')) || functions.find(func => func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE')))?.left?.split('.')[1];
-            const hasPromotedPatch = promotedActionButton && promotedActionButton !== engagementActionButton && typeof inst[promotedActionButton] === 'function';
-
             if (engagementActionButton) {
                 const origEngagementActionButton = inst[engagementActionButton];
                 inst[engagementActionButton] = function () {
@@ -19477,11 +19476,10 @@
                             });
                         }
                     }
-                    // Fallback: add skip-to-highlight here if promoted actions patch wasn't applied
-                    if (!hasPromotedPatch && configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
+                    if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
                         const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
                         if (category && !res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION' || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
-                            res.unshift({
+                            res.push({
                                 type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
                                 button: {
                                     buttonRenderer: ButtonRenderer(
@@ -19507,38 +19505,6 @@
                     }
                     if (!configRead('enableAIAskButton')) {
                         res = res.filter(item => item.type !== 'TRANSPORT_CONTROLS_BUTTON_TYPE_YOUCHAT_BUTTON');
-                    }
-                    return res;
-                };
-            }
-
-            if (hasPromotedPatch) {
-                const origPromotedActionButton = inst[promotedActionButton];
-                inst[promotedActionButton] = function () {
-                    const res = origPromotedActionButton.apply(this, arguments);
-                    if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments && Array.isArray(res)) {
-                        const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
-                        if (category && !res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION' || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
-                            res.push({
-                                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
-                                button: {
-                                    buttonRenderer: ButtonRenderer(
-                                        false,
-                                        t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
-                                        'SKIP_NEXT',
-                                        {
-                                            clickTrackingParams: null,
-                                            customAction: {
-                                                action: 'SKIP',
-                                                parameters: {
-                                                    time: category.segment[0]
-                                                }
-                                            }
-                                        }
-                                    )
-                                }
-                            });
-                        }
                     }
                     return res;
                 };
