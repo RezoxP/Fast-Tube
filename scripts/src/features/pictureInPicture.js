@@ -190,7 +190,17 @@ const observerPipEnter = new MutationObserver(() => {
     }
 });
 
-observerPipEnter.observe(document.body, { childList: true, subtree: true });
+// document.body is null when the userscript is injected at document_start
+// (the userscript-manager path). Register the observer once a body exists
+// instead of throwing at import time and aborting the whole bundle.
+function observePipWhenReady() {
+    if (!document.body) {
+        setTimeout(observePipWhenReady, 200);
+        return;
+    }
+    observerPipEnter.observe(document.body, { childList: true, subtree: true });
+}
+observePipWhenReady();
 
 export {
     enablePip,

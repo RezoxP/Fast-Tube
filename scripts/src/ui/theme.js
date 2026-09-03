@@ -21,6 +21,16 @@ function updateStyle() {
     }
 };
 
-document.head.appendChild(style);
-updateStyle();
+// document.head is null when the userscript is injected at document_start
+// (the userscript-manager path). Mount the style once a head exists instead
+// of throwing at import time and aborting the whole bundle.
+function mountStyle() {
+    if (!document.head) {
+        setTimeout(mountStyle, 200);
+        return;
+    }
+    document.head.appendChild(style);
+    updateStyle();
+}
+mountStyle();
 export default updateStyle;

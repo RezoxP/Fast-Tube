@@ -101,6 +101,73 @@ function applyPatches() {
 
         const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
 
+        // The promoted actions builder (ytlr-player-actions-container `this.j`): the row that
+        // contains the Subscribe button. Uniquely identified by reading props.data.promotedActions
+        // together with props.setReminderButton (the subscribedEntityKey getter also reads
+        // props.data.promotedActions but never references setReminderButton).
+        const promotedActionButton = functions.find(func =>
+            func.rhs.includes('props.data.promotedActions') && func.rhs.includes('setReminderButton')
+        )?.left?.split('.')[1];
+
+        if (promotedActionButton) {
+            const origPromotedActionButton = inst[promotedActionButton];
+            inst[promotedActionButton] = function () {
+                const res = origPromotedActionButton.apply(this, arguments);
+                if (!Array.isArray(res)) return res;
+
+                // NOTE: do NOT use TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION here.
+                // The promoted actions builder special-cases that type and silently drops
+                // items whose button has no `featuredAction` payload.
+                const ownType = 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT';
+
+                let highlightTime = null;
+                if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
+                    const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
+                    if (category) highlightTime = category.segment[0];
+                }
+
+                const existingIdx = res.findIndex(item => item.type === ownType || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION');
+
+                if (highlightTime === null) {
+                    // Segments not loaded (yet) or feature disabled: drop any stale button
+                    if (existingIdx !== -1) res.splice(existingIdx, 1);
+                    return res;
+                }
+
+                if (existingIdx !== -1) return res;
+
+                const highlightButton = {
+                    type: ownType,
+                    button: {
+                        buttonRenderer: ButtonRenderer(
+                            false,
+                            t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
+                            'SKIP_NEXT',
+                            {
+                                clickTrackingParams: null,
+                                customAction: {
+                                    action: 'SKIP',
+                                    parameters: {
+                                        time: highlightTime
+                                    }
+                                }
+                            }
+                        )
+                    }
+                };
+
+                // Insert directly after the Subscribe button so the two stay adjacent
+                // regardless of how many promoted actions YouTube adds.
+                const subscribeIdx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE');
+                if (subscribeIdx === -1) {
+                    res.push(highlightButton);
+                } else {
+                    res.splice(subscribeIdx + 1, 0, highlightButton);
+                }
+                return res;
+            };
+        }
+
         if (engagementActionButton) {
             const origEngagementActionButton = inst[engagementActionButton];
             inst[engagementActionButton] = function () {
@@ -117,30 +184,6 @@ function applyPatches() {
                                     {
                                         customAction: {
                                             action: 'TT_SPEED_SETTINGS_SHOW',
-                                        }
-                                    }
-                                )
-                            }
-                        });
-                    }
-                }
-                if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
-                    const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
-                    if (category && !res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION' || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
-                        res.push({
-                            type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
-                            button: {
-                                buttonRenderer: ButtonRenderer(
-                                    false,
-                                    t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
-                                    'SKIP_NEXT',
-                                    {
-                                        clickTrackingParams: null,
-                                        customAction: {
-                                            action: 'SKIP',
-                                            parameters: {
-                                                time: category.segment[0]
-                                            }
                                         }
                                     }
                                 )

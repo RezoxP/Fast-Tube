@@ -106,6 +106,29 @@ class SponsorBlockHandler {
     this.manualSkippableCategories = configRead('sponsorBlockManualSkips');
     this.skippableCategories = this.getSkippableCategories();
 
+    // The promoted actions row (Description / Subscribe / ...) builds its item
+    // list when the player bar mounts, which usually happens BEFORE this fetch
+    // resolves. If the row is already on screen without the highlight button,
+    // give it a one-shot focus nudge (ArrowDown + ArrowUp, exactly like a
+    // remote user moving through the row) so zylon rebuilds it with the
+    // "Skip to highlight" button in place.
+    setTimeout(() => {
+      try {
+        const hasBtn = [...document.querySelectorAll('[aria-label]')]
+          .some((el) => /skip to highlight/i.test(el.getAttribute('aria-label') || ''));
+        if (hasBtn) return;
+        const press = (key, keyCode) => {
+          const e = new KeyboardEvent('keydown', {
+            key, code: key, bubbles: true, cancelable: true, composed: true
+          });
+          Object.defineProperty(e, 'keyCode', { get: () => keyCode });
+          document.dispatchEvent(e);
+        };
+        press('ArrowDown', 40);
+        setTimeout(() => press('ArrowUp', 38), 150);
+      } catch (e) { }
+    }, 1500);
+
     this.scheduleSkipHandler = () => {
       const slider = document.querySelector('div[idomkey="slider"]');
       const sliderRect = slider?.getBoundingClientRect();
@@ -397,41 +420,67 @@ class SponsorBlockHandler {
 // shows my lack of understanding of javascript. (or both)
 window.sponsorblock = null;
 
-window.addEventListener(
-  'hashchange',
-  () => {
-    const newURL = new URL(location.hash.substring(1), location.href);
-    // A hack, but it works, so...
-    const videoID = newURL.search.replace('?v=', '').split('&')[0];
-    const needsReload =
-      videoID &&
-      (!window.sponsorblock || window.sponsorblock.videoID != videoID);
+// The video ID used to be reliably present as ?v=<id> in the location hash.
+// The current leanback app canonicalizes watch URLs (often via history
+// .replaceState, which fires no hashchange) and may drop the ?v= parameter
+// entirely, so discovery falls back to the live player state and, as a last
+// resort, the watch metadata thumbnails.
+function sbExtractVideoID() {
+  const fromHash = location.hash.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+  if (fromHash) return fromHash[1];
+  try {
+    const id = document.querySelector('.html5-video-player')?.getVideoData?.()?.video_id;
+    if (id && /^[A-Za-z0-9_-]{11}$/.test(id)) return id;
+  } catch (e) { }
+  const img = document.querySelector('ytlr-watch-page img[src*="/vi/"]');
+  if (img) {
+    const m = (img.getAttribute('src') || '').match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+    if (m) return m[1];
+  }
+  return null;
+}
 
-    console.info(
-      'hashchange',
-      videoID,
-      window.sponsorblock,
-      window.sponsorblock ? window.sponsorblock.videoID : null,
-      needsReload
-    );
+function sbEnsureHandler() {
+  const onWatchRoute = location.hash.indexOf('#/watch') === 0;
+  const videoID = onWatchRoute ? sbExtractVideoID() : null;
 
-    if (needsReload) {
-      if (window.sponsorblock) {
-        try {
-          window.sponsorblock.destroy();
-        } catch (err) {
-          console.warn('window.sponsorblock.destroy() failed!', err);
-        }
-        window.sponsorblock = null;
+  if (!videoID) {
+    // Left the watch route (or the route is still settling): drop the handler
+    // so segments from a previous video are never reused.
+    if (window.sponsorblock) {
+      try {
+        window.sponsorblock.destroy();
+      } catch (err) {
+        console.warn('window.sponsorblock.destroy() failed!', err);
       }
-
-      if (configRead('enableSponsorBlock')) {
-        window.sponsorblock = new SponsorBlockHandler(videoID);
-        window.sponsorblock.init();
-      } else {
-        console.info('SponsorBlock disabled, not loading');
-      }
+      window.sponsorblock = null;
     }
-  },
-  false
-);
+    return;
+  }
+
+  if (window.sponsorblock && window.sponsorblock.videoID === videoID) return;
+
+  if (window.sponsorblock) {
+    try {
+      window.sponsorblock.destroy();
+    } catch (err) {
+      console.warn('window.sponsorblock.destroy() failed!', err);
+    }
+    window.sponsorblock = null;
+  }
+
+  if (configRead('enableSponsorBlock')) {
+    console.info('SponsorBlock: binding to video', videoID);
+    window.sponsorblock = new SponsorBlockHandler(videoID);
+    window.sponsorblock.init();
+  } else {
+    console.info('SponsorBlock disabled, not loading');
+  }
+}
+
+window.addEventListener('hashchange', sbEnsureHandler, false);
+
+// Because the app can switch routes without firing hashchange (replaceState)
+// and the player state appears slightly after the route, a lightweight
+// watchdog keeps the handler in sync with the actually-playing video.
+setInterval(sbEnsureHandler, 1000);

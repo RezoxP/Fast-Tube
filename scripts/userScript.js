@@ -3722,7 +3722,17 @@
         }
     });
 
-    observerPipEnter.observe(document.body, { childList: true, subtree: true });
+    // document.body is null when the userscript is injected at document_start
+    // (the userscript-manager path). Register the observer once a body exists
+    // instead of throwing at import time and aborting the whole bundle.
+    function observePipWhenReady() {
+        if (!document.body) {
+            setTimeout(observePipWhenReady, 200);
+            return;
+        }
+        observerPipEnter.observe(document.body, { childList: true, subtree: true });
+    }
+    observePipWhenReady();
 
     function showToast(title, subtitle, thumbnails) {
         const toastCmd = {
@@ -8318,13 +8328,27 @@
     }
 
     // Patch resolveCommand to be able to change Fast-Tube settings
+    // Returns true once at least one app instance with resolveCommand has been
+    // wrapped (idempotent on repeated calls).
+    //
+    // NOTE: the app's command-resolver singleton (_.RC.instance, returned by the
+    // bundle's _.H() accessor) is constructed asynchronously during app boot —
+    // potentially AFTER the <video> element exists. Callers must keep polling
+    // this function until it returns true, otherwise Fast-Tube customAction
+    // commands that reach _.H() (menus and any component dispatching through
+    // props.data.action) would silently fall through to the native resolver.
 
     function patchResolveCommand() {
+        let patched = false;
         for (const key in window._yttv) {
             if (window._yttv[key] && window._yttv[key].instance && window._yttv[key].instance.resolveCommand) {
+                if (window._yttv[key].instance.resolveCommand.__ftPatched) {
+                    patched = true;
+                    continue;
+                }
 
                 const ogResolve = window._yttv[key].instance.resolveCommand;
-                window._yttv[key].instance.resolveCommand = function (cmd, _) {
+                const wrappedResolve = function (cmd, _) {
                     if (cmd.setClientSettingEndpoint) {
                         // Command to change client settings. Use Fast-Tube configuration to change settings.
                         let handled = false;
@@ -8456,8 +8480,12 @@
 
                     return ogResolve.call(this, cmd, _);
                 };
+                wrappedResolve.__ftPatched = true;
+                window._yttv[key].instance.resolveCommand = wrappedResolve;
+                patched = true;
             }
         }
+        return patched;
     }
 
     function customAction(action, parameters) {
@@ -8773,24 +8801,36 @@
               if (!r.transportControls.transportControlsRenderer.promotedActions) {
                 r.transportControls.transportControlsRenderer.promotedActions = [];
               }
-              r.transportControls.transportControlsRenderer.promotedActions.push({
-                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
-                button: {
-                  buttonRenderer: ButtonRenderer(
-                    false,
-                    t('sponsorblock.toasts.skipToHighlight'),
-                    'SKIP_NEXT',
-                    {
-                      clickTrackingParams: null,
-                      customAction: {
-                        action: 'SKIP',
-                        parameters: {
-                          time: category.segment[0]
+              // NOTE: use a dedicated type. TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION is
+              // special-cased by the client's promoted actions builder and items without a
+              // `featuredAction` payload are silently dropped from the row.
+              if (!r.transportControls.transportControlsRenderer.promotedActions.some(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
+                const subscribeIdx = r.transportControls.transportControlsRenderer.promotedActions.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE');
+                const highlightAction = {
+                  type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT',
+                  button: {
+                    buttonRenderer: ButtonRenderer(
+                      false,
+                      t('sponsorblock.toasts.skipToHighlight'),
+                      'SKIP_NEXT',
+                      {
+                        clickTrackingParams: null,
+                        customAction: {
+                          action: 'SKIP',
+                          parameters: {
+                            time: category.segment[0]
+                          }
                         }
                       }
-                    })
+                    )
+                  }
+                };
+                if (subscribeIdx === -1) {
+                  r.transportControls.transportControlsRenderer.promotedActions.push(highlightAction);
+                } else {
+                  r.transportControls.transportControlsRenderer.promotedActions.splice(subscribeIdx + 1, 0, highlightAction);
                 }
-              });
+              }
             }
           }
         }
@@ -9201,6 +9241,29 @@
         this.manualSkippableCategories = configRead('sponsorBlockManualSkips');
         this.skippableCategories = this.getSkippableCategories();
 
+        // The promoted actions row (Description / Subscribe / ...) builds its item
+        // list when the player bar mounts, which usually happens BEFORE this fetch
+        // resolves. If the row is already on screen without the highlight button,
+        // give it a one-shot focus nudge (ArrowDown + ArrowUp, exactly like a
+        // remote user moving through the row) so zylon rebuilds it with the
+        // "Skip to highlight" button in place.
+        setTimeout(() => {
+          try {
+            const hasBtn = [...document.querySelectorAll('[aria-label]')]
+              .some((el) => /skip to highlight/i.test(el.getAttribute('aria-label') || ''));
+            if (hasBtn) return;
+            const press = (key, keyCode) => {
+              const e = new KeyboardEvent('keydown', {
+                key, code: key, bubbles: true, cancelable: true, composed: true
+              });
+              Object.defineProperty(e, 'keyCode', { get: () => keyCode });
+              document.dispatchEvent(e);
+            };
+            press('ArrowDown', 40);
+            setTimeout(() => press('ArrowUp', 38), 150);
+          } catch (e) { }
+        }, 1500);
+
         this.scheduleSkipHandler = () => {
           const slider = document.querySelector('div[idomkey="slider"]');
           const sliderRect = slider?.getBoundingClientRect();
@@ -9492,44 +9555,70 @@
     // shows my lack of understanding of javascript. (or both)
     window.sponsorblock = null;
 
-    window.addEventListener(
-      'hashchange',
-      () => {
-        const newURL = new URL(location.hash.substring(1), location.href);
-        // A hack, but it works, so...
-        const videoID = newURL.search.replace('?v=', '').split('&')[0];
-        const needsReload =
-          videoID &&
-          (!window.sponsorblock || window.sponsorblock.videoID != videoID);
+    // The video ID used to be reliably present as ?v=<id> in the location hash.
+    // The current leanback app canonicalizes watch URLs (often via history
+    // .replaceState, which fires no hashchange) and may drop the ?v= parameter
+    // entirely, so discovery falls back to the live player state and, as a last
+    // resort, the watch metadata thumbnails.
+    function sbExtractVideoID() {
+      const fromHash = location.hash.match(/[?&]v=([A-Za-z0-9_-]{11})/);
+      if (fromHash) return fromHash[1];
+      try {
+        const id = document.querySelector('.html5-video-player')?.getVideoData?.()?.video_id;
+        if (id && /^[A-Za-z0-9_-]{11}$/.test(id)) return id;
+      } catch (e) { }
+      const img = document.querySelector('ytlr-watch-page img[src*="/vi/"]');
+      if (img) {
+        const m = (img.getAttribute('src') || '').match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+        if (m) return m[1];
+      }
+      return null;
+    }
 
-        console.info(
-          'hashchange',
-          videoID,
-          window.sponsorblock,
-          window.sponsorblock ? window.sponsorblock.videoID : null,
-          needsReload
-        );
+    function sbEnsureHandler() {
+      const onWatchRoute = location.hash.indexOf('#/watch') === 0;
+      const videoID = onWatchRoute ? sbExtractVideoID() : null;
 
-        if (needsReload) {
-          if (window.sponsorblock) {
-            try {
-              window.sponsorblock.destroy();
-            } catch (err) {
-              console.warn('window.sponsorblock.destroy() failed!', err);
-            }
-            window.sponsorblock = null;
+      if (!videoID) {
+        // Left the watch route (or the route is still settling): drop the handler
+        // so segments from a previous video are never reused.
+        if (window.sponsorblock) {
+          try {
+            window.sponsorblock.destroy();
+          } catch (err) {
+            console.warn('window.sponsorblock.destroy() failed!', err);
           }
-
-          if (configRead('enableSponsorBlock')) {
-            window.sponsorblock = new SponsorBlockHandler(videoID);
-            window.sponsorblock.init();
-          } else {
-            console.info('SponsorBlock disabled, not loading');
-          }
+          window.sponsorblock = null;
         }
-      },
-      false
-    );
+        return;
+      }
+
+      if (window.sponsorblock && window.sponsorblock.videoID === videoID) return;
+
+      if (window.sponsorblock) {
+        try {
+          window.sponsorblock.destroy();
+        } catch (err) {
+          console.warn('window.sponsorblock.destroy() failed!', err);
+        }
+        window.sponsorblock = null;
+      }
+
+      if (configRead('enableSponsorBlock')) {
+        console.info('SponsorBlock: binding to video', videoID);
+        window.sponsorblock = new SponsorBlockHandler(videoID);
+        window.sponsorblock.init();
+      } else {
+        console.info('SponsorBlock disabled, not loading');
+      }
+    }
+
+    window.addEventListener('hashchange', sbEnsureHandler, false);
+
+    // Because the app can switch routes without firing hashchange (replaceState)
+    // and the player state appears slightly after the route, a lightweight
+    // watchdog keeps the handler in sync with the actually-playing video.
+    setInterval(sbEnsureHandler, 1000);
 
     //
     // https://raw.githubusercontent.com/WICG/spatial-navigation/183f0146b6741007e46fa64ab0950447defdf8af/polyfill/spatial-navigation-polyfill.js
@@ -11310,8 +11399,18 @@
             style.textContent = css;
         }
     }
-    document.head.appendChild(style);
-    updateStyle();
+    // document.head is null when the userscript is injected at document_start
+    // (the userscript-manager path). Mount the style once a head exists instead
+    // of throwing at import time and aborting the whole bundle.
+    function mountStyle() {
+        if (!document.head) {
+            setTimeout(mountStyle, 200);
+            return;
+        }
+        document.head.appendChild(style);
+        updateStyle();
+    }
+    mountStyle();
 
     function getCommandExecutor() {
         let instance;
@@ -11364,12 +11463,22 @@
     /*global navigate*/
 
     // It just works, okay?
+    let uiInitialized = false;
     const interval$1 = setInterval(() => {
       const videoElement = document.querySelector('video');
       if (videoElement) {
-        execute_once_dom_loaded();
-        patchResolveCommand();
-        clearInterval(interval$1);
+        if (!uiInitialized) {
+          execute_once_dom_loaded();
+          uiInitialized = true;
+        }
+        // Some app command resolvers (e.g. the _.RC.instance singleton) are
+        // constructed asynchronously during app boot, possibly AFTER the <video>
+        // element appears. Keep polling until at least one resolver instance has
+        // been wrapped so Fast-Tube customActions (SKIP to highlight, queue
+        // actions, speed settings, ...) are never silently dropped.
+        if (patchResolveCommand()) {
+          clearInterval(interval$1);
+        }
       }
     }, 250);
 
@@ -19453,6 +19562,73 @@
 
             const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
 
+            // The promoted actions builder (ytlr-player-actions-container `this.j`): the row that
+            // contains the Subscribe button. Uniquely identified by reading props.data.promotedActions
+            // together with props.setReminderButton (the subscribedEntityKey getter also reads
+            // props.data.promotedActions but never references setReminderButton).
+            const promotedActionButton = functions.find(func =>
+                func.rhs.includes('props.data.promotedActions') && func.rhs.includes('setReminderButton')
+            )?.left?.split('.')[1];
+
+            if (promotedActionButton) {
+                const origPromotedActionButton = inst[promotedActionButton];
+                inst[promotedActionButton] = function () {
+                    const res = origPromotedActionButton.apply(this, arguments);
+                    if (!Array.isArray(res)) return res;
+
+                    // NOTE: do NOT use TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION here.
+                    // The promoted actions builder special-cases that type and silently drops
+                    // items whose button has no `featuredAction` payload.
+                    const ownType = 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT';
+
+                    let highlightTime = null;
+                    if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
+                        const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
+                        if (category) highlightTime = category.segment[0];
+                    }
+
+                    const existingIdx = res.findIndex(item => item.type === ownType || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION');
+
+                    if (highlightTime === null) {
+                        // Segments not loaded (yet) or feature disabled: drop any stale button
+                        if (existingIdx !== -1) res.splice(existingIdx, 1);
+                        return res;
+                    }
+
+                    if (existingIdx !== -1) return res;
+
+                    const highlightButton = {
+                        type: ownType,
+                        button: {
+                            buttonRenderer: ButtonRenderer(
+                                false,
+                                t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
+                                'SKIP_NEXT',
+                                {
+                                    clickTrackingParams: null,
+                                    customAction: {
+                                        action: 'SKIP',
+                                        parameters: {
+                                            time: highlightTime
+                                        }
+                                    }
+                                }
+                            )
+                        }
+                    };
+
+                    // Insert directly after the Subscribe button so the two stay adjacent
+                    // regardless of how many promoted actions YouTube adds.
+                    const subscribeIdx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE');
+                    if (subscribeIdx === -1) {
+                        res.push(highlightButton);
+                    } else {
+                        res.splice(subscribeIdx + 1, 0, highlightButton);
+                    }
+                    return res;
+                };
+            }
+
             if (engagementActionButton) {
                 const origEngagementActionButton = inst[engagementActionButton];
                 inst[engagementActionButton] = function () {
@@ -19469,30 +19645,6 @@
                                         {
                                             customAction: {
                                                 action: 'TT_SPEED_SETTINGS_SHOW',
-                                            }
-                                        }
-                                    )
-                                }
-                            });
-                        }
-                    }
-                    if (configRead('enableSponsorBlockHighlight') && window?.sponsorblock?.segments) {
-                        const category = window.sponsorblock.segments.find(seg => seg.category === 'poi_highlight');
-                        if (category && !res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION' || item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
-                            res.push({
-                                type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
-                                button: {
-                                    buttonRenderer: ButtonRenderer(
-                                        false,
-                                        t('sponsorblock.toasts.skipToHighlight') || "Skip to highlight",
-                                        'SKIP_NEXT',
-                                        {
-                                            clickTrackingParams: null,
-                                            customAction: {
-                                                action: 'SKIP',
-                                                parameters: {
-                                                    time: category.segment[0]
-                                                }
                                             }
                                         }
                                     )

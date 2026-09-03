@@ -25,13 +25,27 @@ export function findFunction(funcName) {
 }
 
 // Patch resolveCommand to be able to change Fast-Tube settings
+// Returns true once at least one app instance with resolveCommand has been
+// wrapped (idempotent on repeated calls).
+//
+// NOTE: the app's command-resolver singleton (_.RC.instance, returned by the
+// bundle's _.H() accessor) is constructed asynchronously during app boot —
+// potentially AFTER the <video> element exists. Callers must keep polling
+// this function until it returns true, otherwise Fast-Tube customAction
+// commands that reach _.H() (menus and any component dispatching through
+// props.data.action) would silently fall through to the native resolver.
 
 export function patchResolveCommand() {
+    let patched = false;
     for (const key in window._yttv) {
         if (window._yttv[key] && window._yttv[key].instance && window._yttv[key].instance.resolveCommand) {
+            if (window._yttv[key].instance.resolveCommand.__ftPatched) {
+                patched = true;
+                continue;
+            }
 
             const ogResolve = window._yttv[key].instance.resolveCommand;
-            window._yttv[key].instance.resolveCommand = function (cmd, _) {
+            const wrappedResolve = function (cmd, _) {
                 if (cmd.setClientSettingEndpoint) {
                     // Command to change client settings. Use Fast-Tube configuration to change settings.
                     let handled = false;
@@ -163,8 +177,12 @@ export function patchResolveCommand() {
 
                 return ogResolve.call(this, cmd, _);
             }
+            wrappedResolve.__ftPatched = true;
+            window._yttv[key].instance.resolveCommand = wrappedResolve;
+            patched = true;
         }
     }
+    return patched;
 }
 
 function customAction(action, parameters) {

@@ -238,24 +238,36 @@ JSON.parse = function () {
           if (!r.transportControls.transportControlsRenderer.promotedActions) {
             r.transportControls.transportControlsRenderer.promotedActions = [];
           }
-          r.transportControls.transportControlsRenderer.promotedActions.push({
-            type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION',
-            button: {
-              buttonRenderer: ButtonRenderer(
-                false,
-                t('sponsorblock.toasts.skipToHighlight'),
-                'SKIP_NEXT',
-                {
-                  clickTrackingParams: null,
-                  customAction: {
-                    action: 'SKIP',
-                    parameters: {
-                      time: category.segment[0]
+          // NOTE: use a dedicated type. TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION is
+          // special-cased by the client's promoted actions builder and items without a
+          // `featuredAction` payload are silently dropped from the row.
+          if (!r.transportControls.transportControlsRenderer.promotedActions.some(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT')) {
+            const subscribeIdx = r.transportControls.transportControlsRenderer.promotedActions.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SUBSCRIBE');
+            const highlightAction = {
+              type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPONSORBLOCK_HIGHLIGHT',
+              button: {
+                buttonRenderer: ButtonRenderer(
+                  false,
+                  t('sponsorblock.toasts.skipToHighlight'),
+                  'SKIP_NEXT',
+                  {
+                    clickTrackingParams: null,
+                    customAction: {
+                      action: 'SKIP',
+                      parameters: {
+                        time: category.segment[0]
+                      }
                     }
                   }
-                })
+                )
+              }
+            };
+            if (subscribeIdx === -1) {
+              r.transportControls.transportControlsRenderer.promotedActions.push(highlightAction);
+            } else {
+              r.transportControls.transportControlsRenderer.promotedActions.splice(subscribeIdx + 1, 0, highlightAction);
             }
-          });
+          }
         }
       }
     }

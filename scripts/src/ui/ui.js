@@ -11,12 +11,22 @@ import getCommandExecutor from './customCommandExecution.js';
 import { t } from 'i18next';
 
 // It just works, okay?
+let uiInitialized = false;
 const interval = setInterval(() => {
   const videoElement = document.querySelector('video');
   if (videoElement) {
-    execute_once_dom_loaded();
-    patchResolveCommand();
-    clearInterval(interval);
+    if (!uiInitialized) {
+      execute_once_dom_loaded();
+      uiInitialized = true;
+    }
+    // Some app command resolvers (e.g. the _.RC.instance singleton) are
+    // constructed asynchronously during app boot, possibly AFTER the <video>
+    // element appears. Keep polling until at least one resolver instance has
+    // been wrapped so Fast-Tube customActions (SKIP to highlight, queue
+    // actions, speed settings, ...) are never silently dropped.
+    if (patchResolveCommand()) {
+      clearInterval(interval);
+    }
   }
 }, 250);
 
