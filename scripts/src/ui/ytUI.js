@@ -188,6 +188,17 @@ function timelyAction(text, icon, command, triggerTimeMs, timeoutMs) {
 }
 
 function longPressData(data) {
+    // Toggle Watch Later: if the tile is already in the WL playlist, offer
+    // removal instead of a duplicate add (ported from upstream TizenTube).
+    const isWatchLaterItem = data?.watchEndpointData?.playlistId === 'WL';
+    const watchLaterAction = isWatchLaterItem ? {
+        removedVideoId: data.videoId,
+        action: 'ACTION_REMOVE_VIDEO_BY_VIDEO_ID'
+    } : {
+        addedVideoId: data.videoId,
+        action: 'ACTION_ADD_VIDEO'
+    };
+
     return {
         clickTrackingParams: null,
         showMenuCommand: {
@@ -208,16 +219,18 @@ function longPressData(data) {
                             clickTrackingParams: null,
                             watchEndpoint: data.watchEndpointData
                         }),
-                        MenuServiceItemRenderer('Save to Watch Later', {
+                        MenuServiceItemRenderer(isWatchLaterItem ? 'Remove from Watch Later' : 'Save to Watch Later', {
                             clickTrackingParams: null,
+                            // Persist playlist edits reliably (sendPost).
+                            commandMetadata: {
+                                webCommandMetadata: {
+                                    sendPost: true,
+                                    apiUrl: '/youtubei/v1/browse/edit_playlist'
+                                }
+                            },
                             playlistEditEndpoint: {
                                 playlistId: 'WL',
-                                actions: [
-                                    {
-                                        addedVideoId: data.videoId,
-                                        action: 'ACTION_ADD_VIDEO'
-                                    }
-                                ]
+                                actions: [watchLaterAction]
                             }
                         }),
                         MenuNavigationItemRenderer('Save to Playlist', {
@@ -232,6 +245,24 @@ function longPressData(data) {
                                 customAction: {
                                     action: 'ADD_TO_QUEUE',
                                     parameters: data.item
+                                }
+                            }
+                        }),
+                        MenuServiceItemRenderer('Go to Channel', {
+                            clickTrackingParams: null,
+                            playlistEditEndpoint: {
+                                customAction: {
+                                    action: 'GO_TO_CHANNEL',
+                                    parameters: data.item
+                                }
+                            }
+                        }),
+                        MenuServiceItemRenderer('Share Video', {
+                            clickTrackingParams: null,
+                            playlistEditEndpoint: {
+                                customAction: {
+                                    action: 'SHARE',
+                                    parameters: { videoId: data.videoId }
                                 }
                             }
                         }),

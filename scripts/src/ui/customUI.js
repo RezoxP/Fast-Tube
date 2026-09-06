@@ -5,25 +5,109 @@ import { configRead } from "../config.js";
 import { ButtonRenderer } from "./ytUI.js";
 import { t } from "i18next";
 
-function applyPatches() {
-    if (!window._yttv) return setTimeout(applyPatches, 250);
-    if (!document.querySelector('video')) return setTimeout(applyPatches, 250);
-    const methods = Object.keys(window._yttv).filter(key => {
-        if (typeof window._yttv[key] !== 'function') return false;
-        const src = window._yttv[key].toString();
-        return src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION') || src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-    });
+// PERF: the AST extraction below used to run inside the constructor on EVERY
+// instantiation of the player actions container (i.e. on every navigation to
+// the player), stringifying + fully parsing a huge minified class each time.
+// On low-end TVs that is a recurring multi-hundred-ms CPU spike. Everything
+// derived from origMethod is static, so compute it exactly once and cache it.
+let cachedOrigMethod = null;
+let cachedIsClass = false;
+let cachedFunctions = null;
+let cachedSettingActionGroup = null;
+let cachedPreviousButtonName = null;
+let cachedNextButtonName = null;
+let cachedEngagementActionButton = null;
+let cachedPromotedActionButton = null;
 
-    if (methods.length === 0) {
-        setTimeout(applyPatches, 250);
+// PERF: cap boot polling, incrementally scan window._yttv keys without
+// repeatedly stringifying thousands of bundle functions, and recover on
+// route transitions to watch.
+const APPLY_PATCH_MAX_ATTEMPTS = 60;
+let applyPatchAttempts = 0;
+let applyPatchTimeout = null;
+let isPlayerPatched = false;
+const checkedYttvKeys = new Set();
+let targetKey = null;
+
+function applyPatches() {
+    if (isPlayerPatched) return;
+    // Nothing to do at all when player patching is disabled - don't poll.
+    if (!configRead('enablePatchingVideoPlayer')) return;
+
+    if (!window._yttv) {
+        if (++applyPatchAttempts < APPLY_PATCH_MAX_ATTEMPTS) {
+            clearTimeout(applyPatchTimeout);
+            applyPatchTimeout = setTimeout(applyPatches, 500);
+        }
         return;
     }
 
-    const origMethod = window._yttv[methods[0]];
+    if (!targetKey) {
+        for (const key in window._yttv) {
+            if (checkedYttvKeys.has(key)) continue;
+            checkedYttvKeys.add(key);
+            if (typeof window._yttv[key] !== 'function') continue;
+            const src = window._yttv[key].toString();
+            if (src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION') || src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS')) {
+                targetKey = key;
+                break;
+            }
+        }
+    }
+
+    if (!targetKey) {
+        if (++applyPatchAttempts < APPLY_PATCH_MAX_ATTEMPTS) {
+            clearTimeout(applyPatchTimeout);
+            applyPatchTimeout = setTimeout(applyPatches, 500);
+        }
+        return;
+    }
+
+    const origMethod = window._yttv[targetKey];
 
     function YtlrPlayerActionsContainer() {
         const args = Array.prototype.slice.call(arguments);
-        const isClass = /^class\s/.test(origMethod.toString());
+
+        // PERF: computed once per origMethod (see cache above) instead of on
+        // every single instantiation. Must run before the instanceof branch.
+        if (origMethod !== cachedOrigMethod || !cachedFunctions) {
+            cachedOrigMethod = origMethod;
+            const src = origMethod.toString();
+            cachedIsClass = /^class\s/.test(src);
+            cachedFunctions = extractAssignedFunctions(src);
+
+            const funcs = cachedFunctions;
+            cachedSettingActionGroup = funcs.find(func =>
+                func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS')
+            )?.left?.split('.')[1];
+
+            const prevFunc = funcs.find(func => {
+                if (func.rhs.includes('skipNextButton')) {
+                    const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
+                    const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
+                    if (skipPreviousButtonIndex > skipNextButtonIndex) return true;
+                }
+            });
+            cachedPreviousButtonName = prevFunc?.left?.split('.')[1];
+
+            const nextFunc = funcs.find(func => {
+                if (func.rhs.includes('skipPreviousButton')) {
+                    const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
+                    const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
+                    if (skipNextButtonIndex > skipPreviousButtonIndex) return true;
+                }
+            });
+            cachedNextButtonName = nextFunc?.left?.split('.')[1];
+
+            cachedEngagementActionButton = funcs.find(func =>
+                func.rhs.includes('props.data.engagementActions')
+            )?.left?.split('.')[1];
+
+            cachedPromotedActionButton = funcs.find(func =>
+                func.rhs.includes('props.data.promotedActions') && func.rhs.includes('setReminderButton')
+            )?.left?.split('.')[1];
+        }
+        const isClass = cachedIsClass;
 
         function constructAsNew(ctor, argsList) {
             if (typeof Reflect !== 'undefined' && typeof Reflect.construct === 'function') {
@@ -45,8 +129,6 @@ function applyPatches() {
             inst = this;
         }
 
-        const functions = extractAssignedFunctions(origMethod.toString());
-
         const pipCommand = {
             "type": "TRANSPORT_CONTROLS_BUTTON_TYPE_PIP",
             "button": {
@@ -63,9 +145,7 @@ function applyPatches() {
             }
         }
 
-        const settingActionGroup = functions.find(func => {
-            return func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-        })?.left?.split('.')[1];
+        const settingActionGroup = cachedSettingActionGroup;
 
         if (settingActionGroup && configRead('enableMPButton')) {
             const origSettingActionGroup = inst[settingActionGroup];
@@ -77,37 +157,10 @@ function applyPatches() {
             };
         }
 
-        const previousButtonFunc = functions.find(func => {
-            if (func.rhs.includes('skipNextButton')) {
-                const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
-                const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
-                if (skipPreviousButtonIndex > skipNextButtonIndex) {
-                    return true;
-                }
-            }
-        });
-        const previousButtonName = previousButtonFunc?.left?.split('.')[1];
-
-        const nextButtonFunc = functions.find(func => {
-            if (func.rhs.includes('skipPreviousButton')) {
-                const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
-                const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
-                if (skipNextButtonIndex > skipPreviousButtonIndex) {
-                    return true;
-                }
-            }
-        });
-        const nextButtonName = nextButtonFunc?.left?.split('.')[1];
-
-        const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
-
-        // The promoted actions builder (ytlr-player-actions-container `this.j`): the row that
-        // contains the Subscribe button. Uniquely identified by reading props.data.promotedActions
-        // together with props.setReminderButton (the subscribedEntityKey getter also reads
-        // props.data.promotedActions but never references setReminderButton).
-        const promotedActionButton = functions.find(func =>
-            func.rhs.includes('props.data.promotedActions') && func.rhs.includes('setReminderButton')
-        )?.left?.split('.')[1];
+        const previousButtonName = cachedPreviousButtonName;
+        const nextButtonName = cachedNextButtonName;
+        const engagementActionButton = cachedEngagementActionButton;
+        const promotedActionButton = cachedPromotedActionButton;
 
         if (promotedActionButton) {
             const origPromotedActionButton = inst[promotedActionButton];
@@ -236,9 +289,16 @@ function applyPatches() {
 
     if (configRead('enablePatchingVideoPlayer')) {
         YtlrPlayerActionsContainer.prototype = origMethod.prototype;
-        window._yttv[methods[0]] = YtlrPlayerActionsContainer;
+        window._yttv[targetKey] = YtlrPlayerActionsContainer;
+        isPlayerPatched = true;
     }
 }
 
-
 applyPatches();
+
+window.addEventListener('hashchange', () => {
+    if (!isPlayerPatched && location.hash.includes('watch')) {
+        applyPatchAttempts = 0;
+        applyPatches();
+    }
+});

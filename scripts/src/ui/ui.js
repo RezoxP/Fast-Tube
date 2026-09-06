@@ -12,48 +12,77 @@ import { t } from 'i18next';
 
 // It just works, okay?
 let uiInitialized = false;
+let uiPollAttempts = 0;
+const UI_POLL_MAX_ATTEMPTS = 120;
 const interval = setInterval(() => {
-  const videoElement = document.querySelector('video');
-  if (videoElement) {
+  if (!uiInitialized && (document.body || document.querySelector('video'))) {
+    execute_once_dom_loaded();
+    uiInitialized = true;
+  }
+  if (patchResolveCommand()) {
+    clearInterval(interval);
+  } else if (++uiPollAttempts >= UI_POLL_MAX_ATTEMPTS) {
+    clearInterval(interval);
+  }
+}, 500);
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
     if (!uiInitialized) {
       execute_once_dom_loaded();
       uiInitialized = true;
     }
-    // Some app command resolvers (e.g. the _.RC.instance singleton) are
-    // constructed asynchronously during app boot, possibly AFTER the <video>
-    // element appears. Keep polling until at least one resolver instance has
-    // been wrapped so Fast-Tube customActions (SKIP to highlight, queue
-    // actions, speed settings, ...) are never silently dropped.
-    if (patchResolveCommand()) {
-      clearInterval(interval);
-    }
+  }, { once: true });
+} else {
+  if (!uiInitialized) {
+    execute_once_dom_loaded();
+    uiInitialized = true;
   }
-}, 250);
+}
 
 let keyTimeout = null;
 
+// Number keys 0-9 jump to 0%-90% of the current video (ported from upstream
+// TizenTube). Guarded so it never hijacks digits typed into text inputs
+// (e.g. the theme color fields) and never fires for non-keydown repeats.
+const NUMBER_KEY_PERCENT = {
+  48: 0, 49: 1, 50: 2, 51: 3, 52: 4, 53: 5, 54: 6, 55: 7, 56: 8, 57: 9,
+  96: 0, 97: 1, 98: 2, 99: 3, 100: 4, 101: 5, 102: 6, 103: 7, 104: 8, 105: 9
+};
+
 function execute_once_dom_loaded() {
 
-  // Add CSS to head.
-
-  const existingStyle = document.querySelector('style[nonce]');
-  if (existingStyle) {
-    existingStyle.textContent += css;
-  } else {
-    const style = document.createElement('style');
+  // Add CSS to head via dedicated style element to avoid mutating existingStyle.
+  const styleId = 'fasttube-ui-css';
+  let style = document.getElementById(styleId);
+  if (!style) {
+    style = document.createElement('style');
+    style.id = styleId;
     style.textContent = css;
-    document.head.appendChild(style);
+    (document.head || document.documentElement).appendChild(style);
   }
 
-  // Fix UI issues.
+  // Long-press (hold OK) support for custom video tile menus.
+  try {
+    if (window.tectonicConfig?.featureSwitches) {
+      window.tectonicConfig.featureSwitches.supportsLongPress = true;
+    }
+  } catch (e) { }
+
+  // Fix UI animations if enabled. PERF: do NOT force isLimitedMemory = false;
+  // on low-end devices, that disables YouTube TV's memory cache eviction,
+  // leaking textures and DOM nodes until the system runs out of RAM.
   const ui = configRead('enableFixedUI');
   if (ui) {
     try {
-      window.tectonicConfig.featureSwitches.isLimitedMemory = false;
-      window.tectonicConfig.clientData.legacyApplicationQuality = 'full-animation';
-      window.tectonicConfig.featureSwitches.enableAnimations = true;
-      window.tectonicConfig.featureSwitches.enableOnScrollLinearAnimation = true;
-      window.tectonicConfig.featureSwitches.enableListAnimations = true;
+      if (window.tectonicConfig?.clientData) {
+        window.tectonicConfig.clientData.legacyApplicationQuality = 'full-animation';
+      }
+      if (window.tectonicConfig?.featureSwitches) {
+        window.tectonicConfig.featureSwitches.enableAnimations = true;
+        window.tectonicConfig.featureSwitches.enableOnScrollLinearAnimation = true;
+        window.tectonicConfig.featureSwitches.enableListAnimations = true;
+      }
     } catch (e) { }
   }
 
@@ -66,27 +95,17 @@ function execute_once_dom_loaded() {
   uiContainer.classList.add('ytaf-ui-container');
   uiContainer.style['display'] = 'none';
   uiContainer.setAttribute('tabindex', 0);
-  uiContainer.addEventListener(
-    'focus',
-    () => console.info('uiContainer focused!'),
-    true
-  );
-  uiContainer.addEventListener(
-    'blur',
-    () => console.info('uiContainer blured!'),
-    true
-  );
-
+  // PERF: no console logging on focus/blur/keydown - these fire on every
+  // remote keypress while the settings UI is open and each log is a
+  // synchronous IPC round-trip on Cobalt.
   uiContainer.addEventListener(
     'keydown',
     (evt) => {
-      console.info('uiContainer key event:', evt.type, evt.keyCode, evt);
       if (evt.keyCode !== 404 && evt.keyCode !== 172) {
         if (evt.keyCode in ARROW_KEY_CODE) {
           navigate(ARROW_KEY_CODE[evt.keyCode]);
         } else if (evt.keyCode === 13 || evt.keyCode === 32) {
           // "OK" button
-          console.log('OK button pressed');
           const focusedElement = document.querySelector(':focus');
           if (focusedElement.type === 'checkbox') {
             focusedElement.checked = !focusedElement.checked;
@@ -140,7 +159,26 @@ function execute_once_dom_loaded() {
 
   var eventHandler = (evt) => {
     // We handle key events ourselves.
-    // console.info('Key event:', evt.type, evt.keyCode); // Removed for performance
+    if (evt.type === 'keydown' && evt.keyCode in NUMBER_KEY_PERCENT) {
+      const active = document.activeElement;
+      const isEditable = active && (
+        active.tagName === 'INPUT' ||
+        active.tagName === 'TEXTAREA' ||
+        active.isContentEditable ||
+        active.getAttribute('role') === 'textbox' ||
+        Boolean(active.closest('ytlr-search-box, ytlr-search-bar, [role="textbox"], input, textarea'))
+      );
+      if (!isEditable && location.hash.includes('watch')) {
+        const video = document.querySelector('video');
+        if (video && !isNaN(video.duration) && video.duration > 0) {
+          evt.preventDefault();
+          evt.stopPropagation();
+          video.currentTime = (NUMBER_KEY_PERCENT[evt.keyCode] / 10) * video.duration;
+          return;
+        }
+      }
+    }
+
     if (configRead('enableScreenDimming')) {
       if (keyTimeout) {
         clearTimeout(keyTimeout);
@@ -153,15 +191,13 @@ function execute_once_dom_loaded() {
         if (playerStateObject && playerStateObject.isPlaying) return;
         if (container) container.style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
       }, configRead('dimmingTimeout') * 1000);
-    } else {
-      if (keyTimeout) {
-        clearTimeout(keyTimeout);
-        keyTimeout = null;
-      }
+    } else if (keyTimeout) {
+      clearTimeout(keyTimeout);
+      keyTimeout = null;
       const container = document.getElementById('container');
       if (container) container.style.setProperty('opacity', '1', 'important');
     }
-    if (evt.keyCode == 404) {
+    if (evt.keyCode == 404 || evt.keyCode == 172) {
       if (evt.type === 'keydown') {
         modernUI();
       }

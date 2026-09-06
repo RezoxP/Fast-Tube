@@ -2,13 +2,57 @@
 
 import resolveCommand from "../resolveCommand.js";
 
-window.isPipPlaying = false;
+let _isPipPlaying = false;
+let isObservingPip = false;
 let PlayerService = null;
 
+function startPipObserver() {
+    if (isObservingPip) return;
+    if (document.body) {
+        observerPipEnter.observe(document.body, { childList: true, subtree: true });
+        isObservingPip = true;
+    }
+    tryInjectPipButton();
+}
+
+function stopPipObserver() {
+    if (isObservingPip) {
+        observerPipEnter.disconnect();
+        isObservingPip = false;
+    }
+    const pipBtn = document.querySelector('#tt-pip-button');
+    if (pipBtn) pipBtn.remove();
+}
+
+Object.defineProperty(window, 'isPipPlaying', {
+    get() { return _isPipPlaying; },
+    set(v) {
+        _isPipPlaying = !!v;
+        if (_isPipPlaying) {
+            startPipObserver();
+        } else {
+            stopPipObserver();
+        }
+    },
+    configurable: true
+});
+
+let pipLoadAttempts = 0;
+const PIP_LOAD_MAX_ATTEMPTS = 60;
+
 function pipLoad() {
+    if (!window._yttv) {
+        if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+        return;
+    }
     const mappings = Object.values(window._yttv).find(a => a && a.mappings);
+    if (!mappings) {
+        if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+        return;
+    }
     PlayerService = mappings.get('PlayerService');
     const PlaybackPreviewService = mappings.get('PlaybackPreviewService');
+    if (!PlayerService || !PlaybackPreviewService) return;
     const PlaybackPreviewServiceStart = PlaybackPreviewService.start;
     const PlaybackPreviewServiceStop = PlaybackPreviewService.stop;
 
@@ -107,100 +151,92 @@ const originalClasses = {
     }
 }
 
-const observerPipEnter = new MutationObserver(() => {
-    if (!window.isPipPlaying) return;
+function tryInjectPipButton() {
+    if (!_isPipPlaying) return;
     const searchBar = document.querySelector('ytlr-search-bar');
-    if (searchBar) {
-        const pipButtonExists = document.querySelector('#tt-pip-button');
-        if (!pipButtonExists) {
-            const voiceButton = searchBar.querySelector('ytlr-search-voice');
-            if (voiceButton) {
-                const iconClassNames = Object.values(window._yttv).find(a => a instanceof Map && a.has("CLEAR_COOKIES"));
-                const iconClassToBeRemoved = iconClassNames.get('MICROPHONE_ON');
-                const iconClearCookiesClass = iconClassNames.get('CLEAR_COOKIES');
-                const pipButton = document.createElement('ytlr-search-voice');
-                for (let i = 0; i < voiceButton.classList.length; i++) {
-                    if (originalClasses.ytlrSearchVoice.length === 0) {
-                        originalClasses.ytlrSearchVoice.length = voiceButton.classList.length;
-                    }
+    if (!searchBar) return;
+    const pipButtonExists = document.querySelector('#tt-pip-button');
+    if (pipButtonExists) return;
 
-                    if (originalClasses.ytlrSearchVoice.length !== voiceButton.classList.length) {
-                        for (const className of originalClasses.ytlrSearchVoice.classes) {
-                            pipButton.classList.add(className);
-                        }
-                        break;
-                    }
-
-                    if (!originalClasses.ytlrSearchVoice.classes.includes(voiceButton.classList[i]))
-                        originalClasses.ytlrSearchVoice.classes.push(voiceButton.classList[i]);
-
-                    pipButton.classList.add(voiceButton.classList[i]);
-
-                }
-                pipButton.style.left = '10.25em';
-                pipButton.id = 'tt-pip-button';
-                const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
-                for (let i = 0; i < voiceButton.children[0].classList.length; i++) {
-                    if (originalClasses.ytlrSearchVoiceMicButton.length === 0) {
-                        originalClasses.ytlrSearchVoiceMicButton.length = voiceButton.children[0].classList.length;
-                    }
-                    
-                    if (originalClasses.ytlrSearchVoiceMicButton.length !== voiceButton.children[0].classList.length) {
-                        for (const className of originalClasses.ytlrSearchVoiceMicButton.classes) {
-                            pipButtonMicButton.classList.add(className);
-                        }
-                        break;
-                    }
-
-                    if (!originalClasses.ytlrSearchVoiceMicButton.classes.includes(voiceButton.children[0].classList[i]))
-                        originalClasses.ytlrSearchVoiceMicButton.classes.push(voiceButton.children[0].classList[i]);
-
-                    pipButtonMicButton.classList.add(voiceButton.children[0].classList[i]);
-                }
-                const pipIcon = document.createElement('yt-icon');
-                for (let i = 0; i < voiceButton.children[0].children[0].classList.length; i++) {
-                    pipIcon.classList.add(voiceButton.children[0].children[0].classList[i]);
-                }
-                pipIcon.classList.remove(iconClassToBeRemoved);
-                pipIcon.classList.add(iconClearCookiesClass);
-
-                pipButtonMicButton.appendChild(pipIcon);
-                pipButton.appendChild(pipButtonMicButton);
-                searchBar.appendChild(pipButton);
-            } else {
-                const pipButton = document.createElement('ytlr-search-voice');
-                pipButton.style.left = '10.25em';
-                pipButton.id = 'tt-pip-button';
-                pipButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
-                pipButton.setAttribute('tabindex', '0');
-                pipButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice');
-                const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
-                pipButtonMicButton.setAttribute('hybridnavfocusable', 'true');
-                pipButtonMicButton.setAttribute('tabindex', '-1');
-                pipButtonMicButton.classList.add('ytLrSearchVoiceMicButtonHost', 'zylon-ve');
-                const pipIcon = document.createElement('yt-icon');
-                pipIcon.setAttribute('tabindex', '-1');
-                pipIcon.classList.add('ytContribIconTvArrowLeft', 'ytContribIconHost', 'ytLrSearchVoiceMicButtonIcon');
-
-                pipButtonMicButton.appendChild(pipIcon);
-                pipButton.appendChild(pipButtonMicButton);
-                searchBar.appendChild(pipButton);
+    const voiceButton = searchBar.querySelector('ytlr-search-voice');
+    if (voiceButton) {
+        const iconClassNames = Object.values(window._yttv || {}).find(a => a instanceof Map && a.has("CLEAR_COOKIES"));
+        const iconClassToBeRemoved = iconClassNames?.get('MICROPHONE_ON');
+        const iconClearCookiesClass = iconClassNames?.get('CLEAR_COOKIES');
+        const pipButton = document.createElement('ytlr-search-voice');
+        for (let i = 0; i < voiceButton.classList.length; i++) {
+            if (originalClasses.ytlrSearchVoice.length === 0) {
+                originalClasses.ytlrSearchVoice.length = voiceButton.classList.length;
             }
-        }
-    }
-});
 
-// document.body is null when the userscript is injected at document_start
-// (the userscript-manager path). Register the observer once a body exists
-// instead of throwing at import time and aborting the whole bundle.
-function observePipWhenReady() {
-    if (!document.body) {
-        setTimeout(observePipWhenReady, 200);
-        return;
+            if (originalClasses.ytlrSearchVoice.length !== voiceButton.classList.length) {
+                for (const className of originalClasses.ytlrSearchVoice.classes) {
+                    pipButton.classList.add(className);
+                }
+                break;
+            }
+
+            if (!originalClasses.ytlrSearchVoice.classes.includes(voiceButton.classList[i]))
+                originalClasses.ytlrSearchVoice.classes.push(voiceButton.classList[i]);
+
+            pipButton.classList.add(voiceButton.classList[i]);
+
+        }
+        pipButton.style.left = '10.25em';
+        pipButton.id = 'tt-pip-button';
+        const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
+        for (let i = 0; i < voiceButton.children[0].classList.length; i++) {
+            if (originalClasses.ytlrSearchVoiceMicButton.length === 0) {
+                originalClasses.ytlrSearchVoiceMicButton.length = voiceButton.children[0].classList.length;
+            }
+            
+            if (originalClasses.ytlrSearchVoiceMicButton.length !== voiceButton.children[0].classList.length) {
+                for (const className of originalClasses.ytlrSearchVoiceMicButton.classes) {
+                    pipButtonMicButton.classList.add(className);
+                }
+                break;
+            }
+
+            if (!originalClasses.ytlrSearchVoiceMicButton.classes.includes(voiceButton.children[0].classList[i]))
+                originalClasses.ytlrSearchVoiceMicButton.classes.push(voiceButton.children[0].classList[i]);
+
+            pipButtonMicButton.classList.add(voiceButton.children[0].classList[i]);
+        }
+        const pipIcon = document.createElement('yt-icon');
+        for (let i = 0; i < voiceButton.children[0].children[0].classList.length; i++) {
+            pipIcon.classList.add(voiceButton.children[0].children[0].classList[i]);
+        }
+        if (iconClassToBeRemoved) pipIcon.classList.remove(iconClassToBeRemoved);
+        if (iconClearCookiesClass) pipIcon.classList.add(iconClearCookiesClass);
+
+        pipButtonMicButton.appendChild(pipIcon);
+        pipButton.appendChild(pipButtonMicButton);
+        searchBar.appendChild(pipButton);
+    } else {
+        const pipButton = document.createElement('ytlr-search-voice');
+        pipButton.style.left = '10.25em';
+        pipButton.id = 'tt-pip-button';
+        pipButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
+        pipButton.setAttribute('tabindex', '0');
+        pipButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice');
+        const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
+        pipButtonMicButton.setAttribute('hybridnavfocusable', 'true');
+        pipButtonMicButton.setAttribute('tabindex', '-1');
+        pipButtonMicButton.classList.add('ytLrSearchVoiceMicButtonHost', 'zylon-ve');
+        const pipIcon = document.createElement('yt-icon');
+        pipIcon.setAttribute('tabindex', '-1');
+        pipIcon.classList.add('ytContribIconTvArrowLeft', 'ytContribIconHost', 'ytLrSearchVoiceMicButtonIcon');
+
+        pipButtonMicButton.appendChild(pipIcon);
+        pipButton.appendChild(pipButtonMicButton);
+        searchBar.appendChild(pipButton);
     }
-    observerPipEnter.observe(document.body, { childList: true, subtree: true });
 }
-observePipWhenReady();
+
+const observerPipEnter = new MutationObserver(() => {
+    if (!_isPipPlaying) return;
+    tryInjectPipButton();
+});
 
 export {
     enablePip,

@@ -714,8 +714,23 @@ export default function modernUI(update, parameters) {
                             name: t('settings.options.uiSettings.options.clock.options.clockShowSeconds'),
                             icon: 'TIMER',
                             value: 'clockShowSeconds'
+                        },
+                        {
+                            name: 'Hide Clock While Video is Playing',
+                            icon: 'EYE_OFF',
+                            value: 'clockHideWhenVideoPlaying'
                         }
                     ]
+                },
+                {
+                    name: 'Disable Enlarged Thumbnails',
+                    value: 'disableEnlargingThumbnails',
+                    icon: null,
+                },
+                {
+                    name: 'Enable Shrinked Thumbnails',
+                    value: 'enableShrinkingThumbnails',
+                    icon: null,
                 }
             ]
         },
@@ -887,7 +902,9 @@ export function optionShow(parameters, update) {
                 continue;
             }
             const isRadioChoice = option.key !== null && option.key !== undefined;
-            const currentVal = configRead(isRadioChoice ? option.key : option.value);
+            // Items with value === null are submenu entries; reading a config
+            // key of undefined would corrupt state (ported upstream fix).
+            const currentVal = option.value === null ? undefined : configRead(isRadioChoice ? option.key : option.value);
             buttons.push(
                 buttonItem(
                     { title: option.name, subtitle: option.subtitle },

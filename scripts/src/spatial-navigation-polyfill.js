@@ -46,31 +46,48 @@
      * Reference: https://drafts.css-houdini.org/css-properties-values-api/#the-registerproperty-function
      */
     if (window.CSS && CSS.registerProperty) {
-      if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-contain') === '') {
-        CSS.registerProperty({
-          name: '--spatial-navigation-contain',
-          syntax: 'auto | contain',
-          inherits: false,
-          initialValue: 'auto'
-        });
-      }
+      // NOTE: document.documentElement is still null when this polyfill is
+      // injected at document_start (userscript-manager / standalone path).
+      // Calling getComputedStyle(null) used to throw and abort the entire
+      // userscript bundle. Defer registration until an <html> element exists.
+      const registerSpatialNavProperties = () => {
+        if (!document.documentElement) return false;
 
-      if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-action') === '') {
-        CSS.registerProperty({
-          name: '--spatial-navigation-action',
-          syntax: 'auto | focus | scroll',
-          inherits: false,
-          initialValue: 'auto'
-        });
-      }
+        if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-contain') === '') {
+          CSS.registerProperty({
+            name: '--spatial-navigation-contain',
+            syntax: 'auto | contain',
+            inherits: false,
+            initialValue: 'auto'
+          });
+        }
 
-      if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-function') === '') {
-        CSS.registerProperty({
-          name: '--spatial-navigation-function',
-          syntax: 'normal | grid',
-          inherits: false,
-          initialValue: 'normal'
-        });
+        if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-action') === '') {
+          CSS.registerProperty({
+            name: '--spatial-navigation-action',
+            syntax: 'auto | focus | scroll',
+            inherits: false,
+            initialValue: 'auto'
+          });
+        }
+
+        if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-function') === '') {
+          CSS.registerProperty({
+            name: '--spatial-navigation-function',
+            syntax: 'normal | grid',
+            inherits: false,
+            initialValue: 'normal'
+          });
+        }
+        return true;
+      };
+
+      if (!registerSpatialNavProperties()) {
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', registerSpatialNavProperties, { once: true });
+        } else {
+          setTimeout(registerSpatialNavProperties, 0);
+        }
       }
     }
   }

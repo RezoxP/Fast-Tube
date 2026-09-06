@@ -3485,6 +3485,9 @@
       enableClock: false,
       isClock12HourFormat: false,
       clockShowSeconds: false,
+      clockHideWhenVideoPlaying: false,
+      disableEnlargingThumbnails: false,
+      enableShrinkingThumbnails: false,
     };
 
     let localConfig;
@@ -3535,13 +3538,57 @@
     // Picture in Picture Mode for Fast-Tube
 
 
-    window.isPipPlaying = false;
+    let _isPipPlaying = false;
+    let isObservingPip = false;
     let PlayerService = null;
 
+    function startPipObserver() {
+        if (isObservingPip) return;
+        if (document.body) {
+            observerPipEnter.observe(document.body, { childList: true, subtree: true });
+            isObservingPip = true;
+        }
+        tryInjectPipButton();
+    }
+
+    function stopPipObserver() {
+        if (isObservingPip) {
+            observerPipEnter.disconnect();
+            isObservingPip = false;
+        }
+        const pipBtn = document.querySelector('#tt-pip-button');
+        if (pipBtn) pipBtn.remove();
+    }
+
+    Object.defineProperty(window, 'isPipPlaying', {
+        get() { return _isPipPlaying; },
+        set(v) {
+            _isPipPlaying = !!v;
+            if (_isPipPlaying) {
+                startPipObserver();
+            } else {
+                stopPipObserver();
+            }
+        },
+        configurable: true
+    });
+
+    let pipLoadAttempts = 0;
+    const PIP_LOAD_MAX_ATTEMPTS = 60;
+
     function pipLoad() {
+        if (!window._yttv) {
+            if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+            return;
+        }
         const mappings = Object.values(window._yttv).find(a => a && a.mappings);
+        if (!mappings) {
+            if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+            return;
+        }
         PlayerService = mappings.get('PlayerService');
         const PlaybackPreviewService = mappings.get('PlaybackPreviewService');
+        if (!PlayerService || !PlaybackPreviewService) return;
         const PlaybackPreviewServiceStart = PlaybackPreviewService.start;
         const PlaybackPreviewServiceStop = PlaybackPreviewService.stop;
 
@@ -3639,100 +3686,92 @@
         }
     };
 
-    const observerPipEnter = new MutationObserver(() => {
-        if (!window.isPipPlaying) return;
+    function tryInjectPipButton() {
+        if (!_isPipPlaying) return;
         const searchBar = document.querySelector('ytlr-search-bar');
-        if (searchBar) {
-            const pipButtonExists = document.querySelector('#tt-pip-button');
-            if (!pipButtonExists) {
-                const voiceButton = searchBar.querySelector('ytlr-search-voice');
-                if (voiceButton) {
-                    const iconClassNames = Object.values(window._yttv).find(a => a instanceof Map && a.has("CLEAR_COOKIES"));
-                    const iconClassToBeRemoved = iconClassNames.get('MICROPHONE_ON');
-                    const iconClearCookiesClass = iconClassNames.get('CLEAR_COOKIES');
-                    const pipButton = document.createElement('ytlr-search-voice');
-                    for (let i = 0; i < voiceButton.classList.length; i++) {
-                        if (originalClasses.ytlrSearchVoice.length === 0) {
-                            originalClasses.ytlrSearchVoice.length = voiceButton.classList.length;
-                        }
+        if (!searchBar) return;
+        const pipButtonExists = document.querySelector('#tt-pip-button');
+        if (pipButtonExists) return;
 
-                        if (originalClasses.ytlrSearchVoice.length !== voiceButton.classList.length) {
-                            for (const className of originalClasses.ytlrSearchVoice.classes) {
-                                pipButton.classList.add(className);
-                            }
-                            break;
-                        }
-
-                        if (!originalClasses.ytlrSearchVoice.classes.includes(voiceButton.classList[i]))
-                            originalClasses.ytlrSearchVoice.classes.push(voiceButton.classList[i]);
-
-                        pipButton.classList.add(voiceButton.classList[i]);
-
-                    }
-                    pipButton.style.left = '10.25em';
-                    pipButton.id = 'tt-pip-button';
-                    const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
-                    for (let i = 0; i < voiceButton.children[0].classList.length; i++) {
-                        if (originalClasses.ytlrSearchVoiceMicButton.length === 0) {
-                            originalClasses.ytlrSearchVoiceMicButton.length = voiceButton.children[0].classList.length;
-                        }
-                        
-                        if (originalClasses.ytlrSearchVoiceMicButton.length !== voiceButton.children[0].classList.length) {
-                            for (const className of originalClasses.ytlrSearchVoiceMicButton.classes) {
-                                pipButtonMicButton.classList.add(className);
-                            }
-                            break;
-                        }
-
-                        if (!originalClasses.ytlrSearchVoiceMicButton.classes.includes(voiceButton.children[0].classList[i]))
-                            originalClasses.ytlrSearchVoiceMicButton.classes.push(voiceButton.children[0].classList[i]);
-
-                        pipButtonMicButton.classList.add(voiceButton.children[0].classList[i]);
-                    }
-                    const pipIcon = document.createElement('yt-icon');
-                    for (let i = 0; i < voiceButton.children[0].children[0].classList.length; i++) {
-                        pipIcon.classList.add(voiceButton.children[0].children[0].classList[i]);
-                    }
-                    pipIcon.classList.remove(iconClassToBeRemoved);
-                    pipIcon.classList.add(iconClearCookiesClass);
-
-                    pipButtonMicButton.appendChild(pipIcon);
-                    pipButton.appendChild(pipButtonMicButton);
-                    searchBar.appendChild(pipButton);
-                } else {
-                    const pipButton = document.createElement('ytlr-search-voice');
-                    pipButton.style.left = '10.25em';
-                    pipButton.id = 'tt-pip-button';
-                    pipButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
-                    pipButton.setAttribute('tabindex', '0');
-                    pipButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice');
-                    const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
-                    pipButtonMicButton.setAttribute('hybridnavfocusable', 'true');
-                    pipButtonMicButton.setAttribute('tabindex', '-1');
-                    pipButtonMicButton.classList.add('ytLrSearchVoiceMicButtonHost', 'zylon-ve');
-                    const pipIcon = document.createElement('yt-icon');
-                    pipIcon.setAttribute('tabindex', '-1');
-                    pipIcon.classList.add('ytContribIconTvArrowLeft', 'ytContribIconHost', 'ytLrSearchVoiceMicButtonIcon');
-
-                    pipButtonMicButton.appendChild(pipIcon);
-                    pipButton.appendChild(pipButtonMicButton);
-                    searchBar.appendChild(pipButton);
+        const voiceButton = searchBar.querySelector('ytlr-search-voice');
+        if (voiceButton) {
+            const iconClassNames = Object.values(window._yttv || {}).find(a => a instanceof Map && a.has("CLEAR_COOKIES"));
+            const iconClassToBeRemoved = iconClassNames?.get('MICROPHONE_ON');
+            const iconClearCookiesClass = iconClassNames?.get('CLEAR_COOKIES');
+            const pipButton = document.createElement('ytlr-search-voice');
+            for (let i = 0; i < voiceButton.classList.length; i++) {
+                if (originalClasses.ytlrSearchVoice.length === 0) {
+                    originalClasses.ytlrSearchVoice.length = voiceButton.classList.length;
                 }
-            }
-        }
-    });
 
-    // document.body is null when the userscript is injected at document_start
-    // (the userscript-manager path). Register the observer once a body exists
-    // instead of throwing at import time and aborting the whole bundle.
-    function observePipWhenReady() {
-        if (!document.body) {
-            setTimeout(observePipWhenReady, 200);
-            return;
+                if (originalClasses.ytlrSearchVoice.length !== voiceButton.classList.length) {
+                    for (const className of originalClasses.ytlrSearchVoice.classes) {
+                        pipButton.classList.add(className);
+                    }
+                    break;
+                }
+
+                if (!originalClasses.ytlrSearchVoice.classes.includes(voiceButton.classList[i]))
+                    originalClasses.ytlrSearchVoice.classes.push(voiceButton.classList[i]);
+
+                pipButton.classList.add(voiceButton.classList[i]);
+
+            }
+            pipButton.style.left = '10.25em';
+            pipButton.id = 'tt-pip-button';
+            const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
+            for (let i = 0; i < voiceButton.children[0].classList.length; i++) {
+                if (originalClasses.ytlrSearchVoiceMicButton.length === 0) {
+                    originalClasses.ytlrSearchVoiceMicButton.length = voiceButton.children[0].classList.length;
+                }
+                
+                if (originalClasses.ytlrSearchVoiceMicButton.length !== voiceButton.children[0].classList.length) {
+                    for (const className of originalClasses.ytlrSearchVoiceMicButton.classes) {
+                        pipButtonMicButton.classList.add(className);
+                    }
+                    break;
+                }
+
+                if (!originalClasses.ytlrSearchVoiceMicButton.classes.includes(voiceButton.children[0].classList[i]))
+                    originalClasses.ytlrSearchVoiceMicButton.classes.push(voiceButton.children[0].classList[i]);
+
+                pipButtonMicButton.classList.add(voiceButton.children[0].classList[i]);
+            }
+            const pipIcon = document.createElement('yt-icon');
+            for (let i = 0; i < voiceButton.children[0].children[0].classList.length; i++) {
+                pipIcon.classList.add(voiceButton.children[0].children[0].classList[i]);
+            }
+            if (iconClassToBeRemoved) pipIcon.classList.remove(iconClassToBeRemoved);
+            if (iconClearCookiesClass) pipIcon.classList.add(iconClearCookiesClass);
+
+            pipButtonMicButton.appendChild(pipIcon);
+            pipButton.appendChild(pipButtonMicButton);
+            searchBar.appendChild(pipButton);
+        } else {
+            const pipButton = document.createElement('ytlr-search-voice');
+            pipButton.style.left = '10.25em';
+            pipButton.id = 'tt-pip-button';
+            pipButton.setAttribute('idomkey', 'ytLrSearchBarSearchVoice');
+            pipButton.setAttribute('tabindex', '0');
+            pipButton.classList.add('ytLrSearchVoiceHost', 'ytLrSearchBarSearchVoice');
+            const pipButtonMicButton = document.createElement('ytlr-search-voice-mic-button');
+            pipButtonMicButton.setAttribute('hybridnavfocusable', 'true');
+            pipButtonMicButton.setAttribute('tabindex', '-1');
+            pipButtonMicButton.classList.add('ytLrSearchVoiceMicButtonHost', 'zylon-ve');
+            const pipIcon = document.createElement('yt-icon');
+            pipIcon.setAttribute('tabindex', '-1');
+            pipIcon.classList.add('ytContribIconTvArrowLeft', 'ytContribIconHost', 'ytLrSearchVoiceMicButtonIcon');
+
+            pipButtonMicButton.appendChild(pipIcon);
+            pipButton.appendChild(pipButtonMicButton);
+            searchBar.appendChild(pipButton);
         }
-        observerPipEnter.observe(document.body, { childList: true, subtree: true });
     }
-    observePipWhenReady();
+
+    const observerPipEnter = new MutationObserver(() => {
+        if (!_isPipPlaying) return;
+        tryInjectPipButton();
+    });
 
     function showToast(title, subtitle, thumbnails) {
         const toastCmd = {
@@ -3904,6 +3943,17 @@
     }
 
     function longPressData(data) {
+        // Toggle Watch Later: if the tile is already in the WL playlist, offer
+        // removal instead of a duplicate add (ported from upstream TizenTube).
+        const isWatchLaterItem = data?.watchEndpointData?.playlistId === 'WL';
+        const watchLaterAction = isWatchLaterItem ? {
+            removedVideoId: data.videoId,
+            action: 'ACTION_REMOVE_VIDEO_BY_VIDEO_ID'
+        } : {
+            addedVideoId: data.videoId,
+            action: 'ACTION_ADD_VIDEO'
+        };
+
         return {
             clickTrackingParams: null,
             showMenuCommand: {
@@ -3924,16 +3974,18 @@
                                 clickTrackingParams: null,
                                 watchEndpoint: data.watchEndpointData
                             }),
-                            MenuServiceItemRenderer('Save to Watch Later', {
+                            MenuServiceItemRenderer(isWatchLaterItem ? 'Remove from Watch Later' : 'Save to Watch Later', {
                                 clickTrackingParams: null,
+                                // Persist playlist edits reliably (sendPost).
+                                commandMetadata: {
+                                    webCommandMetadata: {
+                                        sendPost: true,
+                                        apiUrl: '/youtubei/v1/browse/edit_playlist'
+                                    }
+                                },
                                 playlistEditEndpoint: {
                                     playlistId: 'WL',
-                                    actions: [
-                                        {
-                                            addedVideoId: data.videoId,
-                                            action: 'ACTION_ADD_VIDEO'
-                                        }
-                                    ]
+                                    actions: [watchLaterAction]
                                 }
                             }),
                             MenuNavigationItemRenderer('Save to Playlist', {
@@ -3948,6 +4000,24 @@
                                     customAction: {
                                         action: 'ADD_TO_QUEUE',
                                         parameters: data.item
+                                    }
+                                }
+                            }),
+                            MenuServiceItemRenderer('Go to Channel', {
+                                clickTrackingParams: null,
+                                playlistEditEndpoint: {
+                                    customAction: {
+                                        action: 'GO_TO_CHANNEL',
+                                        parameters: data.item
+                                    }
+                                }
+                            }),
+                            MenuServiceItemRenderer('Share Video', {
+                                clickTrackingParams: null,
+                                playlistEditEndpoint: {
+                                    customAction: {
+                                        action: 'SHARE',
+                                        parameters: { videoId: data.videoId }
                                     }
                                 }
                             }),
@@ -4126,12 +4196,12 @@
     	return x && x.__esModule && Object.prototype.hasOwnProperty.call(x, 'default') ? x['default'] : x;
     }
 
-    var qrcode = {};
+    var qrcode$1 = {};
 
     var hasRequiredQrcode;
 
     function requireQrcode () {
-    	if (hasRequiredQrcode) return qrcode;
+    	if (hasRequiredQrcode) return qrcode$1;
     	hasRequiredQrcode = 1;
     	//---------------------------------------------------------------------
     	//
@@ -4150,7 +4220,7 @@
     	//
     	//---------------------------------------------------------------------
 
-    	qrcode.qrcode = function() {
+    	qrcode$1.qrcode = function() {
 
     		//---------------------------------------------------------------------
     		// qrcode
@@ -5762,10 +5832,11 @@
 
     		return qrcode;
     	}();
-    	return qrcode;
+    	return qrcode$1;
     }
 
-    requireQrcode();
+    var qrcodeExports = requireQrcode();
+    var qrcode = /*@__PURE__*/getDefaultExportFromCjs(qrcodeExports);
 
     // This is only used for more subtitles feature, as adding polyfill for Intl.DisplayNames makes the user script way too big and slow to load.
     // Taken from @formatjs/intl-displaynames/locale-data/en.js
@@ -6938,15 +7009,15 @@
         };
     }
 
-    // Main function to patch the subtitle menu
+    let subtitlePatchAttempts = 0;
+    const SUBTITLE_MAX_ATTEMPTS = 60;
+
     function patchSubtitleMenu() {
         if (isPatched) return;
 
-        const player = document.querySelector('.html5-video-player');
-        if (!player) return setTimeout(patchSubtitleMenu, 250);
-
         // Always patch if possible - settings will be checked dynamically
-        if (!window._yttv) return setTimeout(patchSubtitleMenu, 250);
+        if (!window._yttv) return;
+
         const yttvInstance = Object.values(window._yttv).find(
             (obj) =>
                 obj &&
@@ -6958,12 +7029,8 @@
             !yttvInstance ||
             yttvInstance.instance.resolveCommand.isPatchedBySubtitleLocalization
         ) {
-            if (!yttvInstance) {
-                console.error(
-                    "Fast-Tube Subtitle Localization: Could not find resolveCommand instance."
-                );
-            } else {
-                console.log("Fast-Tube Subtitle Localization: Already patched.");
+            if (yttvInstance) {
+                isPatched = true;
             }
             return;
         }
@@ -7103,15 +7170,22 @@
         };
 
         yttvInstance.instance.resolveCommand.isPatchedBySubtitleLocalization = true;
+        if (originalResolveCommand.__ftPatched) {
+            yttvInstance.instance.resolveCommand.__ftPatched = true;
+        }
         console.log("Fast-Tube Subtitle Localization: Patch successful!");
         isPatched = true;
     }
 
     // Wait for the YouTube TV app to be ready
-    const interval$3 = setInterval(() => {
+    const interval$2 = setInterval(() => {
         if (window._yttv && Object.keys(window._yttv).length > 0) {
             patchSubtitleMenu();
-            clearInterval(interval$3);
+            if (isPatched || subtitlePatchAttempts >= SUBTITLE_MAX_ATTEMPTS) {
+                clearInterval(interval$2);
+            }
+        } else if (++subtitlePatchAttempts >= SUBTITLE_MAX_ATTEMPTS) {
+            clearInterval(interval$2);
         }
     }, 1000);
 
@@ -7834,8 +7908,23 @@
                                 name: t('settings.options.uiSettings.options.clock.options.clockShowSeconds'),
                                 icon: 'TIMER',
                                 value: 'clockShowSeconds'
+                            },
+                            {
+                                name: 'Hide Clock While Video is Playing',
+                                icon: 'EYE_OFF',
+                                value: 'clockHideWhenVideoPlaying'
                             }
                         ]
+                    },
+                    {
+                        name: 'Disable Enlarged Thumbnails',
+                        value: 'disableEnlargingThumbnails',
+                        icon: null,
+                    },
+                    {
+                        name: 'Enable Shrinked Thumbnails',
+                        value: 'enableShrinkingThumbnails',
+                        icon: null,
                     }
                 ]
             },
@@ -8007,7 +8096,9 @@
                     continue;
                 }
                 const isRadioChoice = option.key !== null && option.key !== undefined;
-                const currentVal = configRead(isRadioChoice ? option.key : option.value);
+                // Items with value === null are submenu entries; reading a config
+                // key of undefined would corrupt state (ported upstream fix).
+                const currentVal = option.value === null ? undefined : configRead(isRadioChoice ? option.key : option.value);
                 buttons.push(
                     buttonItem(
                         { title: option.name, subtitle: option.subtitle },
@@ -8091,36 +8182,45 @@
         showModal(parameters.menuHeader ? parameters.menuHeader : 'Fast-Tube Settings', overlayPanelItemListRenderer(buttons, parameters.selectedIndex), parameters.menuId || 'tt-settings-options', update);
     }
 
-    const interval$2 = setInterval(() => {
-        const videoElement = document.querySelector('video');
-        if (videoElement) {
-            execute_once_dom_loaded_speed();
-            clearInterval(interval$2);
+    function applyVideoSpeed(video) {
+        if (!video) return;
+        const targetSpeed = Number(configRead('videoSpeed')) || 1;
+        if (video.playbackRate !== targetSpeed) {
+            video.playbackRate = targetSpeed;
         }
-    }, 1000);
-
-    function execute_once_dom_loaded_speed() {
-        document.querySelector('video').addEventListener('canplay', () => {
-            document.getElementsByTagName('video')[0].playbackRate = configRead('videoSpeed');    });
-
-        const eventHandler = (evt) => {
-            if (evt.keyCode == 406 || evt.keyCode == 191) {
-                evt.preventDefault();
-                evt.stopPropagation();
-                if (evt.type === 'keydown') {
-                    speedSettings();
-                    return false;
-                }
-                return true;
-            }    };
-
-        // Red, Green, Yellow, Blue
-        // 403, 404, 405, 406
-        // ---, 172, 170, 191
-        document.addEventListener('keydown', eventHandler, true);
-        document.addEventListener('keypress', eventHandler, true);
-        document.addEventListener('keyup', eventHandler, true);
     }
+
+    // Automatically enforce configured playback speed on any video element
+    document.addEventListener('canplay', (e) => {
+        if (e.target && e.target.tagName === 'VIDEO') {
+            applyVideoSpeed(e.target);
+        }
+    }, true);
+
+    document.addEventListener('play', (e) => {
+        if (e.target && e.target.tagName === 'VIDEO') {
+            applyVideoSpeed(e.target);
+        }
+    }, true);
+
+    const eventHandler = (evt) => {
+        if (evt.keyCode == 406 || evt.keyCode == 191) {
+            evt.preventDefault();
+            evt.stopPropagation();
+            if (evt.type === 'keydown') {
+                speedSettings();
+                return false;
+            }
+            return true;
+        }
+    };
+
+    // Red, Green, Yellow, Blue
+    // 403, 404, 405, 406
+    // ---, 172, 170, 191
+    document.addEventListener('keydown', eventHandler, true);
+    document.addEventListener('keypress', eventHandler, true);
+    document.addEventListener('keyup', eventHandler, true);
 
     function speedSettings() {
         const currentSpeed = configRead('videoSpeed');
@@ -8199,6 +8299,67 @@
         );
 
         showModal('Playback Speed', overlayPanelItemListRenderer(buttons, selectedIndex), 'tt-speed');
+    }
+
+    // InnerTube request helpers (ported from upstream TizenTube).
+    // These reuse the app's own KabukiInnerTubeClient, so requests are
+    // authenticated and identical to what the TV app itself sends.
+
+
+    function requestNextAndNavigateChannel(params) {
+        const mappings = Object.values(window._yttv).find(a => a && a.mappings);
+        if (!mappings) return;
+        const CurrentIdentityService = mappings.get('CurrentIdentityService');
+        const KabukiInnerTubeClient = mappings.get('KabukiInnerTubeClient');
+        if (!CurrentIdentityService || !KabukiInnerTubeClient) return;
+
+        const data = params.tileRenderer;
+        if (!data || !data.contentId) return;
+
+        // A small random delay mirrors the app's own lactMilliseconds jitter.
+        const randomDelay = Math.floor(Math.random() * 2000);
+
+        CurrentIdentityService.get().then(identity => {
+            const request = {
+                identity,
+                isPrefetch: false,
+                path: '/youtubei/v1/next',
+                payload: {
+                    videoId: data.contentId,
+                    params: data.onSelectCommand?.watchEndpoint?.params,
+                    racyCheckOk: true,
+                    contentCheckOk: true,
+                    playbackContext: {
+                        lactMilliseconds: randomDelay,
+                        isLyricsMode: false
+                    },
+                    autonavState: 'STATE_NONE',
+                    mdxContext: {
+                        mdxReceiverContext: {
+                            mdxConnectedDevices: []
+                        }
+                    }
+                },
+                clickTracking: {
+                    clickTrackingParams: null,
+                }
+            };
+
+            KabukiInnerTubeClient.fetch(request).subscribe({
+                next: (response) => {
+                    const contents = response?.contents?.singleColumnWatchNextResults?.results?.results?.contents;
+                    if (contents) {
+                        const itemSectionRenderer = contents.find(item => item.itemSectionRenderer);
+                        const videoMetadataRenderer = itemSectionRenderer?.itemSectionRenderer?.contents?.find(item => item.videoMetadataRenderer);
+                        if (videoMetadataRenderer) {
+                            const navigation = videoMetadataRenderer.videoMetadataRenderer?.owner?.videoOwnerRenderer?.navigationEndpoint;
+                            if (navigation) resolveCommand(navigation);
+                        }
+                    }
+                },
+                error: () => { }
+            });
+        }).catch(() => { });
     }
 
     // Fast-Tube Cobalt Update Checker
@@ -8316,12 +8477,19 @@
             });
     }
 
+    let cachedResolveCommandKey = null;
+
     function resolveCommand(cmd, _) {
         // resolveCommand function is pretty OP, it can do from opening modals, changing client settings and way more.
         // Because the client might change, we should find it first.
 
+        if (cachedResolveCommandKey && window._yttv?.[cachedResolveCommandKey]?.instance?.resolveCommand) {
+            return window._yttv[cachedResolveCommandKey].instance.resolveCommand(cmd, _);
+        }
+
         for (const key in window._yttv) {
             if (window._yttv[key] && window._yttv[key].instance && window._yttv[key].instance.resolveCommand) {
+                cachedResolveCommandKey = key;
                 return window._yttv[key].instance.resolveCommand(cmd, _);
             }
         }
@@ -8412,41 +8580,75 @@
                             }
                         }
 
-                        cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(2, 0,
-                            buttonItem(
-                                { title: 'Mini Player' },
-                                { icon: 'CLEAR_COOKIES' }, [
-                                {
-                                    customAction: {
-                                        action: 'ENTER_MP'
-                                    }
-                                }
-                            ])
+                        const alreadyHasMiniPlayer = items.some(item =>
+                            item?.compactLinkRenderer?.serviceEndpoint?.signalAction?.customAction?.action === 'ENTER_MP' ||
+                            item?.compactLinkRenderer?.serviceEndpoint?.commandExecutorCommand?.commands?.some(c => c?.customAction?.action === 'ENTER_MP') ||
+                            item?.compactLinkRenderer?.title?.simpleText === 'Mini Player'
                         );
-
-                        if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.HasSystemFeature && 
-                            window.h5vcc.fasttube.HasSystemFeature('android.software.picture_in_picture')) {
-                            cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(3, 0,
+                        if (!alreadyHasMiniPlayer) {
+                            items.splice(2, 0,
                                 buttonItem(
-                                    { title: 'Picture in Picture' },
-                                    { icon: 'PIP' }, [
+                                    { title: 'Mini Player' },
+                                    { icon: 'CLEAR_COOKIES' }, [
                                     {
                                         customAction: {
-                                            action: 'ENTER_PIP'
-                                        }
-                                    },
-                                    {
-                                        signalAction: {
-                                             signal: 'POPUP_BACK'
+                                            action: 'ENTER_MP'
                                         }
                                     }
                                 ])
                             );
                         }
+
+                        // Share button (QR code) - ported from upstream TizenTube
+                        const alreadyHasShare = items.some(item =>
+                            item?.compactLinkRenderer?.serviceEndpoint?.signalAction?.customAction?.action === 'SHARE' ||
+                            item?.compactLinkRenderer?.serviceEndpoint?.commandExecutorCommand?.commands?.some(c => c?.customAction?.action === 'SHARE') ||
+                            item?.compactLinkRenderer?.title?.simpleText === 'Share'
+                        );
+                        if (!alreadyHasShare) {
+                            items.splice(3, 0,
+                                buttonItem(
+                                    { title: 'Share' },
+                                    { icon: 'OPEN_IN_NEW' }, [
+                                    {
+                                        customAction: {
+                                            action: 'SHARE'
+                                        }
+                                    }
+                                ])
+                            );
+                        }
+
+                        if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.HasSystemFeature && 
+                            window.h5vcc.fasttube.HasSystemFeature('android.software.picture_in_picture')) {
+                            const alreadyHasPip = items.some(item =>
+                                item?.compactLinkRenderer?.serviceEndpoint?.signalAction?.customAction?.action === 'ENTER_PIP' ||
+                                item?.compactLinkRenderer?.serviceEndpoint?.commandExecutorCommand?.commands?.some(c => c?.customAction?.action === 'ENTER_PIP') ||
+                                item?.compactLinkRenderer?.title?.simpleText === 'Picture in Picture'
+                            );
+                            if (!alreadyHasPip) {
+                                items.splice(3, 0,
+                                    buttonItem(
+                                        { title: 'Picture in Picture' },
+                                        { icon: 'PIP' }, [
+                                        {
+                                            customAction: {
+                                                action: 'ENTER_PIP'
+                                            }
+                                        },
+                                        {
+                                            signalAction: {
+                                                 signal: 'POPUP_BACK'
+                                            }
+                                        }
+                                    ])
+                                );
+                            }
+                        }
                     } else if (cmd?.watchEndpoint?.videoId) {
                         window.isPipPlaying = false;
                         const ytlrPlayerContainer = document.querySelector('ytlr-player-container');
-                        ytlrPlayerContainer.style.removeProperty('z-index');
+                        ytlrPlayerContainer?.style?.removeProperty('z-index');
                     }
 
                     if (cmd.commandExecutorCommand && cmd.commandExecutorCommand.commands) {
@@ -8481,6 +8683,9 @@
                     return ogResolve.call(this, cmd, _);
                 };
                 wrappedResolve.__ftPatched = true;
+                if (ogResolve.isPatchedBySubtitleLocalization) {
+                    wrappedResolve.isPatchedBySubtitleLocalization = true;
+                }
                 window._yttv[key].instance.resolveCommand = wrappedResolve;
                 patched = true;
             }
@@ -8542,10 +8747,86 @@
             case 'CHECK_FOR_UPDATES':
                 checkForUpdates(true);
                 break;
+            case 'GO_TO_CHANNEL':
+                requestNextAndNavigateChannel(parameters);
+                break;
+            case 'SHARE': {
+                // QR-code video sharing (ported from upstream TizenTube)
+                try {
+                    let videoId = (typeof parameters === 'string' ? parameters : parameters?.videoId) || null;
+                    if (!videoId) {
+                        const videoPlayer = document.querySelector('.html5-video-player');
+                        const videoData = videoPlayer && typeof videoPlayer.getVideoData === 'function' ? videoPlayer.getVideoData() : null;
+                        videoId = videoData && videoData.video_id ? videoData.video_id : null;
+                    }
+                    if (!videoId) {
+                        const match = location.hash.match(/(?:[?&]v=|\/watch(?:\/|\?v=))([A-Za-z0-9_-]{11})/);
+                        if (match) videoId = match[1];
+                    }
+                    if (!videoId) {
+                        const img = document.querySelector('ytlr-watch-page img[src*="/vi/"]');
+                        if (img) {
+                            const m = (img.getAttribute('src') || '').match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+                            if (m) videoId = m[1];
+                        }
+                    }
+                    if (!videoId) break;
+                    const shareUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+                    const qr = qrcode.qrcode(6, 'H');
+                    qr.addData(shareUrl);
+                    qr.make();
+
+                    const qrDataImgTag = qr.createImgTag(8, 8);
+                    const qrDataUrl = qrDataImgTag.match(/src="([^"]+)"/)[1];
+
+                    showModal({
+                        title: 'Share Video',
+                    }, overlayPanelItemListRenderer([
+                        buttonItem({ title: 'Close' }, null, [{ signalAction: { signal: 'POPUP_BACK' } }])
+                    ]), 'ft-share-modal');
+
+                    // Render QR image and caption into modal container safely using DOM APIs (avoiding TrustedHTML restrictions)
+                    const checkModalInterval = setInterval(() => {
+                        const container = document.querySelector('ytlr-overlay-panel-item-list-renderer');
+                        if (container) {
+                            clearInterval(checkModalInterval);
+                            if (!container.querySelector('#ft-qr-wrapper')) {
+                                const wrapper = document.createElement('div');
+                                wrapper.id = 'ft-qr-wrapper';
+                                wrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; width: 100%; box-sizing: border-box;';
+
+                                const text = document.createElement('div');
+                                text.textContent = 'Scan the QR code below to share this video:';
+                                text.style.cssText = 'color: #fff; font-size: 1.8rem; margin-bottom: 20px; text-align: center; font-family: Roboto, sans-serif;';
+
+                                const img = document.createElement('img');
+                                img.src = qrDataUrl;
+                                img.style.cssText = 'background: #fff; padding: 12px; border-radius: 12px; width: 200px; height: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);';
+
+                                wrapper.appendChild(text);
+                                wrapper.appendChild(img);
+                                container.prepend(wrapper);
+                            }
+                        }
+                    }, 50);
+                    setTimeout(() => clearInterval(checkModalInterval), 2000);
+                } catch (e) {
+                    console.error('Fast-Tube: SHARE failed', e);
+                }
+                break;
+            }
         }
     }
 
     function PatchSettings(settingsObject) {
+        if (!settingsObject?.items || !Array.isArray(settingsObject.items)) return;
+        const alreadyPatched = settingsObject.items.some(
+            cat => (cat?.settingCategoryCollectionRenderer?.categoryId === 'fasttube_category') ||
+                   (cat?.settingsCategoryRenderer?.categoryId === 'fasttube_category')
+        );
+        if (alreadyPatched) return;
+
         const fasttubeOpenAction = SettingActionRenderer(
             t('settings.ttSettings.title'),
             'fasttube_open_action',
@@ -8565,7 +8846,6 @@
         );
         // Add it as the first item in the settings object
         settingsObject.items.unshift(fasttubeCategory);
-
     }
 
     /**
@@ -8580,6 +8860,7 @@
     const origParse$1 = JSON.parse;
     JSON.parse = function () {
       const r = origParse$1.apply(this, arguments);
+      if (!r || typeof r !== 'object') return r;
       try {
         const adBlockEnabled = configRead('enableAdBlock');
         const signinReminderEnabled = configRead('enableSigninReminder');
@@ -8666,9 +8947,8 @@
           );
         }
 
-        // Patch settings
-
-        if (r?.title?.runs) {
+        // Patch settings: only when r is the settings browse response
+        if (r?.items && Array.isArray(r.items) && r.items.some(cat => cat?.settingCategoryCollectionRenderer || cat?.settingsCategoryRenderer)) {
           PatchSettings(r);
         }
 
@@ -8689,6 +8969,11 @@
           r.continuationContents.horizontalListContinuation.items = hideVideo(r.continuationContents.horizontalListContinuation.items);
         }
 
+        // Long-press menus in grid-style continuations (e.g. channel video grids)
+        if (r?.continuationContents?.gridContinuation?.items) {
+          addLongPress(r.continuationContents.gridContinuation.items);
+        }
+
         if (r?.contents?.tvBrowseRenderer?.content?.tvSecondaryNavRenderer?.sections) {
           for (let i = 0; i < r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections.length; i++) {
             const section = r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections[i].tvSecondaryNavSectionRenderer;
@@ -8704,11 +8989,16 @@
 
             for (let j = 0; j < section.tabs.length; j++) {
               const tab = section.tabs[j];
-              if (tab.tabRenderer.content?.tvSurfaceContentRenderer?.content?.sectionListRenderer?.contents) {
+              const content = tab.tabRenderer.content?.tvSurfaceContentRenderer?.content;
+              if (content?.sectionListRenderer?.contents) {
                 const index = section.tabs.indexOf(tab);
-                const clone = tab.tabRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents;
+                const clone = content.sectionListRenderer.contents;
                 processShelves(clone);
                 section.tabs[index].tabRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents = clone;
+              }
+              // Long-press menus in grid-renderer tabs (e.g. channel home)
+              if (content?.gridRenderer?.items) {
+                addLongPress(content.gridRenderer.items);
               }
             }
           }
@@ -8762,10 +9052,19 @@
 
         // Manual SponsorBlock Skips
 
-        if (configRead('sponsorBlockManualSkips').length > 0 && r?.playerOverlays?.playerOverlayRenderer) {
-          const manualSkippedSegments = configRead('sponsorBlockManualSkips');
-          let timelyActions = [];
-          if (window?.sponsorblock?.segments) {
+        if (r?.playerOverlays?.playerOverlayRenderer) {
+          // Keep native timely actions, but drop the noisy shopping / NFL
+          // watermark ones (ported from upstream TizenTube).
+          if (r.playerOverlays.playerOverlayRenderer.timelyActionRenderers) {
+            r.playerOverlays.playerOverlayRenderer.timelyActionRenderers =
+              r.playerOverlays.playerOverlayRenderer.timelyActionRenderers.filter(a =>
+                a?.timelyActionRenderer?.type !== 'TIMELY_ACTION_TYPE_SHOPPING' &&
+                a?.timelyActionRenderer?.type !== 'TIMELY_ACTION_TYPE_NFL_WATERMARK');
+          } else {
+            r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = [];
+          }
+          if (configRead('sponsorBlockManualSkips').length > 0 && window?.sponsorblock?.segments) {
+            const manualSkippedSegments = configRead('sponsorBlockManualSkips');
             for (const segment of window.sponsorblock.segments) {
               if (manualSkippedSegments.includes(segment.category)) {
                 const timelyActionData = timelyAction(
@@ -8785,13 +9084,10 @@
                   segment.segment[0] * 1000,
                   segment.segment[1] * 1000 - segment.segment[0] * 1000
                 );
-                timelyActions.push(timelyActionData);
+                r.playerOverlays.playerOverlayRenderer.timelyActionRenderers.push(timelyActionData);
               }
             }
-            r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = timelyActions;
           }
-        } else if (r?.playerOverlays?.playerOverlayRenderer) {
-          r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = [];
         }
 
         if (r?.transportControls?.transportControlsRenderer && configRead('enableSponsorBlockHighlight')) {
@@ -8845,12 +9141,8 @@
 
     const origStringify = JSON.stringify;
     JSON.stringify = function (value, replacer, space) {
-      if (value?.playbackContext?.contentPlaybackContext) {
-        const copiedValue = JSON.parse(origStringify(value));
-        if (!copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
-          copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
-          return origStringify.call(this, copiedValue, replacer, space);
-        }
+      if (value?.playbackContext?.contentPlaybackContext && !value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
+        value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
       }
       return origStringify.call(this, value, replacer, space);
     };
@@ -8859,6 +9151,7 @@
 
     // Patch JSON.parse to use the custom one
     window.JSON.parse = JSON.parse;
+    JSON.parse.__ftAdblock = true; // test marker
     for (const key in window._yttv) {
       if (window._yttv[key] && window._yttv[key].JSON && window._yttv[key].JSON.parse) {
         window._yttv[key].JSON.parse = JSON.parse;
@@ -8867,8 +9160,14 @@
 
 
     function processShelves(shelves, shouldAddPreviews = true) {
-      for (const shelve of shelves) {
+      for (let s = shelves.length - 1; s >= 0; s--) {
+        const shelve = shelves[s];
         if (shelve.shelfRenderer) {
+          // Thumbnail sizing options (ported from upstream TizenTube)
+          if (!shelve.shelfRenderer.tvhtml5Style) shelve.shelfRenderer.tvhtml5Style = {};
+          if (!shelve.shelfRenderer.tvhtml5Style.effects) shelve.shelfRenderer.tvhtml5Style.effects = {};
+          if (configRead('disableEnlargingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.enlarge = false;
+          if (configRead('enableShrinkingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.shrink = true;
           if (!shelve.shelfRenderer.content?.horizontalListRenderer?.items) continue;
           deArrowify(shelve.shelfRenderer.content.horizontalListRenderer.items);
           hqify(shelve.shelfRenderer.content.horizontalListRenderer.items);
@@ -8879,7 +9178,7 @@
           shelve.shelfRenderer.content.horizontalListRenderer.items = hideVideo(shelve.shelfRenderer.content.horizontalListRenderer.items);
           if (!configRead('enableShorts')) {
             if (shelve.shelfRenderer.tvhtml5ShelfRendererType === 'TVHTML5_SHELF_RENDERER_TYPE_SHORTS') {
-              shelves.splice(shelves.indexOf(shelve), 1);
+              shelves.splice(s, 1);
               continue;
             }
             shelve.shelfRenderer.content.horizontalListRenderer.items = shelve.shelfRenderer.content.horizontalListRenderer.items.filter(item => item.tileRenderer?.tvhtml5ShelfRendererType !== 'TVHTML5_TILE_RENDERER_TYPE_SHORTS');
@@ -8914,6 +9213,32 @@
       }
     }
 
+    const deArrowCache = new Map();
+    const pendingDeArrowFetches = new Set();
+    const MAX_DEARROW_CACHE = 150;
+
+    function applyDeArrowData(item, videoID, data, isDeArrowThumbnailsEnabled) {
+      if (data.titles && data.titles.length > 0) {
+        const mostVoted = data.titles.reduce((max, title) => max.votes > title.votes ? max : title);
+        if (item.tileRenderer?.metadata?.tileMetadataRenderer?.title) {
+          item.tileRenderer.metadata.tileMetadataRenderer.title.simpleText = mostVoted.title;
+        }
+      }
+
+      if (isDeArrowThumbnailsEnabled && data.thumbnails && data.thumbnails.length > 0) {
+        const mostVotedThumbnail = data.thumbnails.reduce((max, thumbnail) => max.votes > thumbnail.votes ? max : thumbnail);
+        if (mostVotedThumbnail.timestamp && item.tileRenderer?.header?.tileHeaderRenderer?.thumbnail) {
+          item.tileRenderer.header.tileHeaderRenderer.thumbnail.thumbnails = [
+            {
+              url: `https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=${videoID}&time=${mostVotedThumbnail.timestamp}`,
+              width: 1280,
+              height: 640
+            }
+          ];
+        }
+      }
+    }
+
     function deArrowify(items) {
       const isDeArrowEnabled = configRead('enableDeArrow');
       const isDeArrowThumbnailsEnabled = configRead('enableDeArrowThumbnails');
@@ -8930,29 +9255,26 @@
         const videoID = item.tileRenderer.contentId;
         if (!videoID) continue;
 
+        if (deArrowCache.has(videoID)) {
+          applyDeArrowData(item, videoID, deArrowCache.get(videoID), isDeArrowThumbnailsEnabled);
+          continue;
+        }
+
+        if (pendingDeArrowFetches.has(videoID)) continue;
+        pendingDeArrowFetches.add(videoID);
+
         // Delay the fetch to prevent blocking the JS thread on low-end TVs
         setTimeout(() => {
             fetch(`https://sponsor.ajay.app/api/branding?videoID=${videoID}`).then(res => res.json()).then(data => {
-              if (data.titles && data.titles.length > 0) {
-                const mostVoted = data.titles.reduce((max, title) => max.votes > title.votes ? max : title);
-                if (item.tileRenderer && item.tileRenderer.metadata && item.tileRenderer.metadata.tileMetadataRenderer && item.tileRenderer.metadata.tileMetadataRenderer.title) {
-                    item.tileRenderer.metadata.tileMetadataRenderer.title.simpleText = mostVoted.title;
-                }
+              pendingDeArrowFetches.delete(videoID);
+              if (deArrowCache.size >= MAX_DEARROW_CACHE) {
+                deArrowCache.delete(deArrowCache.keys().next().value);
               }
-
-              if (isDeArrowThumbnailsEnabled && data.thumbnails && data.thumbnails.length > 0) {
-                const mostVotedThumbnail = data.thumbnails.reduce((max, thumbnail) => max.votes > thumbnail.votes ? max : thumbnail);
-                if (mostVotedThumbnail.timestamp && item.tileRenderer && item.tileRenderer.header && item.tileRenderer.header.tileHeaderRenderer && item.tileRenderer.header.tileHeaderRenderer.thumbnail) {
-                  item.tileRenderer.header.tileHeaderRenderer.thumbnail.thumbnails = [
-                    {
-                      url: `https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=${videoID}&time=${mostVotedThumbnail.timestamp}`,
-                      width: 1280,
-                      height: 640
-                    }
-                  ];
-                }
-              }
-            }).catch(() => { });
+              deArrowCache.set(videoID, data);
+              applyDeArrowData(item, videoID, data, isDeArrowThumbnailsEnabled);
+            }).catch(() => {
+              pendingDeArrowFetches.delete(videoID);
+            });
         }, 500 + Math.random() * 2000); // Stagger network requests over 2.5 seconds
       }
     }
@@ -8983,16 +9305,23 @@
         if (!item.tileRenderer) continue;
         if (item.tileRenderer.style !== 'TILE_STYLE_YTLR_DEFAULT') continue;
         if (item.tileRenderer.onLongPressCommand?.showMenuCommand?.menu?.menuRenderer?.items) {
-            const copiedItem = { ...item, tileRenderer: { ...item.tileRenderer, onLongPressCommand: undefined } };
-            item.tileRenderer.onLongPressCommand.showMenuCommand.menu.menuRenderer.items.push(MenuServiceItemRenderer('Add to Queue', {
-              clickTrackingParams: null,
-              playlistEditEndpoint: {
-                customAction: {
-                  action: 'ADD_TO_QUEUE',
-                  parameters: copiedItem
+            const menuItems = item.tileRenderer.onLongPressCommand.showMenuCommand.menu.menuRenderer.items;
+            const alreadyHasQueue = menuItems.some(i =>
+              i?.menuServiceItemRenderer?.serviceEndpoint?.playlistEditEndpoint?.customAction?.action === 'ADD_TO_QUEUE' ||
+              i?.menuServiceItemRenderer?.text?.runs?.[0]?.text === 'Add to Queue'
+            );
+            if (!alreadyHasQueue) {
+              const copiedItem = { ...item, tileRenderer: { ...item.tileRenderer, onLongPressCommand: undefined } };
+              menuItems.push(MenuServiceItemRenderer('Add to Queue', {
+                clickTrackingParams: null,
+                playlistEditEndpoint: {
+                  customAction: {
+                    action: 'ADD_TO_QUEUE',
+                    parameters: copiedItem
+                  }
                 }
-              }
-            }));
+              }));
+            }
           continue;
         }
         if (!configRead('enableLongPress')) continue;
@@ -9194,12 +9523,19 @@
       active = true;
 
       attachVideoTimeout = null;
+      buildOverlayTimeout = null;
       nextSkipTimeout = null;
       sliderInterval = null;
+      nudgeTimeout = null;
+      nudgeSecondTimeout = null;
 
       observer = null;
-      scheduleSkipHandler = null;
-      durationChangeHandler = null;
+      scheduleSkipHandler = () => {
+        this.scheduleSkip();
+      };
+      durationChangeHandler = () => {
+        this.buildOverlay();
+      };
       segments = null;
       skippableCategories = [];
       manualSkippableCategories = [];
@@ -9222,22 +9558,34 @@
           'music_offtopic',
           'poi_highlight'
         ];
-        const resp = await fetch(
-          `${sponsorblockAPI}/skipSegments/${videoHash}?categories=${encodeURIComponent(
-        JSON.stringify(categories)
-      )}`
-        );
-        const results = await resp.json();
+        let resp;
+        try {
+          resp = await fetch(
+            `${sponsorblockAPI}/skipSegments/${videoHash}?categories=${encodeURIComponent(
+          JSON.stringify(categories)
+        )}`
+          );
+        } catch (e) {
+          return;
+        }
+        if (!this.active) return;
+
+        let results;
+        try {
+          results = await resp.json();
+        } catch (e) {
+          return;
+        }
+        if (!this.active) return;
 
         const result = results.find((v) => v.videoID === this.videoID);
-        console.info(this.videoID, 'Got it:', result);
 
         if (!result || !result.segments || !result.segments.length) {
-          console.info(this.videoID, 'No segments found.');
           return;
         }
 
-        this.segments = result.segments;
+        this.segments = result.segments.slice();
+        this.segments.sort((s1, s2) => s1.segment[0] - s2.segment[0]);
         this.manualSkippableCategories = configRead('sponsorBlockManualSkips');
         this.skippableCategories = this.getSkippableCategories();
 
@@ -9247,7 +9595,8 @@
         // give it a one-shot focus nudge (ArrowDown + ArrowUp, exactly like a
         // remote user moving through the row) so zylon rebuilds it with the
         // "Skip to highlight" button in place.
-        setTimeout(() => {
+        this.nudgeTimeout = setTimeout(() => {
+          if (!this.active) return;
           try {
             const hasBtn = [...document.querySelectorAll('[aria-label]')]
               .some((el) => /skip to highlight/i.test(el.getAttribute('aria-label') || ''));
@@ -9260,20 +9609,16 @@
               document.dispatchEvent(e);
             };
             press('ArrowDown', 40);
-            setTimeout(() => press('ArrowUp', 38), 150);
+            this.nudgeSecondTimeout = setTimeout(() => {
+              if (!this.active) return;
+              press('ArrowUp', 38);
+            }, 150);
           } catch (e) { }
         }, 1500);
 
-        this.scheduleSkipHandler = () => {
-          const slider = document.querySelector('div[idomkey="slider"]');
-          const sliderRect = slider?.getBoundingClientRect();
-          const isOldUI = !document.querySelector('div[idomkey="Metadata-Section"]');
-          if (isOldUI && sliderRect) {
-            this.segmentsoverlay.style.setProperty('top', `${sliderRect.top}px`, 'important');
-          }
-          this.scheduleSkip();
-        };
-        this.durationChangeHandler = () => this.buildOverlay();
+        // PERF: never run getBoundingClientRect or DOM queries inside scheduleSkipHandler.
+        // That handler runs on every single 'timeupdate' (4-60x per sec); running reflows
+        // causes dropped frames and severe stuttering on low-end devices.
 
         this.attachVideo();
         this.buildOverlay();
@@ -9314,12 +9659,10 @@
 
         this.video = document.querySelector('video');
         if (!this.video) {
-          console.info(this.videoID, 'No video yet...');
+          // PERF: no logging here - this retries every 100ms until the player mounts.
           this.attachVideoTimeout = setTimeout(() => this.attachVideo(), 100);
           return;
         }
-
-        console.info(this.videoID, 'Video found, binding...');
 
         this.video.addEventListener('play', this.scheduleSkipHandler);
         this.video.addEventListener('pause', this.scheduleSkipHandler);
@@ -9328,19 +9671,20 @@
       }
 
       buildOverlay() {
-        if (this.segmentsoverlay) {
-          console.info('Overlay already built');
-          return;
-        }
+        if (!this.active) return;
+        if (this.segmentsoverlay) return;
 
         if (!this.video || !this.video.duration) {
-          console.info('No video duration yet');
           return;
         }
 
         const videoDuration = this.video.duration;
         const slider = document.querySelector('div[idomkey="slider"]');
-        if (!slider) return setTimeout(() => this.buildOverlay(), 100);
+        if (!slider) {
+          clearTimeout(this.buildOverlayTimeout);
+          this.buildOverlayTimeout = setTimeout(() => this.buildOverlay(), 100);
+          return;
+        }
 
         this.segmentsoverlay = document.createElement('div');
 
@@ -9350,6 +9694,10 @@
         this.segmentsoverlay.style.setProperty('width', '72rem', 'important');
         this.segmentsoverlay.style.setProperty('left', '4rem', 'important');
         const sliderRect = slider.getBoundingClientRect();
+        const isOldUI = !document.querySelector('div[idomkey="Metadata-Section"]');
+        if (isOldUI && sliderRect) {
+          this.segmentsoverlay.style.setProperty('top', `${sliderRect.top}px`, 'important');
+        }
         if (!slider.classList.contains('ytLrProgressBarSlider')) {
           for (let i = 0; i < slider.classList.length; i++) {
             this.segmentsoverlay.classList.add(slider.classList[i]);
@@ -9374,34 +9722,60 @@
           elm.style.setProperty('width', `${segment.category === 'poi_highlight' ? 1 : widthPercent}%`, 'important');
           elm.style.setProperty('left', `${leftPercent}%`, 'important');
           elm.style.setProperty('position', 'absolute', 'important');
-          console.info('Generated element', elm, 'from', segment);
           this.segmentsoverlay.appendChild(elm);
         });
 
+        // PERF: this observer lives on the progress-bar subtree, which mutates
+        // constantly during playback. The old callback ran a document-wide
+        // querySelector and two style.setProperty calls for EVERY mutation batch
+        // (forced style recalcs). Cache the progress-bar node, early-exit the
+        // removedNodes scan, and only touch the style when visibility actually
+        // flips.
+        this.overlayHidden = false;
+        this.progressBar = null;
+
         this.observer = new MutationObserver((mutations) => {
-          mutations.forEach((m) => {
-            if (m.removedNodes) {
-              for (const node of m.removedNodes) {
-                if (node === this.segmentsoverlay) {
-                  console.info('bringing back segments overlay');
-                  this.slider.appendChild(this.segmentsoverlay);
+          if (!this.active || !this.segmentsoverlay) return;
+
+          if (this.slider) {
+            for (let i = 0; i < mutations.length; i++) {
+              const removed = mutations[i].removedNodes;
+              if (!removed || !removed.length) continue;
+              for (let j = 0; j < removed.length; j++) {
+                if (removed[j] === this.segmentsoverlay) {
+                  if (this.active && this.slider) {
+                    this.slider.appendChild(this.segmentsoverlay);
+                  }
+                  break;
                 }
               }
             }
+          }
 
-            if (document.querySelector('ytlr-progress-bar').getAttribute('hybridnavfocusable') === 'false') {
-              this.segmentsoverlay.style.setProperty('display', 'none', 'important');
-            } else {
-              this.segmentsoverlay.style.setProperty('display', 'block', 'important');
-            }
-          });
+          let progressBar = this.progressBar;
+          if (!progressBar || !progressBar.isConnected) {
+            progressBar = this.progressBar = document.querySelector('ytlr-progress-bar');
+          }
+          const hidden = progressBar ? progressBar.getAttribute('hybridnavfocusable') === 'false' : false;
+          if (hidden !== this.overlayHidden) {
+            this.overlayHidden = hidden;
+            this.segmentsoverlay.style.setProperty('display', hidden ? 'none' : 'block', 'important');
+          }
         });
 
         this.sliderInterval = setInterval(() => {
+          if (!this.active) {
+            if (this.sliderInterval) {
+              clearInterval(this.sliderInterval);
+              this.sliderInterval = null;
+            }
+            return;
+          }
           this.slider = document.querySelector('ytlr-redux-connect-ytlr-progress-bar');
           if (this.slider) {
             clearInterval(this.sliderInterval);
             this.sliderInterval = null;
+            if (!this.active || !this.segmentsoverlay) return;
             this.observer.observe(this.slider, {
               childList: true,
               subtree: true
@@ -9415,58 +9789,40 @@
         clearTimeout(this.nextSkipTimeout);
         this.nextSkipTimeout = null;
 
-        if (!this.active) {
-          console.info(this.videoID, 'No longer active, ignoring...');
-          return;
-        }
-
-        if (this.video.paused) {
-          console.info(this.videoID, 'Currently paused, ignoring...');
-          return;
-        }
+        // PERF: scheduleSkip runs on every single 'timeupdate' (4-60x per second
+        // while playing). No console logging may ever happen on this path - on
+        // Cobalt each log line is a synchronous IPC round-trip.
+        if (!this.active) return;
+        if (!this.video || this.video.paused) return;
+        if (!this.segments || !this.segments.length) return;
 
         // Sometimes timeupdate event (that calls scheduleSkip) gets fired right before
         // already scheduled skip routine below. Let's just look back a little bit
         // and, in worst case, perform a skip at negative interval (immediately)...
-        const nextSegments = this.segments.filter(
-          (seg) =>
-            seg.segment[0] > this.video.currentTime - 0.3 &&
-            seg.segment[1] > this.video.currentTime - 0.3
-        );
-        nextSegments.sort((s1, s2) => s1.segment[0] - s2.segment[0]);
-
-        if (!nextSegments.length) {
-          console.info(this.videoID, 'No more segments');
-          return;
+        // PERF: segments are already sorted in init(); find next segment without
+        // allocating/sorting temporary arrays on every frame.
+        const currentTime = this.video.currentTime;
+        let segment = null;
+        for (let i = 0; i < this.segments.length; i++) {
+          const seg = this.segments[i];
+          // Match if playback is currently inside the segment OR approaching it (0.3s tolerance)
+          if (seg.segment[1] > currentTime && (seg.segment[0] <= currentTime || seg.segment[0] > currentTime - 0.3)) {
+            segment = seg;
+            break;
+          }
         }
 
-        const [segment] = nextSegments;
+        if (!segment) return;
+
         const [start, end] = segment.segment;
-        console.info(
-          this.videoID,
-          'Scheduling skip of',
-          segment,
-          'in',
-          start - this.video.currentTime
-        );
+        const delay = Math.max(0, (start - currentTime) * 1000);
 
         this.nextSkipTimeout = setTimeout(() => {
-          if (this.video.paused) {
-            console.info(this.videoID, 'Currently paused, ignoring...');
-            return;
-          }
-          if (!this.skippableCategories.includes(segment.category)) {
-            console.info(
-              this.videoID,
-              'Segment',
-              segment.category,
-              'is not skippable, ignoring...'
-            );
-            return;
-          }
+          if (!this.active) return;
+          if (!this.video || this.video.paused) return;
+          if (!this.skippableCategories.includes(segment.category)) return;
 
           const skipName = barTypes[segment.category]?.name || segment.category;
-          console.info(this.videoID, 'Skipping', segment);
           if (!this.manualSkippableCategories.includes(segment.category)) {
             const wasSkippedBefore = this.skippedCategories.get(segment.UUID);
             if (wasSkippedBefore) {
@@ -9500,12 +9856,10 @@
             } else this.video.currentTime = end;
             this.scheduleSkip();
           }
-        }, (start - this.video.currentTime) * 1000);
+        }, delay);
       }
 
       destroy() {
-        console.info(this.videoID, 'Destroying');
-
         this.active = false;
 
         if (this.nextSkipTimeout) {
@@ -9516,6 +9870,21 @@
         if (this.attachVideoTimeout) {
           clearTimeout(this.attachVideoTimeout);
           this.attachVideoTimeout = null;
+        }
+
+        if (this.buildOverlayTimeout) {
+          clearTimeout(this.buildOverlayTimeout);
+          this.buildOverlayTimeout = null;
+        }
+
+        if (this.nudgeTimeout) {
+          clearTimeout(this.nudgeTimeout);
+          this.nudgeTimeout = null;
+        }
+
+        if (this.nudgeSecondTimeout) {
+          clearTimeout(this.nudgeSecondTimeout);
+          this.nudgeSecondTimeout = null;
         }
 
         if (this.sliderInterval) {
@@ -9532,6 +9901,9 @@
           this.segmentsoverlay.remove();
           this.segmentsoverlay = null;
         }
+        this.progressBar = null;
+        this.slider = null;
+        this.overlayHidden = false;
 
         if (this.video) {
           this.video.removeEventListener('play', this.scheduleSkipHandler);
@@ -9541,6 +9913,7 @@
             'durationchange',
             this.durationChangeHandler
           );
+          this.video = null;
         }
 
         this.skippedCategories.clear();
@@ -9575,8 +9948,13 @@
       return null;
     }
 
+    // Because the app can switch routes without firing hashchange (replaceState)
+    // and the player state appears slightly after the route, a lightweight
+    // watchdog keeps the handler in sync with the actually-playing video.
+    //
     function sbEnsureHandler() {
-      const onWatchRoute = location.hash.indexOf('#/watch') === 0;
+      const hash = location.hash;
+      const onWatchRoute = hash.indexOf('#/watch') === 0;
       const videoID = onWatchRoute ? sbExtractVideoID() : null;
 
       if (!videoID) {
@@ -9593,6 +9971,7 @@
         return;
       }
 
+      // Fast path: already bound to the currently playing video.
       if (window.sponsorblock && window.sponsorblock.videoID === videoID) return;
 
       if (window.sponsorblock) {
@@ -9605,20 +9984,25 @@
       }
 
       if (configRead('enableSponsorBlock')) {
-        console.info('SponsorBlock: binding to video', videoID);
         window.sponsorblock = new SponsorBlockHandler(videoID);
         window.sponsorblock.init();
-      } else {
-        console.info('SponsorBlock disabled, not loading');
       }
     }
 
     window.addEventListener('hashchange', sbEnsureHandler, false);
-
-    // Because the app can switch routes without firing hashchange (replaceState)
-    // and the player state appears slightly after the route, a lightweight
-    // watchdog keeps the handler in sync with the actually-playing video.
-    setInterval(sbEnsureHandler, 1000);
+    sbEnsureHandler();
+    let sbWatchdogInterval = setInterval(sbEnsureHandler, 1000);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) {
+        if (sbWatchdogInterval) {
+          clearInterval(sbWatchdogInterval);
+          sbWatchdogInterval = null;
+        }
+      } else if (!sbWatchdogInterval) {
+        sbWatchdogInterval = setInterval(sbEnsureHandler, 1000);
+        sbEnsureHandler();
+      }
+    });
 
     //
     // https://raw.githubusercontent.com/WICG/spatial-navigation/183f0146b6741007e46fa64ab0950447defdf8af/polyfill/spatial-navigation-polyfill.js
@@ -9668,31 +10052,48 @@
          * Reference: https://drafts.css-houdini.org/css-properties-values-api/#the-registerproperty-function
          */
         if (window.CSS && CSS.registerProperty) {
-          if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-contain') === '') {
-            CSS.registerProperty({
-              name: '--spatial-navigation-contain',
-              syntax: 'auto | contain',
-              inherits: false,
-              initialValue: 'auto'
-            });
-          }
+          // NOTE: document.documentElement is still null when this polyfill is
+          // injected at document_start (userscript-manager / standalone path).
+          // Calling getComputedStyle(null) used to throw and abort the entire
+          // userscript bundle. Defer registration until an <html> element exists.
+          const registerSpatialNavProperties = () => {
+            if (!document.documentElement) return false;
 
-          if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-action') === '') {
-            CSS.registerProperty({
-              name: '--spatial-navigation-action',
-              syntax: 'auto | focus | scroll',
-              inherits: false,
-              initialValue: 'auto'
-            });
-          }
+            if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-contain') === '') {
+              CSS.registerProperty({
+                name: '--spatial-navigation-contain',
+                syntax: 'auto | contain',
+                inherits: false,
+                initialValue: 'auto'
+              });
+            }
 
-          if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-function') === '') {
-            CSS.registerProperty({
-              name: '--spatial-navigation-function',
-              syntax: 'normal | grid',
-              inherits: false,
-              initialValue: 'normal'
-            });
+            if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-action') === '') {
+              CSS.registerProperty({
+                name: '--spatial-navigation-action',
+                syntax: 'auto | focus | scroll',
+                inherits: false,
+                initialValue: 'auto'
+              });
+            }
+
+            if (window.getComputedStyle(document.documentElement).getPropertyValue('--spatial-navigation-function') === '') {
+              CSS.registerProperty({
+                name: '--spatial-navigation-function',
+                syntax: 'normal | grid',
+                inherits: false,
+                initialValue: 'normal'
+              });
+            }
+            return true;
+          };
+
+          if (!registerSpatialNavProperties()) {
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', registerSpatialNavProperties, { once: true });
+            } else {
+              setTimeout(registerSpatialNavProperties, 0);
+            }
           }
         }
       }
@@ -11377,13 +11778,12 @@
       });
     })();
 
-    var css$1 = ".ytaf-ui-container {\n  position: absolute;\n  top: 10%;\n  left: 10%;\n  right: 10%;\n  bottom: 10%;\n\n  background: rgba(0, 0, 0, 0.8);\n  color: white;\n  border-radius: 20px;\n  padding: 20px;\n  font-size: 1.5rem;\n  z-index: 1000;\n}\n\n.ytaf-ui-container :focus {\n  outline: 4px red solid;\n}\n\n.ytaf-ui-container h1 {\n  margin: 0;\n  margin-bottom: 0.5em;\n  text-align: center;\n}\n\n.ytaf-ui-container input[type='checkbox'] {\n  width: 1.4rem;\n  height: 1.4rem;\n}\n\n.ytaf-ui-container input[type='radio'] {\n  width: 1.4rem;\n  height: 1.4rem;\n}\n\n.ytaf-ui-container label {\n  display: block;\n  font-size: 1.4rem;\n}\n\n.ytaf-notification-container {\n  position: absolute;\n  right: 10px;\n  bottom: 10px;\n  font-size: 16pt;\n  z-index: 1200;\n}\n\n.ytaf-notification-container .message {\n  background: rgba(0, 0, 0, 0.7);\n  color: white;\n  padding: 1em;\n  margin: 0.5em;\n  transition: all 0.3s ease-in-out;\n  opacity: 1;\n  line-height: 1;\n  border-right: 10px solid rgba(50, 255, 50, 0.3);\n  display: inline-block;\n  float: right;\n}\n\n.ytaf-notification-container .message-hidden {\n  opacity: 0;\n  margin: 0 0.5em;\n  padding: 0 1em;\n  line-height: 0;\n}\n\n/* Fixes transparency effect for the video player */\n\n.ytLrWatchDefaultShadow,\ndiv[idomkey=\"shadow\"] {\n  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0.8) 90%) !important;\n  background-color: rgba(0, 0, 0, 0.3) !important;\n  display: block !important;\n  height: 100% !important;\n  pointer-events: none !important;\n  position: absolute !important;\n  width: 100% !important;\n}\n\n/* https://github.com/webosbrew/youtube-webos/commit/4fbe38a18df31ddd62b6cf15f141dd58e1d1a71d */\n.ytLrWatchDefault2025Shadow {\n  background-color: rgba(11, 11, 11, 0.5) !important;\n}\n\n/* Fixes shorts having a black background */\n\n.ytLrTileHeaderRendererShorts {\n  background-image: none !important;\n}\n\n/* Multiline support for strings in the UI */\n\n.ytLrOverlayPanelHeaderRendererSubtitle {\n  white-space: pre-wrap !important;\n}\n\n/* Fixes SponsorBlock segments overlapping with the playhead */\n\n.ytLrProgressBarPlayhead {\n  z-index: 1 !important;\n}\n\n.ytLrProgressBarPlayed {\n  z-index: 1 !important;\n}\n\n.ytLrSearchBarSearchVoice {\n    display: block;\n    position: absolute;\n    left: 0;\n    top: 0;\n    pointer-events: auto\n}\n\n.ytLrSearchVoiceHost {\n    font-size: 3rem;\n}\n\n.ytLrSearchVoiceMicButtonHost {\n    color: rgba(255, 255, 255, 0.7);\n}\n\n.ytLrSearchVoiceMicButtonHost {\n    background-color: rgba(255, 255, 255, 0.1);\n    border-radius: 50%;\n    color: #f1f1f1;\n    display: block;\n    text-align: center;\n    width: 1em;\n    height: 1em;\n}\n\n.ytLrSearchVoiceMicButtonIcon {\n    display: inline-block;\n    font-size: .5em;\n    height: .5em;\n    width: .5em;\n    height: 1em;\n    width: 1em;\n    margin-top: .5em;\n    vertical-align: top !important;\n}\n\n.ytContribIconHost {\n    display: inline-block;\n    vertical-align: middle;\n}\n\n.ytContribIconTvArrowLeft::before {\n    content: \"\\e822\";\n}\n\n.ytContribIconHost::before {\n    font-family: \"YouTube Icons Outlined\";\n}";
+    var css = ".ytaf-ui-container {\n  position: absolute;\n  top: 10%;\n  left: 10%;\n  right: 10%;\n  bottom: 10%;\n\n  background: rgba(0, 0, 0, 0.8);\n  color: white;\n  border-radius: 20px;\n  padding: 20px;\n  font-size: 1.5rem;\n  z-index: 1000;\n}\n\n.ytaf-ui-container :focus {\n  outline: 4px red solid;\n}\n\n.ytaf-ui-container h1 {\n  margin: 0;\n  margin-bottom: 0.5em;\n  text-align: center;\n}\n\n.ytaf-ui-container input[type='checkbox'] {\n  width: 1.4rem;\n  height: 1.4rem;\n}\n\n.ytaf-ui-container input[type='radio'] {\n  width: 1.4rem;\n  height: 1.4rem;\n}\n\n.ytaf-ui-container label {\n  display: block;\n  font-size: 1.4rem;\n}\n\n.ytaf-notification-container {\n  position: absolute;\n  right: 10px;\n  bottom: 10px;\n  font-size: 16pt;\n  z-index: 1200;\n}\n\n.ytaf-notification-container .message {\n  background: rgba(0, 0, 0, 0.7);\n  color: white;\n  padding: 1em;\n  margin: 0.5em;\n  transition: all 0.3s ease-in-out;\n  opacity: 1;\n  line-height: 1;\n  border-right: 10px solid rgba(50, 255, 50, 0.3);\n  display: inline-block;\n  float: right;\n}\n\n.ytaf-notification-container .message-hidden {\n  opacity: 0;\n  margin: 0 0.5em;\n  padding: 0 1em;\n  line-height: 0;\n}\n\n/* Fixes transparency effect for the video player */\n\n.ytLrWatchDefaultShadow,\ndiv[idomkey=\"shadow\"] {\n  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0.8) 90%) !important;\n  background-color: rgba(0, 0, 0, 0.3) !important;\n  display: block !important;\n  height: 100% !important;\n  pointer-events: none !important;\n  position: absolute !important;\n  width: 100% !important;\n}\n\n/* https://github.com/webosbrew/youtube-webos/commit/4fbe38a18df31ddd62b6cf15f141dd58e1d1a71d */\n.ytLrWatchDefault2025Shadow {\n  background-color: rgba(11, 11, 11, 0.5) !important;\n}\n\n/* Fixes shorts having a black background */\n\n.ytLrTileHeaderRendererShorts {\n  background-image: none !important;\n}\n\n/* Multiline support for strings in the UI */\n\n.ytLrOverlayPanelHeaderRendererSubtitle {\n  white-space: pre-wrap !important;\n}\n\n/* Fixes SponsorBlock segments overlapping with the playhead */\n\n.ytLrProgressBarPlayhead {\n  z-index: 1 !important;\n}\n\n.ytLrProgressBarPlayed {\n  z-index: 1 !important;\n}\n\n.ytLrSearchBarSearchVoice {\n    display: block;\n    position: absolute;\n    left: 0;\n    top: 0;\n    pointer-events: auto\n}\n\n.ytLrSearchVoiceHost {\n    font-size: 3rem;\n}\n\n.ytLrSearchVoiceMicButtonHost {\n    color: rgba(255, 255, 255, 0.7);\n}\n\n.ytLrSearchVoiceMicButtonHost {\n    background-color: rgba(255, 255, 255, 0.1);\n    border-radius: 50%;\n    color: #f1f1f1;\n    display: block;\n    text-align: center;\n    width: 1em;\n    height: 1em;\n}\n\n.ytLrSearchVoiceMicButtonIcon {\n    display: inline-block;\n    font-size: .5em;\n    height: .5em;\n    width: .5em;\n    height: 1em;\n    width: 1em;\n    margin-top: .5em;\n    vertical-align: top !important;\n}\n\n.ytContribIconHost {\n    display: inline-block;\n    vertical-align: middle;\n}\n\n.ytContribIconTvArrowLeft::before {\n    content: \"\\e822\";\n}\n\n.ytContribIconHost::before {\n    font-family: \"YouTube Icons Outlined\";\n}";
 
-    const style = document.createElement('style');
-    let css = '';
+    let style = null;
 
     function updateStyle() {
-        css = `
+        const css = `
     ytlr-guide-response yt-focus-container {
         background-color: ${configRead('focusContainerColor')};
     }
@@ -11392,24 +11792,29 @@
         background-color: ${configRead('routeColor')} !important;
     }
 `;
-        const existingStyle = document.querySelector('style[nonce]');
-        if (existingStyle) {
-            existingStyle.textContent += css;
-        } else {
+        if (!style) {
+            style = document.getElementById('fasttube-theme');
+        }
+        if (style) {
             style.textContent = css;
         }
     }
-    // document.head is null when the userscript is injected at document_start
-    // (the userscript-manager path). Mount the style once a head exists instead
-    // of throwing at import time and aborting the whole bundle.
+
     function mountStyle() {
-        if (!document.head) {
+        const head = document.head || document.documentElement;
+        if (!head) {
             setTimeout(mountStyle, 200);
             return;
         }
-        document.head.appendChild(style);
+        style = document.getElementById('fasttube-theme');
+        if (!style) {
+            style = document.createElement('style');
+            style.id = 'fasttube-theme';
+            head.appendChild(style);
+        }
         updateStyle();
     }
+
     mountStyle();
 
     function getCommandExecutor() {
@@ -11464,48 +11869,77 @@
 
     // It just works, okay?
     let uiInitialized = false;
+    let uiPollAttempts = 0;
+    const UI_POLL_MAX_ATTEMPTS = 120;
     const interval$1 = setInterval(() => {
-      const videoElement = document.querySelector('video');
-      if (videoElement) {
+      if (!uiInitialized && (document.body || document.querySelector('video'))) {
+        execute_once_dom_loaded();
+        uiInitialized = true;
+      }
+      if (patchResolveCommand()) {
+        clearInterval(interval$1);
+      } else if (++uiPollAttempts >= UI_POLL_MAX_ATTEMPTS) {
+        clearInterval(interval$1);
+      }
+    }, 500);
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => {
         if (!uiInitialized) {
           execute_once_dom_loaded();
           uiInitialized = true;
         }
-        // Some app command resolvers (e.g. the _.RC.instance singleton) are
-        // constructed asynchronously during app boot, possibly AFTER the <video>
-        // element appears. Keep polling until at least one resolver instance has
-        // been wrapped so Fast-Tube customActions (SKIP to highlight, queue
-        // actions, speed settings, ...) are never silently dropped.
-        if (patchResolveCommand()) {
-          clearInterval(interval$1);
-        }
+      }, { once: true });
+    } else {
+      if (!uiInitialized) {
+        execute_once_dom_loaded();
+        uiInitialized = true;
       }
-    }, 250);
+    }
 
     let keyTimeout = null;
 
+    // Number keys 0-9 jump to 0%-90% of the current video (ported from upstream
+    // TizenTube). Guarded so it never hijacks digits typed into text inputs
+    // (e.g. the theme color fields) and never fires for non-keydown repeats.
+    const NUMBER_KEY_PERCENT = {
+      48: 0, 49: 1, 50: 2, 51: 3, 52: 4, 53: 5, 54: 6, 55: 7, 56: 8, 57: 9,
+      96: 0, 97: 1, 98: 2, 99: 3, 100: 4, 101: 5, 102: 6, 103: 7, 104: 8, 105: 9
+    };
+
     function execute_once_dom_loaded() {
 
-      // Add CSS to head.
-
-      const existingStyle = document.querySelector('style[nonce]');
-      if (existingStyle) {
-        existingStyle.textContent += css$1;
-      } else {
-        const style = document.createElement('style');
-        style.textContent = css$1;
-        document.head.appendChild(style);
+      // Add CSS to head via dedicated style element to avoid mutating existingStyle.
+      const styleId = 'fasttube-ui-css';
+      let style = document.getElementById(styleId);
+      if (!style) {
+        style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = css;
+        (document.head || document.documentElement).appendChild(style);
       }
 
-      // Fix UI issues.
+      // Long-press (hold OK) support for custom video tile menus.
+      try {
+        if (window.tectonicConfig?.featureSwitches) {
+          window.tectonicConfig.featureSwitches.supportsLongPress = true;
+        }
+      } catch (e) { }
+
+      // Fix UI animations if enabled. PERF: do NOT force isLimitedMemory = false;
+      // on low-end devices, that disables YouTube TV's memory cache eviction,
+      // leaking textures and DOM nodes until the system runs out of RAM.
       const ui = configRead('enableFixedUI');
       if (ui) {
         try {
-          window.tectonicConfig.featureSwitches.isLimitedMemory = false;
-          window.tectonicConfig.clientData.legacyApplicationQuality = 'full-animation';
-          window.tectonicConfig.featureSwitches.enableAnimations = true;
-          window.tectonicConfig.featureSwitches.enableOnScrollLinearAnimation = true;
-          window.tectonicConfig.featureSwitches.enableListAnimations = true;
+          if (window.tectonicConfig?.clientData) {
+            window.tectonicConfig.clientData.legacyApplicationQuality = 'full-animation';
+          }
+          if (window.tectonicConfig?.featureSwitches) {
+            window.tectonicConfig.featureSwitches.enableAnimations = true;
+            window.tectonicConfig.featureSwitches.enableOnScrollLinearAnimation = true;
+            window.tectonicConfig.featureSwitches.enableListAnimations = true;
+          }
         } catch (e) { }
       }
 
@@ -11518,27 +11952,17 @@
       uiContainer.classList.add('ytaf-ui-container');
       uiContainer.style['display'] = 'none';
       uiContainer.setAttribute('tabindex', 0);
-      uiContainer.addEventListener(
-        'focus',
-        () => console.info('uiContainer focused!'),
-        true
-      );
-      uiContainer.addEventListener(
-        'blur',
-        () => console.info('uiContainer blured!'),
-        true
-      );
-
+      // PERF: no console logging on focus/blur/keydown - these fire on every
+      // remote keypress while the settings UI is open and each log is a
+      // synchronous IPC round-trip on Cobalt.
       uiContainer.addEventListener(
         'keydown',
         (evt) => {
-          console.info('uiContainer key event:', evt.type, evt.keyCode, evt);
           if (evt.keyCode !== 404 && evt.keyCode !== 172) {
             if (evt.keyCode in ARROW_KEY_CODE) {
               navigate(ARROW_KEY_CODE[evt.keyCode]);
             } else if (evt.keyCode === 13 || evt.keyCode === 32) {
               // "OK" button
-              console.log('OK button pressed');
               const focusedElement = document.querySelector(':focus');
               if (focusedElement.type === 'checkbox') {
                 focusedElement.checked = !focusedElement.checked;
@@ -11592,7 +12016,26 @@
 
       var eventHandler = (evt) => {
         // We handle key events ourselves.
-        // console.info('Key event:', evt.type, evt.keyCode); // Removed for performance
+        if (evt.type === 'keydown' && evt.keyCode in NUMBER_KEY_PERCENT) {
+          const active = document.activeElement;
+          const isEditable = active && (
+            active.tagName === 'INPUT' ||
+            active.tagName === 'TEXTAREA' ||
+            active.isContentEditable ||
+            active.getAttribute('role') === 'textbox' ||
+            Boolean(active.closest('ytlr-search-box, ytlr-search-bar, [role="textbox"], input, textarea'))
+          );
+          if (!isEditable && location.hash.includes('watch')) {
+            const video = document.querySelector('video');
+            if (video && !isNaN(video.duration) && video.duration > 0) {
+              evt.preventDefault();
+              evt.stopPropagation();
+              video.currentTime = (NUMBER_KEY_PERCENT[evt.keyCode] / 10) * video.duration;
+              return;
+            }
+          }
+        }
+
         if (configRead('enableScreenDimming')) {
           if (keyTimeout) {
             clearTimeout(keyTimeout);
@@ -11605,15 +12048,13 @@
             if (playerStateObject && playerStateObject.isPlaying) return;
             if (container) container.style.setProperty('opacity', (1 - configRead('dimmingOpacity')).toString(), 'important');
           }, configRead('dimmingTimeout') * 1000);
-        } else {
-          if (keyTimeout) {
-            clearTimeout(keyTimeout);
-            keyTimeout = null;
-          }
+        } else if (keyTimeout) {
+          clearTimeout(keyTimeout);
+          keyTimeout = null;
           const container = document.getElementById('container');
           if (container) container.style.setProperty('opacity', '1', 'important');
         }
-        if (evt.keyCode == 404) {
+        if (evt.keyCode == 404 || evt.keyCode == 172) {
           if (evt.type === 'keydown') {
             modernUI();
           }
@@ -11704,38 +12145,54 @@
     let interval;
 
     function disableWhosWatching(value) {
-        const LeanbackRecurringActions = JSON.parse(localStorage['yt.leanback.default::recurring_actions']);
+        // NOTE: this module runs at userscript evaluation time. On a fresh
+        // install (or the userscript-manager injection path) the app has not
+        // written 'yt.leanback.default::recurring_actions' yet - an unguarded
+        // JSON.parse here used to throw and abort the ENTIRE userscript bundle.
+        let LeanbackRecurringActions = null;
+        try {
+            LeanbackRecurringActions = JSON.parse(localStorage['yt.leanback.default::recurring_actions'] || 'null');
+        } catch (e) {
+            return;
+        }
+        const recurringData = LeanbackRecurringActions && LeanbackRecurringActions.data && LeanbackRecurringActions.data.data;
+        if (!recurringData || !recurringData.whos_watching_fullscreen_zero_accounts) return;
+
         const shouldPermanentlyEnable = configRead('permanentlyEnableWhoIsWatchingMenu');
         const date = new Date();
         if (!value) {
             // Setting it after 7 days should be enough, as it'll get executed every time the app launches.
             date.setDate(date.getDate() + 7);
-            LeanbackRecurringActions.data.data["startup-screen-account-selector-with-guest"] && 
-                (LeanbackRecurringActions.data.data["startup-screen-account-selector-with-guest"].lastFired = date.getTime());
-            LeanbackRecurringActions.data.data.whos_watching_fullscreen_zero_accounts.lastFired = date.getTime();
-            LeanbackRecurringActions.data.data["startup-screen-signed-out-welcome-back"] && 
-                (LeanbackRecurringActions.data.data["startup-screen-signed-out-welcome-back"].lastFired = date.getTime());
+            recurringData["startup-screen-account-selector-with-guest"] &&
+                (recurringData["startup-screen-account-selector-with-guest"].lastFired = date.getTime());
+            recurringData.whos_watching_fullscreen_zero_accounts.lastFired = date.getTime();
+            recurringData["startup-screen-signed-out-welcome-back"] &&
+                (recurringData["startup-screen-signed-out-welcome-back"].lastFired = date.getTime());
             localStorage['yt.leanback.default::recurring_actions'] = JSON.stringify(LeanbackRecurringActions);
         } else {
             // Do nothing if the last fired action is less than 2 hours ago.
-            if (date.getTime() - LeanbackRecurringActions.data.data["startup-screen-account-selector-with-guest"]?.lastFired > 0 && date.getTime() - LeanbackRecurringActions.data.data["startup-screen-account-selector-with-guest"]?.lastFired < 2 * 60 * 60 * 1000
+            if (date.getTime() - recurringData["startup-screen-account-selector-with-guest"]?.lastFired > 0 && date.getTime() - recurringData["startup-screen-account-selector-with-guest"]?.lastFired < 2 * 60 * 60 * 1000
             && !shouldPermanentlyEnable) {
                 return;
             }
             function setActions() {
-                LeanbackRecurringActions.data.data["startup-screen-account-selector-with-guest"] && 
-                    (LeanbackRecurringActions.data.data["startup-screen-account-selector-with-guest"].lastFired = date.getTime());
-                LeanbackRecurringActions.data.data.whos_watching_fullscreen_zero_accounts.lastFired = date.getTime();
-                LeanbackRecurringActions.data.data["startup-screen-signed-out-welcome-back"] &&
-                    (LeanbackRecurringActions.data.data["startup-screen-signed-out-welcome-back"].lastFired = date.getTime());
+                recurringData["startup-screen-account-selector-with-guest"] &&
+                    (recurringData["startup-screen-account-selector-with-guest"].lastFired = date.getTime());
+                recurringData.whos_watching_fullscreen_zero_accounts.lastFired = date.getTime();
+                recurringData["startup-screen-signed-out-welcome-back"] &&
+                    (recurringData["startup-screen-signed-out-welcome-back"].lastFired = date.getTime());
                 localStorage['yt.leanback.default::recurring_actions'] = JSON.stringify(LeanbackRecurringActions);
             }
             setActions();
             if (shouldPermanentlyEnable) {
                 date.setDate(date.getDate() - 7);
                 setActions();
+                if (interval) clearInterval(interval);
                 interval = setInterval(setActions, 60 * 1000);
-            } else if (interval) clearInterval(interval);
+            } else if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
         }
     }
 
@@ -11759,26 +12216,48 @@
         #attachTimeout = null;
         #lastVideoId = null;
         #hasAppliedQuality = false;
+        #pollAttempts = 0;
+        #maxPollAttempts = 20;
 
         constructor() {
             this.init();
         }
 
         init() {
-            this.#pollForPlayer();
             this.#setupConfigListener();
+            this.#setupRouteListener();
+            this.#pollForPlayer();
+        }
+
+        #setupRouteListener() {
+            window.addEventListener('hashchange', () => {
+                if (location.hash.includes('watch')) {
+                    this.#pollAttempts = 0;
+                    this.#pollForPlayer();
+                }
+            });
         }
 
         #pollForPlayer() {
             clearTimeout(this.#attachTimeout);
 
-            const playerElement = document.querySelector(SELECTORS.PLAYER);
-
-            if (!playerElement) {
-                this.#attachTimeout = setTimeout(() => this.#pollForPlayer(), 100);
+            const preferredQuality = configRead(CONFIG_KEYS.QUALITY);
+            if (!preferredQuality || preferredQuality === 'auto') {
+                this.#pollAttempts = 0;
                 return;
             }
 
+            const playerElement = document.querySelector(SELECTORS.PLAYER);
+
+            if (!playerElement) {
+                if (++this.#pollAttempts < this.#maxPollAttempts) {
+                    this.#attachTimeout = setTimeout(() => this.#pollForPlayer(), 500);
+                }
+                return;
+            }
+
+            this.#pollAttempts = 0;
+            if (this.#player === playerElement) return;
             this.#player = playerElement;
 
             this.#player.addEventListener(EVENTS.YT_STATE_CHANGE, this.#handleStateChange);
@@ -11789,12 +12268,19 @@
         #setupConfigListener() {
             configChangeEmitter.addEventListener(EVENTS.CONFIG_CHANGE, (ev) => {
                 if (ev.detail?.key === CONFIG_KEYS.QUALITY) {
+                    if (ev.detail?.value !== 'auto') {
+                        this.#pollAttempts = 0;
+                        this.#pollForPlayer();
+                    }
                     this.#applyQuality();
                 }
             });
         }
 
         #handleStateChange = () => {
+            const preferredQuality = configRead(CONFIG_KEYS.QUALITY);
+            if (!preferredQuality || preferredQuality === 'auto' || !this.#player) return;
+
             const state = this.#player?.getPlayerStateObject?.();
             const videoData = this.#player?.getVideoData?.();
             const videoId = videoData?.video_id;
@@ -11804,7 +12290,8 @@
                 this.#hasAppliedQuality = false;
             }
 
-            const isShorts = Object.values(this.#player.getVideoStats()).find(a => a && a === 'shortspage');
+            const stats = this.#player?.getVideoStats ? this.#player.getVideoStats() : {};
+            const isShorts = Object.values(stats).some(a => a === 'shortspage');
             if (state?.isPlaying && !this.#hasAppliedQuality && !isShorts) {
                 this.#applyQuality();
                 this.#hasAppliedQuality = true;
@@ -11846,16 +12333,31 @@
         lastVideoId: null
     };
 
+    let attachedQueuePlayer = null;
+    let queuePollAttempts = 0;
+    const QUEUE_MAX_ATTEMPTS = 30;
+
     function addListener() {
         const videoPlayer = document.querySelector('.html5-video-player');
-        if (!videoPlayer) return setTimeout(addListener, 250);
+        if (!videoPlayer) {
+            if (++queuePollAttempts < QUEUE_MAX_ATTEMPTS) {
+                setTimeout(addListener, 1000);
+            }
+            return;
+        }
+
+        if (attachedQueuePlayer === videoPlayer && attachedQueuePlayer.isConnected) return;
+        attachedQueuePlayer = videoPlayer;
 
         videoPlayer.addEventListener('onStateChange', () => {
-            const playerStateObject = videoPlayer.getPlayerStateObject();
-            const videoData = videoPlayer.getVideoData();
-            if (window.queuedVideos.videos.length === 0) return;
+            const playerStateObject = videoPlayer.getPlayerStateObject ? videoPlayer.getPlayerStateObject() : null;
+            const videoData = videoPlayer.getVideoData ? videoPlayer.getVideoData() : null;
+            if (!playerStateObject || !videoData || window.queuedVideos.videos.length === 0) return;
+
+            const getVideoId = (v) => v?.tileRenderer?.contentId || v?.contentId || v?.videoId;
+
             if (playerStateObject.isEnded) {
-                const index = window.queuedVideos.videos.findIndex(v => v.tileRenderer.contentId === videoData.video_id);
+                const index = window.queuedVideos.videos.findIndex(v => getVideoId(v) === videoData.video_id);
                 if (index !== -1) {
                     if (index + 1 >= window.queuedVideos.videos.length) {
                         resolveCommand({
@@ -11865,13 +12367,15 @@
                         });
                         return;
                     }
-                    const videoWatchEndpoint = window.queuedVideos.videos[index + 1].tileRenderer.onSelectCommand;
-                    setTimeout(() => resolveCommand(videoWatchEndpoint), 500);
+                    const nextItem = window.queuedVideos.videos[index + 1];
+                    const videoWatchEndpoint = nextItem?.tileRenderer?.onSelectCommand || nextItem?.onSelectCommand;
+                    if (videoWatchEndpoint) setTimeout(() => resolveCommand(videoWatchEndpoint), 500);
                 } else if (window.queuedVideos.lastVideoId) {
-                    const lastIndex = window.queuedVideos.videos.findIndex(v => v.tileRenderer.contentId === window.queuedVideos.lastVideoId);
+                    const lastIndex = window.queuedVideos.videos.findIndex(v => getVideoId(v) === window.queuedVideos.lastVideoId);
                     if (lastIndex !== -1 && lastIndex + 1 < window.queuedVideos.videos.length) {
-                        const videoWatchEndpoint = window.queuedVideos.videos[lastIndex + 1].tileRenderer.onSelectCommand;
-                        setTimeout(() => resolveCommand(videoWatchEndpoint), 500);
+                        const nextItem = window.queuedVideos.videos[lastIndex + 1];
+                        const videoWatchEndpoint = nextItem?.tileRenderer?.onSelectCommand || nextItem?.onSelectCommand;
+                        if (videoWatchEndpoint) setTimeout(() => resolveCommand(videoWatchEndpoint), 500);
                     } else {
                         resolveCommand({
                             customAction: {
@@ -11881,33 +12385,62 @@
                         return;
                     }
                 } else {
-                    const videoWatchEndpoint = window.queuedVideos.videos[0].tileRenderer.onSelectCommand;
-                    setTimeout(() => resolveCommand(videoWatchEndpoint), 500);
+                    const firstItem = window.queuedVideos.videos[0];
+                    const videoWatchEndpoint = firstItem?.tileRenderer?.onSelectCommand || firstItem?.onSelectCommand;
+                    if (videoWatchEndpoint) setTimeout(() => resolveCommand(videoWatchEndpoint), 500);
                 }
             } else if (playerStateObject.isPlaying) {
-                document.getElementById('container').style.setProperty('opacity', '1', 'important');
-                if (window.queuedVideos.videos.find(v => v.contentId === videoData.video_id)) {
+                const container = document.getElementById('container');
+                if (container) container.style.setProperty('opacity', '1', 'important');
+                if (window.queuedVideos.videos.find(v => getVideoId(v) === videoData.video_id)) {
                     window.queuedVideos.lastVideoId = videoData.video_id;
                 }
             }
         });
     }
 
+    window.addEventListener('hashchange', () => {
+        if (location.hash.includes('watch')) {
+            queuePollAttempts = 0;
+            addListener();
+        }
+    });
+
     addListener();
 
     // Enable features that aren't enabled by default due to YT seeing the TV as a low-end device
 
     configChangeEmitter.addEventListener('configChange', (event) => {
-        enableFeatures();
+        if (event.detail?.key === 'enablePreviews') {
+            enableFeatures();
+        }
     });
 
+    // PERF: cap the boot polling so a missing window._yttv (e.g. on non-YouTube
+    // error pages) can never leave a 250ms retry loop running forever.
+    const ENABLE_FEATURES_MAX_ATTEMPTS = 120; // ~30s at 250ms
+    let enableFeaturesAttempts = 0;
+    let cachedPreviewMap = null;
 
     function enableFeatures() {
-        if (!window._yttv) return setTimeout(enableFeatures, 250);
+        if (cachedPreviewMap) {
+            cachedPreviewMap.set("ENABLE_PREVIEWS_WITH_SOUND", configRead('enablePreviews'));
+            return;
+        }
+        if (!window._yttv) {
+            if (++enableFeaturesAttempts > ENABLE_FEATURES_MAX_ATTEMPTS) return;
+            return setTimeout(enableFeatures, 250);
+        }
         const yttvValues = Object.values(window._yttv);
 
         // Enable preview mode
-        yttvValues.find(a => a instanceof Map && a.has("ENABLE_PREVIEWS_WITH_SOUND"))?.set("ENABLE_PREVIEWS_WITH_SOUND", configRead('enablePreviews'));
+        const previewMap = yttvValues.find(a => a instanceof Map && a.has("ENABLE_PREVIEWS_WITH_SOUND"));
+        if (!previewMap) {
+            if (++enableFeaturesAttempts > ENABLE_FEATURES_MAX_ATTEMPTS) return;
+            return setTimeout(enableFeatures, 250);
+        }
+        cachedPreviewMap = previewMap;
+        previewMap.set("ENABLE_PREVIEWS_WITH_SOUND", configRead('enablePreviews'));
     }
 
     if (document.readyState === 'complete') {
@@ -19466,25 +19999,109 @@
     // Custom UI for video player
 
 
-    function applyPatches() {
-        if (!window._yttv) return setTimeout(applyPatches, 250);
-        if (!document.querySelector('video')) return setTimeout(applyPatches, 250);
-        const methods = Object.keys(window._yttv).filter(key => {
-            if (typeof window._yttv[key] !== 'function') return false;
-            const src = window._yttv[key].toString();
-            return src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION') || src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-        });
+    // PERF: the AST extraction below used to run inside the constructor on EVERY
+    // instantiation of the player actions container (i.e. on every navigation to
+    // the player), stringifying + fully parsing a huge minified class each time.
+    // On low-end TVs that is a recurring multi-hundred-ms CPU spike. Everything
+    // derived from origMethod is static, so compute it exactly once and cache it.
+    let cachedOrigMethod = null;
+    let cachedIsClass = false;
+    let cachedFunctions = null;
+    let cachedSettingActionGroup = null;
+    let cachedPreviousButtonName = null;
+    let cachedNextButtonName = null;
+    let cachedEngagementActionButton = null;
+    let cachedPromotedActionButton = null;
 
-        if (methods.length === 0) {
-            setTimeout(applyPatches, 250);
+    // PERF: cap boot polling, incrementally scan window._yttv keys without
+    // repeatedly stringifying thousands of bundle functions, and recover on
+    // route transitions to watch.
+    const APPLY_PATCH_MAX_ATTEMPTS = 60;
+    let applyPatchAttempts = 0;
+    let applyPatchTimeout = null;
+    let isPlayerPatched = false;
+    const checkedYttvKeys = new Set();
+    let targetKey = null;
+
+    function applyPatches() {
+        if (isPlayerPatched) return;
+        // Nothing to do at all when player patching is disabled - don't poll.
+        if (!configRead('enablePatchingVideoPlayer')) return;
+
+        if (!window._yttv) {
+            if (++applyPatchAttempts < APPLY_PATCH_MAX_ATTEMPTS) {
+                clearTimeout(applyPatchTimeout);
+                applyPatchTimeout = setTimeout(applyPatches, 500);
+            }
             return;
         }
 
-        const origMethod = window._yttv[methods[0]];
+        if (!targetKey) {
+            for (const key in window._yttv) {
+                if (checkedYttvKeys.has(key)) continue;
+                checkedYttvKeys.add(key);
+                if (typeof window._yttv[key] !== 'function') continue;
+                const src = window._yttv[key].toString();
+                if (src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_FEATURED_ACTION') || src.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS')) {
+                    targetKey = key;
+                    break;
+                }
+            }
+        }
+
+        if (!targetKey) {
+            if (++applyPatchAttempts < APPLY_PATCH_MAX_ATTEMPTS) {
+                clearTimeout(applyPatchTimeout);
+                applyPatchTimeout = setTimeout(applyPatches, 500);
+            }
+            return;
+        }
+
+        const origMethod = window._yttv[targetKey];
 
         function YtlrPlayerActionsContainer() {
             const args = Array.prototype.slice.call(arguments);
-            const isClass = /^class\s/.test(origMethod.toString());
+
+            // PERF: computed once per origMethod (see cache above) instead of on
+            // every single instantiation. Must run before the instanceof branch.
+            if (origMethod !== cachedOrigMethod || !cachedFunctions) {
+                cachedOrigMethod = origMethod;
+                const src = origMethod.toString();
+                cachedIsClass = /^class\s/.test(src);
+                cachedFunctions = extractAssignedFunctions(src);
+
+                const funcs = cachedFunctions;
+                cachedSettingActionGroup = funcs.find(func =>
+                    func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS')
+                )?.left?.split('.')[1];
+
+                const prevFunc = funcs.find(func => {
+                    if (func.rhs.includes('skipNextButton')) {
+                        const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
+                        const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
+                        if (skipPreviousButtonIndex > skipNextButtonIndex) return true;
+                    }
+                });
+                cachedPreviousButtonName = prevFunc?.left?.split('.')[1];
+
+                const nextFunc = funcs.find(func => {
+                    if (func.rhs.includes('skipPreviousButton')) {
+                        const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
+                        const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
+                        if (skipNextButtonIndex > skipPreviousButtonIndex) return true;
+                    }
+                });
+                cachedNextButtonName = nextFunc?.left?.split('.')[1];
+
+                cachedEngagementActionButton = funcs.find(func =>
+                    func.rhs.includes('props.data.engagementActions')
+                )?.left?.split('.')[1];
+
+                cachedPromotedActionButton = funcs.find(func =>
+                    func.rhs.includes('props.data.promotedActions') && func.rhs.includes('setReminderButton')
+                )?.left?.split('.')[1];
+            }
+            const isClass = cachedIsClass;
 
             function constructAsNew(ctor, argsList) {
                 if (typeof Reflect !== 'undefined' && typeof Reflect.construct === 'function') {
@@ -19506,8 +20123,6 @@
                 inst = this;
             }
 
-            const functions = extractAssignedFunctions(origMethod.toString());
-
             const pipCommand = {
                 "type": "TRANSPORT_CONTROLS_BUTTON_TYPE_PIP",
                 "button": {
@@ -19524,9 +20139,7 @@
                 }
             };
 
-            const settingActionGroup = functions.find(func => {
-                return func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-            })?.left?.split('.')[1];
+            const settingActionGroup = cachedSettingActionGroup;
 
             if (settingActionGroup && configRead('enableMPButton')) {
                 const origSettingActionGroup = inst[settingActionGroup];
@@ -19538,37 +20151,10 @@
                 };
             }
 
-            const previousButtonFunc = functions.find(func => {
-                if (func.rhs.includes('skipNextButton')) {
-                    const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
-                    const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
-                    if (skipPreviousButtonIndex > skipNextButtonIndex) {
-                        return true;
-                    }
-                }
-            });
-            const previousButtonName = previousButtonFunc?.left?.split('.')[1];
-
-            const nextButtonFunc = functions.find(func => {
-                if (func.rhs.includes('skipPreviousButton')) {
-                    const skipNextButtonIndex = func.rhs.indexOf('skipNextButton');
-                    const skipPreviousButtonIndex = func.rhs.indexOf('skipPreviousButton');
-                    if (skipNextButtonIndex > skipPreviousButtonIndex) {
-                        return true;
-                    }
-                }
-            });
-            const nextButtonName = nextButtonFunc?.left?.split('.')[1];
-
-            const engagementActionButton = functions.find(func => func.rhs.includes('props.data.engagementActions'))?.left?.split('.')[1];
-
-            // The promoted actions builder (ytlr-player-actions-container `this.j`): the row that
-            // contains the Subscribe button. Uniquely identified by reading props.data.promotedActions
-            // together with props.setReminderButton (the subscribedEntityKey getter also reads
-            // props.data.promotedActions but never references setReminderButton).
-            const promotedActionButton = functions.find(func =>
-                func.rhs.includes('props.data.promotedActions') && func.rhs.includes('setReminderButton')
-            )?.left?.split('.')[1];
+            const previousButtonName = cachedPreviousButtonName;
+            const nextButtonName = cachedNextButtonName;
+            const engagementActionButton = cachedEngagementActionButton;
+            const promotedActionButton = cachedPromotedActionButton;
 
             if (promotedActionButton) {
                 const origPromotedActionButton = inst[promotedActionButton];
@@ -19697,33 +20283,45 @@
 
         if (configRead('enablePatchingVideoPlayer')) {
             YtlrPlayerActionsContainer.prototype = origMethod.prototype;
-            window._yttv[methods[0]] = YtlrPlayerActionsContainer;
+            window._yttv[targetKey] = YtlrPlayerActionsContainer;
+            isPlayerPatched = true;
         }
     }
 
-
     applyPatches();
+
+    window.addEventListener('hashchange', () => {
+        if (!isPlayerPatched && location.hash.includes('watch')) {
+            applyPatchAttempts = 0;
+            applyPatches();
+        }
+    });
 
     const origParse = JSON.parse;
     JSON.parse = function () {
         const r = origParse.apply(this, arguments);
 
-        const disabledSidebarContents = configRead('disabledSidebarContents');
-        const disableChannelsOnSidebar = configRead('disableChannelsOnSidebar');
-        if (r.items && Array.isArray(r.items) && r.items[0].guideSectionRenderer) {
-            for (let i = 0; i < r.items.length; i++) {
-                const section = r.items[i].guideSectionRenderer;
-                for (let j = 0; j < section.items.length; j++) {
-                    const item = section.items[j].guideEntryRenderer;
-                    if (!item) continue;
-                    if ((disabledSidebarContents?.length && disabledSidebarContents.includes(item.icon?.iconType))
-                        || (disableChannelsOnSidebar && item?.thumbnail)) {
-                        section.items.splice(j, 1);
-                        j--;
+        // NOTE: must never throw into the app's parse call sites (unguarded
+        // access to guideSectionRenderer.items crashed page boot paths).
+        try {
+            const disabledSidebarContents = configRead('disabledSidebarContents');
+            const disableChannelsOnSidebar = configRead('disableChannelsOnSidebar');
+            if (r?.items && Array.isArray(r.items) && r.items[0]?.guideSectionRenderer) {
+                for (let i = 0; i < r.items.length; i++) {
+                    const section = r.items[i].guideSectionRenderer;
+                    if (!section || !Array.isArray(section.items)) continue;
+                    for (let j = 0; j < section.items.length; j++) {
+                        const item = section.items[j].guideEntryRenderer;
+                        if (!item) continue;
+                        if ((disabledSidebarContents?.length && disabledSidebarContents.includes(item.icon?.iconType))
+                            || (disableChannelsOnSidebar && item?.thumbnail)) {
+                            section.items.splice(j, 1);
+                            j--;
+                        }
                     }
                 }
             }
-        }
+        } catch (e) { }
 
         return r;
     };
@@ -19737,15 +20335,29 @@
         }
     });
 
+    let attachedPlayer = null;
+    let frameRatePollAttempts = 0;
+    const FRAME_RATE_MAX_ATTEMPTS = 20;
+
     function attachToVideoPlayer() {
+        if (!configRead('autoFrameRate')) return;
+
         const player = document.querySelector('.html5-video-player');
         const video = document.querySelector('video');
-        if (!player) return setTimeout(attachToVideoPlayer, 500);
+        if (!player || !video) {
+            if (++frameRatePollAttempts < FRAME_RATE_MAX_ATTEMPTS) {
+                setTimeout(attachToVideoPlayer, 1000);
+            }
+            return;
+        }
 
+        if (attachedPlayer === player && attachedPlayer.isConnected) return;
+        attachedPlayer = player;
         player.addEventListener('onPlaybackStartExternal', () => {
             try {
                 if (window.location.href.indexOf('watch') === -1) return;
-                const statsForNerds = player.getStatsForNerds();
+                const statsForNerds = player.getStatsForNerds ? player.getStatsForNerds() : null;
+                if (!statsForNerds || !statsForNerds.resolution) return;
 
                 const resolutionMatch = statsForNerds.resolution.match(/(\d+)x(\d+)@([\d.]+)/);
                 const pauseFor = configRead('autoFrameRatePauseVideoFor');
@@ -19770,30 +20382,44 @@
                 console.error('Error in auto frame rate handling:', e);
             }
         });
-
-        const resetFrameRate = () => {
-            if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
-                window.h5vcc.fasttube.SetFrameRate(0);
-            }
-        };
-
-        window.addEventListener('hashchange', () => {
-            if (window.location.href.indexOf('watch') === -1) {
-                resetFrameRate();
-            }
-        });
-
-        configChangeEmitter.addEventListener('configChange', (event) => {
-            if (event.detail.key === 'autoFrameRate' && !event.detail.value) {
-                resetFrameRate();
-            }
-        });
     }
+
+    const resetFrameRate = () => {
+        if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
+            window.h5vcc.fasttube.SetFrameRate(0);
+        }
+    };
+
+    window.addEventListener('hashchange', () => {
+        if (window.location.href.indexOf('watch') === -1) {
+            resetFrameRate();
+        } else if (configRead('autoFrameRate')) {
+            frameRatePollAttempts = 0;
+            attachToVideoPlayer();
+        }
+    });
+
+    configChangeEmitter.addEventListener('configChange', (event) => {
+        if (event.detail.key === 'autoFrameRate') {
+            if (event.detail.value) {
+                frameRatePollAttempts = 0;
+                attachToVideoPlayer();
+            } else {
+                resetFrameRate();
+            }
+        }
+    });
 
     attachToVideoPlayer();
 
     let actualClock;
     let clockInterval;
+
+    // PERF: cache the watch-page node instead of running a querySelector on every
+    // 1s tick. The node is only re-queried when it gets disconnected from the DOM
+    // (i.e. after navigating away from the player).
+    let watchDefaultNode = null;
+    let clockHidden = false;
 
     configChangeEmitter.addEventListener('configChange', (e) => {
         if (e.detail.key === 'enableClock') {
@@ -19801,6 +20427,13 @@
         } else if (e.detail.key === 'isClock12HourFormat' || e.detail.key === 'clockShowSeconds') {
             if (configRead('enableClock')) {
                 // Force a quick update so changes are visible instantly
+                updateClock();
+            }
+        } else if (e.detail.key === 'clockHideWhenVideoPlaying') {
+            if (configRead('enableClock') && actualClock) {
+                // Reset visibility so the new policy applies on the next tick
+                clockHidden = false;
+                actualClock.style.display = 'block';
                 updateClock();
             }
         }
@@ -19811,6 +20444,20 @@
         const now = new Date();
         const is12HourFormat = configRead('isClock12HourFormat');
         const secondsEnabled = configRead('clockShowSeconds');
+
+        if (configRead('clockHideWhenVideoPlaying')) {
+            if (!watchDefaultNode || !watchDefaultNode.isConnected) {
+                watchDefaultNode = document.querySelector('ytlr-watch-default');
+            }
+            const shouldHide = !!(watchDefaultNode && watchDefaultNode.getAttribute('hybridnavfocusable') === 'true');
+            if (shouldHide !== clockHidden) {
+                clockHidden = shouldHide;
+                actualClock.style.display = shouldHide ? 'none' : 'block';
+            }
+        } else if (clockHidden) {
+            clockHidden = false;
+            actualClock.style.display = 'block';
+        }
 
         let hours = now.getHours();
         if (is12HourFormat) {
@@ -19823,19 +20470,37 @@
         actualClock.textContent = `${hours}:${minutes}${secondsEnabled ? `:${seconds}` : ''}${is12HourFormat ? (now.getHours() >= 12 ? ' PM' : ' AM') : ''}`;
     }
 
+    function startClockTimer() {
+        if (clockInterval) clearInterval(clockInterval);
+        clockInterval = null;
+        if (!document.hidden && actualClock && configRead('enableClock')) {
+            clockInterval = setInterval(updateClock, 1000);
+        }
+    }
+
+    function stopClockTimer() {
+        if (clockInterval) {
+            clearInterval(clockInterval);
+            clockInterval = null;
+        }
+    }
+
     function toggleClock(value) {
         const existingClock = document.getElementById('fasttube-clock');
         if (value && existingClock) return;
         if (!value && existingClock) {
             existingClock.parentNode.removeChild(existingClock);
-            if (clockInterval) clearInterval(clockInterval);
+            stopClockTimer();
+            actualClock = null;
+            watchDefaultNode = null;
+            clockHidden = false;
             return;
         }
         if (!value && !existingClock) {
             return;
         } else {
             const clock = document.createElement('div');
-     
+
             clock.id = 'fasttube-clock';
             clock.style.height = '45rem';
             clock.style.width = '80rem';
@@ -19856,12 +20521,24 @@
             document.body.appendChild(clock);
 
             updateClock();
-            if (clockInterval) clearInterval(clockInterval);
-            clockInterval = setInterval(updateClock, 1000);
+            startClockTimer();
         }
     }
 
-    toggleClock(configRead('enableClock'));
+    document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+            stopClockTimer();
+        } else if (actualClock && configRead('enableClock')) {
+            updateClock();
+            startClockTimer();
+        }
+    });
+
+    if (document.body) {
+        toggleClock(configRead('enableClock'));
+    } else {
+        document.addEventListener('DOMContentLoaded', () => toggleClock(configRead('enableClock')), { once: true });
+    }
 
     if (window.location.hostname === 'localhost') {
         initPatches();

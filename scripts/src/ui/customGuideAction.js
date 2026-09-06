@@ -5,22 +5,27 @@ const origParse = JSON.parse;
 JSON.parse = function () {
     const r = origParse.apply(this, arguments);
 
-    const disabledSidebarContents = configRead('disabledSidebarContents');
-    const disableChannelsOnSidebar = configRead('disableChannelsOnSidebar');
-    if (r.items && Array.isArray(r.items) && r.items[0].guideSectionRenderer) {
-        for (let i = 0; i < r.items.length; i++) {
-            const section = r.items[i].guideSectionRenderer;
-            for (let j = 0; j < section.items.length; j++) {
-                const item = section.items[j].guideEntryRenderer;
-                if (!item) continue;
-                if ((disabledSidebarContents?.length && disabledSidebarContents.includes(item.icon?.iconType))
-                    || (disableChannelsOnSidebar && item?.thumbnail)) {
-                    section.items.splice(j, 1);
-                    j--;
+    // NOTE: must never throw into the app's parse call sites (unguarded
+    // access to guideSectionRenderer.items crashed page boot paths).
+    try {
+        const disabledSidebarContents = configRead('disabledSidebarContents');
+        const disableChannelsOnSidebar = configRead('disableChannelsOnSidebar');
+        if (r?.items && Array.isArray(r.items) && r.items[0]?.guideSectionRenderer) {
+            for (let i = 0; i < r.items.length; i++) {
+                const section = r.items[i].guideSectionRenderer;
+                if (!section || !Array.isArray(section.items)) continue;
+                for (let j = 0; j < section.items.length; j++) {
+                    const item = section.items[j].guideEntryRenderer;
+                    if (!item) continue;
+                    if ((disabledSidebarContents?.length && disabledSidebarContents.includes(item.icon?.iconType))
+                        || (disableChannelsOnSidebar && item?.thumbnail)) {
+                        section.items.splice(j, 1);
+                        j--;
+                    }
                 }
             }
         }
-    }
+    } catch (e) { }
 
     return r;
 }

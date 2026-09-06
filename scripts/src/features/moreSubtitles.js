@@ -189,15 +189,15 @@ function createSectionTitle(title) {
     };
 }
 
-// Main function to patch the subtitle menu
+let subtitlePatchAttempts = 0;
+const SUBTITLE_MAX_ATTEMPTS = 60;
+
 function patchSubtitleMenu() {
     if (isPatched) return;
 
-    const player = document.querySelector('.html5-video-player');
-    if (!player) return setTimeout(patchSubtitleMenu, 250);
-
     // Always patch if possible - settings will be checked dynamically
-    if (!window._yttv) return setTimeout(patchSubtitleMenu, 250);
+    if (!window._yttv) return;
+
     const yttvInstance = Object.values(window._yttv).find(
         (obj) =>
             obj &&
@@ -209,12 +209,8 @@ function patchSubtitleMenu() {
         !yttvInstance ||
         yttvInstance.instance.resolveCommand.isPatchedBySubtitleLocalization
     ) {
-        if (!yttvInstance) {
-            console.error(
-                "Fast-Tube Subtitle Localization: Could not find resolveCommand instance."
-            );
-        } else {
-            console.log("Fast-Tube Subtitle Localization: Already patched.");
+        if (yttvInstance) {
+            isPatched = true;
         }
         return;
     }
@@ -354,6 +350,9 @@ function patchSubtitleMenu() {
     };
 
     yttvInstance.instance.resolveCommand.isPatchedBySubtitleLocalization = true;
+    if (originalResolveCommand.__ftPatched) {
+        yttvInstance.instance.resolveCommand.__ftPatched = true;
+    }
     console.log("Fast-Tube Subtitle Localization: Patch successful!");
     isPatched = true;
 }
@@ -362,6 +361,10 @@ function patchSubtitleMenu() {
 const interval = setInterval(() => {
     if (window._yttv && Object.keys(window._yttv).length > 0) {
         patchSubtitleMenu();
+        if (isPatched || subtitlePatchAttempts >= SUBTITLE_MAX_ATTEMPTS) {
+            clearInterval(interval);
+        }
+    } else if (++subtitlePatchAttempts >= SUBTITLE_MAX_ATTEMPTS) {
         clearInterval(interval);
     }
 }, 1000);

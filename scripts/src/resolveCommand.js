@@ -2,15 +2,24 @@ import { configWrite, configRead } from './config.js';
 import { enablePip } from './features/pictureInPicture.js';
 import modernUI, { optionShow } from './ui/settings.js';
 import { speedSettings } from './ui/speedUI.js';
-import { showToast, buttonItem } from './ui/ytUI.js';
+import { showToast, buttonItem, showModal, QrCodeRenderer, overlayPanelItemListRenderer, overlayMessageRenderer } from './ui/ytUI.js';
+import { requestNextAndNavigateChannel } from './utils/innerTubeCalls.js';
+import qrcode from 'qrcode-npm';
 import checkForUpdates from './features/updater.js';
+
+let cachedResolveCommandKey = null;
 
 export default function resolveCommand(cmd, _) {
     // resolveCommand function is pretty OP, it can do from opening modals, changing client settings and way more.
     // Because the client might change, we should find it first.
 
+    if (cachedResolveCommandKey && window._yttv?.[cachedResolveCommandKey]?.instance?.resolveCommand) {
+        return window._yttv[cachedResolveCommandKey].instance.resolveCommand(cmd, _);
+    }
+
     for (const key in window._yttv) {
         if (window._yttv[key] && window._yttv[key].instance && window._yttv[key].instance.resolveCommand) {
+            cachedResolveCommandKey = key;
             return window._yttv[key].instance.resolveCommand(cmd, _);
         }
     }
@@ -109,41 +118,75 @@ export function patchResolveCommand() {
                         }
                     }
 
-                    cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(2, 0,
-                        buttonItem(
-                            { title: 'Mini Player' },
-                            { icon: 'CLEAR_COOKIES' }, [
-                            {
-                                customAction: {
-                                    action: 'ENTER_MP'
-                                }
-                            }
-                        ])
+                    const alreadyHasMiniPlayer = items.some(item =>
+                        item?.compactLinkRenderer?.serviceEndpoint?.signalAction?.customAction?.action === 'ENTER_MP' ||
+                        item?.compactLinkRenderer?.serviceEndpoint?.commandExecutorCommand?.commands?.some(c => c?.customAction?.action === 'ENTER_MP') ||
+                        item?.compactLinkRenderer?.title?.simpleText === 'Mini Player'
                     );
-
-                    if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.HasSystemFeature && 
-                        window.h5vcc.fasttube.HasSystemFeature('android.software.picture_in_picture')) {
-                        cmd.openPopupAction.popup.overlaySectionRenderer.overlay.overlayTwoPanelRenderer.actionPanel.overlayPanelRenderer.content.overlayPanelItemListRenderer.items.splice(3, 0,
+                    if (!alreadyHasMiniPlayer) {
+                        items.splice(2, 0,
                             buttonItem(
-                                { title: 'Picture in Picture' },
-                                { icon: 'PIP' }, [
+                                { title: 'Mini Player' },
+                                { icon: 'CLEAR_COOKIES' }, [
                                 {
                                     customAction: {
-                                        action: 'ENTER_PIP'
-                                    }
-                                },
-                                {
-                                    signalAction: {
-                                         signal: 'POPUP_BACK'
+                                        action: 'ENTER_MP'
                                     }
                                 }
                             ])
                         );
                     }
+
+                    // Share button (QR code) - ported from upstream TizenTube
+                    const alreadyHasShare = items.some(item =>
+                        item?.compactLinkRenderer?.serviceEndpoint?.signalAction?.customAction?.action === 'SHARE' ||
+                        item?.compactLinkRenderer?.serviceEndpoint?.commandExecutorCommand?.commands?.some(c => c?.customAction?.action === 'SHARE') ||
+                        item?.compactLinkRenderer?.title?.simpleText === 'Share'
+                    );
+                    if (!alreadyHasShare) {
+                        items.splice(3, 0,
+                            buttonItem(
+                                { title: 'Share' },
+                                { icon: 'OPEN_IN_NEW' }, [
+                                {
+                                    customAction: {
+                                        action: 'SHARE'
+                                    }
+                                }
+                            ])
+                        );
+                    }
+
+                    if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.HasSystemFeature && 
+                        window.h5vcc.fasttube.HasSystemFeature('android.software.picture_in_picture')) {
+                        const alreadyHasPip = items.some(item =>
+                            item?.compactLinkRenderer?.serviceEndpoint?.signalAction?.customAction?.action === 'ENTER_PIP' ||
+                            item?.compactLinkRenderer?.serviceEndpoint?.commandExecutorCommand?.commands?.some(c => c?.customAction?.action === 'ENTER_PIP') ||
+                            item?.compactLinkRenderer?.title?.simpleText === 'Picture in Picture'
+                        );
+                        if (!alreadyHasPip) {
+                            items.splice(3, 0,
+                                buttonItem(
+                                    { title: 'Picture in Picture' },
+                                    { icon: 'PIP' }, [
+                                    {
+                                        customAction: {
+                                            action: 'ENTER_PIP'
+                                        }
+                                    },
+                                    {
+                                        signalAction: {
+                                             signal: 'POPUP_BACK'
+                                        }
+                                    }
+                                ])
+                            );
+                        }
+                    }
                 } else if (cmd?.watchEndpoint?.videoId) {
                     window.isPipPlaying = false;
                     const ytlrPlayerContainer = document.querySelector('ytlr-player-container');
-                    ytlrPlayerContainer.style.removeProperty('z-index');
+                    ytlrPlayerContainer?.style?.removeProperty('z-index');
                 }
 
                 if (cmd.commandExecutorCommand && cmd.commandExecutorCommand.commands) {
@@ -178,6 +221,9 @@ export function patchResolveCommand() {
                 return ogResolve.call(this, cmd, _);
             }
             wrappedResolve.__ftPatched = true;
+            if (ogResolve.isPatchedBySubtitleLocalization) {
+                wrappedResolve.isPatchedBySubtitleLocalization = true;
+            }
             window._yttv[key].instance.resolveCommand = wrappedResolve;
             patched = true;
         }
@@ -239,5 +285,74 @@ function customAction(action, parameters) {
         case 'CHECK_FOR_UPDATES':
             checkForUpdates(true);
             break;
+        case 'GO_TO_CHANNEL':
+            requestNextAndNavigateChannel(parameters);
+            break;
+        case 'SHARE': {
+            // QR-code video sharing (ported from upstream TizenTube)
+            try {
+                let videoId = (typeof parameters === 'string' ? parameters : parameters?.videoId) || null;
+                if (!videoId) {
+                    const videoPlayer = document.querySelector('.html5-video-player');
+                    const videoData = videoPlayer && typeof videoPlayer.getVideoData === 'function' ? videoPlayer.getVideoData() : null;
+                    videoId = videoData && videoData.video_id ? videoData.video_id : null;
+                }
+                if (!videoId) {
+                    const match = location.hash.match(/(?:[?&]v=|\/watch(?:\/|\?v=))([A-Za-z0-9_-]{11})/);
+                    if (match) videoId = match[1];
+                }
+                if (!videoId) {
+                    const img = document.querySelector('ytlr-watch-page img[src*="/vi/"]');
+                    if (img) {
+                        const m = (img.getAttribute('src') || '').match(/\/vi\/([A-Za-z0-9_-]{11})\//);
+                        if (m) videoId = m[1];
+                    }
+                }
+                if (!videoId) break;
+                const shareUrl = `https://www.youtube.com/watch?v=${videoId}`;
+
+                const qr = qrcode.qrcode(6, 'H');
+                qr.addData(shareUrl);
+                qr.make();
+
+                const qrDataImgTag = qr.createImgTag(8, 8);
+                const qrDataUrl = qrDataImgTag.match(/src="([^"]+)"/)[1];
+
+                showModal({
+                    title: 'Share Video',
+                }, overlayPanelItemListRenderer([
+                    buttonItem({ title: 'Close' }, null, [{ signalAction: { signal: 'POPUP_BACK' } }])
+                ]), 'ft-share-modal');
+
+                // Render QR image and caption into modal container safely using DOM APIs (avoiding TrustedHTML restrictions)
+                const checkModalInterval = setInterval(() => {
+                    const container = document.querySelector('ytlr-overlay-panel-item-list-renderer');
+                    if (container) {
+                        clearInterval(checkModalInterval);
+                        if (!container.querySelector('#ft-qr-wrapper')) {
+                            const wrapper = document.createElement('div');
+                            wrapper.id = 'ft-qr-wrapper';
+                            wrapper.style.cssText = 'display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 20px 10px; width: 100%; box-sizing: border-box;';
+
+                            const text = document.createElement('div');
+                            text.textContent = 'Scan the QR code below to share this video:';
+                            text.style.cssText = 'color: #fff; font-size: 1.8rem; margin-bottom: 20px; text-align: center; font-family: Roboto, sans-serif;';
+
+                            const img = document.createElement('img');
+                            img.src = qrDataUrl;
+                            img.style.cssText = 'background: #fff; padding: 12px; border-radius: 12px; width: 200px; height: 200px; box-shadow: 0 4px 12px rgba(0,0,0,0.5);';
+
+                            wrapper.appendChild(text);
+                            wrapper.appendChild(img);
+                            container.prepend(wrapper);
+                        }
+                    }
+                }, 50);
+                setTimeout(() => clearInterval(checkModalInterval), 2000);
+            } catch (e) {
+                console.error('Fast-Tube: SHARE failed', e);
+            }
+            break;
+        }
     }
 }

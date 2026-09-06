@@ -17,6 +17,7 @@ import { t } from 'i18next';
 const origParse = JSON.parse;
 JSON.parse = function () {
   const r = origParse.apply(this, arguments);
+  if (!r || typeof r !== 'object') return r;
   try {
     const adBlockEnabled = configRead('enableAdBlock');
     const signinReminderEnabled = configRead('enableSigninReminder');
@@ -103,9 +104,8 @@ JSON.parse = function () {
       );
     }
 
-    // Patch settings
-
-    if (r?.title?.runs) {
+    // Patch settings: only when r is the settings browse response
+    if (r?.items && Array.isArray(r.items) && r.items.some(cat => cat?.settingCategoryCollectionRenderer || cat?.settingsCategoryRenderer)) {
       PatchSettings(r);
     }
 
@@ -126,6 +126,11 @@ JSON.parse = function () {
       r.continuationContents.horizontalListContinuation.items = hideVideo(r.continuationContents.horizontalListContinuation.items);
     }
 
+    // Long-press menus in grid-style continuations (e.g. channel video grids)
+    if (r?.continuationContents?.gridContinuation?.items) {
+      addLongPress(r.continuationContents.gridContinuation.items);
+    }
+
     if (r?.contents?.tvBrowseRenderer?.content?.tvSecondaryNavRenderer?.sections) {
       for (let i = 0; i < r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections.length; i++) {
         const section = r.contents.tvBrowseRenderer.content.tvSecondaryNavRenderer.sections[i].tvSecondaryNavSectionRenderer;
@@ -141,11 +146,16 @@ JSON.parse = function () {
 
         for (let j = 0; j < section.tabs.length; j++) {
           const tab = section.tabs[j];
-          if (tab.tabRenderer.content?.tvSurfaceContentRenderer?.content?.sectionListRenderer?.contents) {
+          const content = tab.tabRenderer.content?.tvSurfaceContentRenderer?.content;
+          if (content?.sectionListRenderer?.contents) {
             const index = section.tabs.indexOf(tab);
-            const clone = tab.tabRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents;
+            const clone = content.sectionListRenderer.contents;
             processShelves(clone);
             section.tabs[index].tabRenderer.content.tvSurfaceContentRenderer.content.sectionListRenderer.contents = clone;
+          }
+          // Long-press menus in grid-renderer tabs (e.g. channel home)
+          if (content?.gridRenderer?.items) {
+            addLongPress(content.gridRenderer.items);
           }
         }
       }
@@ -199,10 +209,19 @@ JSON.parse = function () {
 
     // Manual SponsorBlock Skips
 
-    if (configRead('sponsorBlockManualSkips').length > 0 && r?.playerOverlays?.playerOverlayRenderer) {
-      const manualSkippedSegments = configRead('sponsorBlockManualSkips');
-      let timelyActions = [];
-      if (window?.sponsorblock?.segments) {
+    if (r?.playerOverlays?.playerOverlayRenderer) {
+      // Keep native timely actions, but drop the noisy shopping / NFL
+      // watermark ones (ported from upstream TizenTube).
+      if (r.playerOverlays.playerOverlayRenderer.timelyActionRenderers) {
+        r.playerOverlays.playerOverlayRenderer.timelyActionRenderers =
+          r.playerOverlays.playerOverlayRenderer.timelyActionRenderers.filter(a =>
+            a?.timelyActionRenderer?.type !== 'TIMELY_ACTION_TYPE_SHOPPING' &&
+            a?.timelyActionRenderer?.type !== 'TIMELY_ACTION_TYPE_NFL_WATERMARK');
+      } else {
+        r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = [];
+      }
+      if (configRead('sponsorBlockManualSkips').length > 0 && window?.sponsorblock?.segments) {
+        const manualSkippedSegments = configRead('sponsorBlockManualSkips');
         for (const segment of window.sponsorblock.segments) {
           if (manualSkippedSegments.includes(segment.category)) {
             const timelyActionData = timelyAction(
@@ -222,13 +241,10 @@ JSON.parse = function () {
               segment.segment[0] * 1000,
               segment.segment[1] * 1000 - segment.segment[0] * 1000
             );
-            timelyActions.push(timelyActionData);
+            r.playerOverlays.playerOverlayRenderer.timelyActionRenderers.push(timelyActionData);
           }
         }
-        r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = timelyActions;
       }
-    } else if (r?.playerOverlays?.playerOverlayRenderer) {
-      r.playerOverlays.playerOverlayRenderer.timelyActionRenderers = [];
     }
 
     if (r?.transportControls?.transportControlsRenderer && configRead('enableSponsorBlockHighlight')) {
@@ -282,12 +298,8 @@ JSON.parse = function () {
 
 const origStringify = JSON.stringify;
 JSON.stringify = function (value, replacer, space) {
-  if (value?.playbackContext?.contentPlaybackContext) {
-    const copiedValue = JSON.parse(origStringify(value));
-    if (!copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
-      copiedValue.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
-      return origStringify.call(this, copiedValue, replacer, space);
-    }
+  if (value?.playbackContext?.contentPlaybackContext && !value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
+    value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
   }
   return origStringify.call(this, value, replacer, space);
 };
@@ -296,6 +308,7 @@ window.JSON.stringify = JSON.stringify;
 
 // Patch JSON.parse to use the custom one
 window.JSON.parse = JSON.parse;
+JSON.parse.__ftAdblock = true; // test marker
 for (const key in window._yttv) {
   if (window._yttv[key] && window._yttv[key].JSON && window._yttv[key].JSON.parse) {
     window._yttv[key].JSON.parse = JSON.parse;
@@ -304,8 +317,14 @@ for (const key in window._yttv) {
 
 
 function processShelves(shelves, shouldAddPreviews = true) {
-  for (const shelve of shelves) {
+  for (let s = shelves.length - 1; s >= 0; s--) {
+    const shelve = shelves[s];
     if (shelve.shelfRenderer) {
+      // Thumbnail sizing options (ported from upstream TizenTube)
+      if (!shelve.shelfRenderer.tvhtml5Style) shelve.shelfRenderer.tvhtml5Style = {};
+      if (!shelve.shelfRenderer.tvhtml5Style.effects) shelve.shelfRenderer.tvhtml5Style.effects = {};
+      if (configRead('disableEnlargingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.enlarge = false;
+      if (configRead('enableShrinkingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.shrink = true;
       if (!shelve.shelfRenderer.content?.horizontalListRenderer?.items) continue;
       deArrowify(shelve.shelfRenderer.content.horizontalListRenderer.items);
       hqify(shelve.shelfRenderer.content.horizontalListRenderer.items);
@@ -316,7 +335,7 @@ function processShelves(shelves, shouldAddPreviews = true) {
       shelve.shelfRenderer.content.horizontalListRenderer.items = hideVideo(shelve.shelfRenderer.content.horizontalListRenderer.items);
       if (!configRead('enableShorts')) {
         if (shelve.shelfRenderer.tvhtml5ShelfRendererType === 'TVHTML5_SHELF_RENDERER_TYPE_SHORTS') {
-          shelves.splice(shelves.indexOf(shelve), 1);
+          shelves.splice(s, 1);
           continue;
         }
         shelve.shelfRenderer.content.horizontalListRenderer.items = shelve.shelfRenderer.content.horizontalListRenderer.items.filter(item => item.tileRenderer?.tvhtml5ShelfRendererType !== 'TVHTML5_TILE_RENDERER_TYPE_SHORTS');
@@ -351,6 +370,32 @@ function addPreviews(items) {
   }
 }
 
+const deArrowCache = new Map();
+const pendingDeArrowFetches = new Set();
+const MAX_DEARROW_CACHE = 150;
+
+function applyDeArrowData(item, videoID, data, isDeArrowThumbnailsEnabled) {
+  if (data.titles && data.titles.length > 0) {
+    const mostVoted = data.titles.reduce((max, title) => max.votes > title.votes ? max : title);
+    if (item.tileRenderer?.metadata?.tileMetadataRenderer?.title) {
+      item.tileRenderer.metadata.tileMetadataRenderer.title.simpleText = mostVoted.title;
+    }
+  }
+
+  if (isDeArrowThumbnailsEnabled && data.thumbnails && data.thumbnails.length > 0) {
+    const mostVotedThumbnail = data.thumbnails.reduce((max, thumbnail) => max.votes > thumbnail.votes ? max : thumbnail);
+    if (mostVotedThumbnail.timestamp && item.tileRenderer?.header?.tileHeaderRenderer?.thumbnail) {
+      item.tileRenderer.header.tileHeaderRenderer.thumbnail.thumbnails = [
+        {
+          url: `https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=${videoID}&time=${mostVotedThumbnail.timestamp}`,
+          width: 1280,
+          height: 640
+        }
+      ];
+    }
+  }
+}
+
 function deArrowify(items) {
   const isDeArrowEnabled = configRead('enableDeArrow');
   const isDeArrowThumbnailsEnabled = configRead('enableDeArrowThumbnails');
@@ -367,29 +412,26 @@ function deArrowify(items) {
     const videoID = item.tileRenderer.contentId;
     if (!videoID) continue;
 
+    if (deArrowCache.has(videoID)) {
+      applyDeArrowData(item, videoID, deArrowCache.get(videoID), isDeArrowThumbnailsEnabled);
+      continue;
+    }
+
+    if (pendingDeArrowFetches.has(videoID)) continue;
+    pendingDeArrowFetches.add(videoID);
+
     // Delay the fetch to prevent blocking the JS thread on low-end TVs
     setTimeout(() => {
         fetch(`https://sponsor.ajay.app/api/branding?videoID=${videoID}`).then(res => res.json()).then(data => {
-          if (data.titles && data.titles.length > 0) {
-            const mostVoted = data.titles.reduce((max, title) => max.votes > title.votes ? max : title);
-            if (item.tileRenderer && item.tileRenderer.metadata && item.tileRenderer.metadata.tileMetadataRenderer && item.tileRenderer.metadata.tileMetadataRenderer.title) {
-                item.tileRenderer.metadata.tileMetadataRenderer.title.simpleText = mostVoted.title;
-            }
+          pendingDeArrowFetches.delete(videoID);
+          if (deArrowCache.size >= MAX_DEARROW_CACHE) {
+            deArrowCache.delete(deArrowCache.keys().next().value);
           }
-
-          if (isDeArrowThumbnailsEnabled && data.thumbnails && data.thumbnails.length > 0) {
-            const mostVotedThumbnail = data.thumbnails.reduce((max, thumbnail) => max.votes > thumbnail.votes ? max : thumbnail);
-            if (mostVotedThumbnail.timestamp && item.tileRenderer && item.tileRenderer.header && item.tileRenderer.header.tileHeaderRenderer && item.tileRenderer.header.tileHeaderRenderer.thumbnail) {
-              item.tileRenderer.header.tileHeaderRenderer.thumbnail.thumbnails = [
-                {
-                  url: `https://dearrow-thumb.ajay.app/api/v1/getThumbnail?videoID=${videoID}&time=${mostVotedThumbnail.timestamp}`,
-                  width: 1280,
-                  height: 640
-                }
-              ];
-            }
-          }
-        }).catch(() => { });
+          deArrowCache.set(videoID, data);
+          applyDeArrowData(item, videoID, data, isDeArrowThumbnailsEnabled);
+        }).catch(() => {
+          pendingDeArrowFetches.delete(videoID);
+        });
     }, 500 + Math.random() * 2000); // Stagger network requests over 2.5 seconds
   }
 }
@@ -420,16 +462,23 @@ function addLongPress(items) {
     if (!item.tileRenderer) continue;
     if (item.tileRenderer.style !== 'TILE_STYLE_YTLR_DEFAULT') continue;
     if (item.tileRenderer.onLongPressCommand?.showMenuCommand?.menu?.menuRenderer?.items) {
-        const copiedItem = { ...item, tileRenderer: { ...item.tileRenderer, onLongPressCommand: undefined } };
-        item.tileRenderer.onLongPressCommand.showMenuCommand.menu.menuRenderer.items.push(MenuServiceItemRenderer('Add to Queue', {
-          clickTrackingParams: null,
-          playlistEditEndpoint: {
-            customAction: {
-              action: 'ADD_TO_QUEUE',
-              parameters: copiedItem
+        const menuItems = item.tileRenderer.onLongPressCommand.showMenuCommand.menu.menuRenderer.items;
+        const alreadyHasQueue = menuItems.some(i =>
+          i?.menuServiceItemRenderer?.serviceEndpoint?.playlistEditEndpoint?.customAction?.action === 'ADD_TO_QUEUE' ||
+          i?.menuServiceItemRenderer?.text?.runs?.[0]?.text === 'Add to Queue'
+        );
+        if (!alreadyHasQueue) {
+          const copiedItem = { ...item, tileRenderer: { ...item.tileRenderer, onLongPressCommand: undefined } };
+          menuItems.push(MenuServiceItemRenderer('Add to Queue', {
+            clickTrackingParams: null,
+            playlistEditEndpoint: {
+              customAction: {
+                action: 'ADD_TO_QUEUE',
+                parameters: copiedItem
+              }
             }
-          }
-        }));
+          }));
+        }
       continue;
     }
     if (!configRead('enableLongPress')) continue;

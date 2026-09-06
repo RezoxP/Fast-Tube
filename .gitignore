@@ -8,3 +8,4 @@ actionlint
 *.log
 *.png
 node_modules/
+.agents/

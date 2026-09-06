@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
-  "versionCode": 1,
-  "notes": "Fast-Tube release: Ultra-lightweight, size- and performance-optimized YouTube TV client for Android 7.0 to 15 (ARM64 and ARM32).",
+  "version": "1.1.0",
+  "versionCode": 2,
+  "notes": "Fast-Tube 1.1.0: major efficiency overhaul for low-end TVs (AST parse caching, hot-path logging removal, watchdog idle fast-paths, document_start crash fixes) plus upstream TizenTube feature ports: QR video sharing, Go to Channel, Watch Later toggle, grid long-press menus, shopping/NFL timely action removal, thumbnail size options, number-key percentage seek, hide-clock-while-playing.",
   "downloadUrl": "https://github.com/RezoxP/Fast-Tube/releases/latest",
   "repo": "RezoxP/Fast-Tube"
 }
