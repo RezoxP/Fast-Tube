@@ -298,20 +298,39 @@ JSON.parse = function () {
 
 const origStringify = JSON.stringify;
 JSON.stringify = function (value, replacer, space) {
-  if (value?.playbackContext?.contentPlaybackContext && !value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
-    value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
+  if (configRead('enableAdBlock') && value && typeof value === 'object' && value.playbackContext?.contentPlaybackContext && !value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
+    if (!replacer) {
+      return origStringify.call(this, value, function (k, v) {
+        if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
+          return Object.assign({}, v, { isInlinePlaybackNoAd: true });
+        }
+        return v;
+      }, space);
+    } else if (typeof replacer === 'function') {
+      return origStringify.call(this, value, function (k, v) {
+        if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
+          v = Object.assign({}, v, { isInlinePlaybackNoAd: true });
+        }
+        return replacer.call(this, k, v);
+      }, space);
+    }
   }
   return origStringify.call(this, value, replacer, space);
 };
 
 window.JSON.stringify = JSON.stringify;
 
-// Patch JSON.parse to use the custom one
+// Patch JSON.parse and JSON.stringify to use the custom ones
 window.JSON.parse = JSON.parse;
 JSON.parse.__ftAdblock = true; // test marker
 for (const key in window._yttv) {
-  if (window._yttv[key] && window._yttv[key].JSON && window._yttv[key].JSON.parse) {
-    window._yttv[key].JSON.parse = JSON.parse;
+  if (window._yttv[key] && window._yttv[key].JSON) {
+    if (window._yttv[key].JSON.parse) {
+      window._yttv[key].JSON.parse = JSON.parse;
+    }
+    if (window._yttv[key].JSON.stringify) {
+      window._yttv[key].JSON.stringify = JSON.stringify;
+    }
   }
 }
 

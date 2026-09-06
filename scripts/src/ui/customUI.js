@@ -78,6 +78,9 @@ function applyPatches() {
 
             const funcs = cachedFunctions;
             cachedSettingActionGroup = funcs.find(func =>
+                func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS') &&
+                func.rhs.includes('.filter(')
+            )?.left?.split('.')[1] || funcs.find(func =>
                 func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS')
             )?.left?.split('.')[1];
 
@@ -151,8 +154,15 @@ function applyPatches() {
             const origSettingActionGroup = inst[settingActionGroup];
             inst[settingActionGroup] = function () {
                 const res = origSettingActionGroup.apply(this, arguments);
-                const idx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-                res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP') || res.splice(idx, 0, pipCommand);
+                if (!Array.isArray(res)) return res;
+                if (!res.some(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP')) {
+                    const idx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
+                    if (idx !== -1) {
+                        res.splice(idx, 0, pipCommand);
+                    } else {
+                        res.push(pipCommand);
+                    }
+                }
                 return res;
             };
         }
@@ -225,6 +235,7 @@ function applyPatches() {
             const origEngagementActionButton = inst[engagementActionButton];
             inst[engagementActionButton] = function () {
                 let res = origEngagementActionButton.apply(this, arguments);
+                if (!Array.isArray(res)) return res;
                 if (configRead('enableSpeedControlsButton')) {
                     if (!res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED')) {
                         res.push({

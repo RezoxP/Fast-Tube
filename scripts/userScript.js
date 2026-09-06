@@ -9141,20 +9141,39 @@
 
     const origStringify = JSON.stringify;
     JSON.stringify = function (value, replacer, space) {
-      if (value?.playbackContext?.contentPlaybackContext && !value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
-        value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd = true;
+      if (configRead('enableAdBlock') && value && typeof value === 'object' && value.playbackContext?.contentPlaybackContext && !value.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd) {
+        if (!replacer) {
+          return origStringify.call(this, value, function (k, v) {
+            if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
+              return Object.assign({}, v, { isInlinePlaybackNoAd: true });
+            }
+            return v;
+          }, space);
+        } else if (typeof replacer === 'function') {
+          return origStringify.call(this, value, function (k, v) {
+            if (k === 'contentPlaybackContext' && v && typeof v === 'object') {
+              v = Object.assign({}, v, { isInlinePlaybackNoAd: true });
+            }
+            return replacer.call(this, k, v);
+          }, space);
+        }
       }
       return origStringify.call(this, value, replacer, space);
     };
 
     window.JSON.stringify = JSON.stringify;
 
-    // Patch JSON.parse to use the custom one
+    // Patch JSON.parse and JSON.stringify to use the custom ones
     window.JSON.parse = JSON.parse;
     JSON.parse.__ftAdblock = true; // test marker
     for (const key in window._yttv) {
-      if (window._yttv[key] && window._yttv[key].JSON && window._yttv[key].JSON.parse) {
-        window._yttv[key].JSON.parse = JSON.parse;
+      if (window._yttv[key] && window._yttv[key].JSON) {
+        if (window._yttv[key].JSON.parse) {
+          window._yttv[key].JSON.parse = JSON.parse;
+        }
+        if (window._yttv[key].JSON.stringify) {
+          window._yttv[key].JSON.stringify = JSON.stringify;
+        }
       }
     }
 
@@ -11993,22 +12012,44 @@
       );
 
       try {
-        uiContainer.innerHTML = `
-<h1>Fast-Tube Theme Configuration</h1>
-<label for="__barColor">Navigation Bar Color: <input type="text" id="__barColor"/></label>
-<label for="__routeColor">Main Content Color: <input type="text" id="__routeColor"/></label>
-<div><small>Sponsor segments skipping - https://sponsor.ajay.app</small></div>
-`;
+        const h1 = document.createElement('h1');
+        h1.textContent = 'Fast-Tube Theme Configuration';
+        uiContainer.appendChild(h1);
+
+        const labelBar = document.createElement('label');
+        labelBar.htmlFor = '__barColor';
+        labelBar.textContent = 'Navigation Bar Color: ';
+        const inputBar = document.createElement('input');
+        inputBar.type = 'text';
+        inputBar.id = '__barColor';
+        labelBar.appendChild(inputBar);
+        uiContainer.appendChild(labelBar);
+
+        const labelRoute = document.createElement('label');
+        labelRoute.htmlFor = '__routeColor';
+        labelRoute.textContent = 'Main Content Color: ';
+        const inputRoute = document.createElement('input');
+        inputRoute.type = 'text';
+        inputRoute.id = '__routeColor';
+        labelRoute.appendChild(inputRoute);
+        uiContainer.appendChild(labelRoute);
+
+        const div = document.createElement('div');
+        const small = document.createElement('small');
+        small.textContent = 'Sponsor segments skipping - https://sponsor.ajay.app';
+        div.appendChild(small);
+        uiContainer.appendChild(div);
+
         document.querySelector('body').appendChild(uiContainer);
 
-        uiContainer.querySelector('#__barColor').value = configRead('focusContainerColor');
-        uiContainer.querySelector('#__barColor').addEventListener('change', (evt) => {
+        inputBar.value = configRead('focusContainerColor');
+        inputBar.addEventListener('change', (evt) => {
           configWrite('focusContainerColor', evt.target.value);
           updateStyle();
         });
 
-        uiContainer.querySelector('#__routeColor').value = configRead('routeColor');
-        uiContainer.querySelector('#__routeColor').addEventListener('change', (evt) => {
+        inputRoute.value = configRead('routeColor');
+        inputRoute.addEventListener('change', (evt) => {
           configWrite('routeColor', evt.target.value);
           updateStyle();
         });
@@ -20072,6 +20113,9 @@
 
                 const funcs = cachedFunctions;
                 cachedSettingActionGroup = funcs.find(func =>
+                    func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS') &&
+                    func.rhs.includes('.filter(')
+                )?.left?.split('.')[1] || funcs.find(func =>
                     func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS')
                 )?.left?.split('.')[1];
 
@@ -20145,8 +20189,15 @@
                 const origSettingActionGroup = inst[settingActionGroup];
                 inst[settingActionGroup] = function () {
                     const res = origSettingActionGroup.apply(this, arguments);
-                    const idx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
-                    res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP') || res.splice(idx, 0, pipCommand);
+                    if (!Array.isArray(res)) return res;
+                    if (!res.some(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP')) {
+                        const idx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
+                        if (idx !== -1) {
+                            res.splice(idx, 0, pipCommand);
+                        } else {
+                            res.push(pipCommand);
+                        }
+                    }
                     return res;
                 };
             }
@@ -20219,6 +20270,7 @@
                 const origEngagementActionButton = inst[engagementActionButton];
                 inst[engagementActionButton] = function () {
                     let res = origEngagementActionButton.apply(this, arguments);
+                    if (!Array.isArray(res)) return res;
                     if (configRead('enableSpeedControlsButton')) {
                         if (!res.find(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_SPEED')) {
                             res.push({

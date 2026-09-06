@@ -136,22 +136,44 @@ function execute_once_dom_loaded() {
   );
 
   try {
-    uiContainer.innerHTML = `
-<h1>Fast-Tube Theme Configuration</h1>
-<label for="__barColor">Navigation Bar Color: <input type="text" id="__barColor"/></label>
-<label for="__routeColor">Main Content Color: <input type="text" id="__routeColor"/></label>
-<div><small>Sponsor segments skipping - https://sponsor.ajay.app</small></div>
-`;
+    const h1 = document.createElement('h1');
+    h1.textContent = 'Fast-Tube Theme Configuration';
+    uiContainer.appendChild(h1);
+
+    const labelBar = document.createElement('label');
+    labelBar.htmlFor = '__barColor';
+    labelBar.textContent = 'Navigation Bar Color: ';
+    const inputBar = document.createElement('input');
+    inputBar.type = 'text';
+    inputBar.id = '__barColor';
+    labelBar.appendChild(inputBar);
+    uiContainer.appendChild(labelBar);
+
+    const labelRoute = document.createElement('label');
+    labelRoute.htmlFor = '__routeColor';
+    labelRoute.textContent = 'Main Content Color: ';
+    const inputRoute = document.createElement('input');
+    inputRoute.type = 'text';
+    inputRoute.id = '__routeColor';
+    labelRoute.appendChild(inputRoute);
+    uiContainer.appendChild(labelRoute);
+
+    const div = document.createElement('div');
+    const small = document.createElement('small');
+    small.textContent = 'Sponsor segments skipping - https://sponsor.ajay.app';
+    div.appendChild(small);
+    uiContainer.appendChild(div);
+
     document.querySelector('body').appendChild(uiContainer);
 
-    uiContainer.querySelector('#__barColor').value = configRead('focusContainerColor');
-    uiContainer.querySelector('#__barColor').addEventListener('change', (evt) => {
+    inputBar.value = configRead('focusContainerColor');
+    inputBar.addEventListener('change', (evt) => {
       configWrite('focusContainerColor', evt.target.value);
       updateStyle();
     });
 
-    uiContainer.querySelector('#__routeColor').value = configRead('routeColor');
-    uiContainer.querySelector('#__routeColor').addEventListener('change', (evt) => {
+    inputRoute.value = configRead('routeColor');
+    inputRoute.addEventListener('change', (evt) => {
       configWrite('routeColor', evt.target.value);
       updateStyle();
     });

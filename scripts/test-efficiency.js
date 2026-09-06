@@ -314,8 +314,30 @@ const stringified = JSON.stringify(payloadToSave);
 JSON.parse = originalParseHook;
 
 assert.strictEqual(parseCalledDuringStringify, false, 'JSON.stringify must not invoke JSON.parse on playback payloads');
-assert(stringified.includes('"isInlinePlaybackNoAd":true'), 'JSON.stringify should set isInlinePlaybackNoAd to true');
-console.log('   ✓ JSON.stringify directly sets isInlinePlaybackNoAd without JSON.parse round-trip');
+assert(stringified.includes('"isInlinePlaybackNoAd":true'), 'JSON.stringify should set isInlinePlaybackNoAd to true in output');
+assert.strictEqual(payloadToSave.playbackContext.contentPlaybackContext.isInlinePlaybackNoAd, false, 'JSON.stringify must not mutate original object in place');
+
+// Verify frozen objects do not throw TypeError
+const frozenPayload = Object.freeze({
+    playbackContext: Object.freeze({
+        contentPlaybackContext: Object.freeze({
+            isInlinePlaybackNoAd: false
+        })
+    })
+});
+let frozenStringified;
+assert.doesNotThrow(() => {
+    frozenStringified = JSON.stringify(frozenPayload);
+}, 'JSON.stringify replacer must handle frozen objects without throwing TypeError');
+assert(frozenStringified.includes('"isInlinePlaybackNoAd":true'), 'Frozen object should serialize with isInlinePlaybackNoAd:true');
+
+// Verify enableAdBlock: false does not inject isInlinePlaybackNoAd
+configWrite('enableAdBlock', false);
+const adblockDisabledString = JSON.stringify(payloadToSave);
+assert.strictEqual(adblockDisabledString.includes('"isInlinePlaybackNoAd":true'), false, 'When enableAdBlock is false, isInlinePlaybackNoAd should not be injected');
+configWrite('enableAdBlock', true);
+
+console.log('   ✓ JSON.stringify safely sets isInlinePlaybackNoAd via replacer without mutating original object or JSON.parse round-trip');
 
 // --- Test 4: Verify PatchSettings does not crash on non-settings payloads with title.runs ---
 console.log('\n4. Testing PatchSettings robustness on non-settings browse responses...');
@@ -697,5 +719,60 @@ scanYttv(testYttv);
 assert.strictEqual(foundKey, 'playerActionsContainer', 'Target key should be successfully detected');
 console.log('   ✓ Target player actions container correctly detected without re-scanning old keys');
 
-console.log('\n=== All 14 Efficiency and Regression Tests PASSED Successfully! ===');
+// --- Test 15: Verify customUI settingActionGroup AST resolution and safe button insertion ---
+console.log('\n15. Testing customUI settingActionGroup AST resolution & safe splicing...');
+const mockPlayerSource = `function(a) {
+    this.Ma = function(c) { var d = e.get("TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS"); };
+    this.Ba = function() { var c = _.hq(function(d) { return d.filter(function(h) { return h.type === "TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS"; }); }); };
+}`;
+const { extractAssignedFunctions } = require('./src/utils/ASTParser.js');
+const parsedFuncs = extractAssignedFunctions(mockPlayerSource);
+const resolvedSettingMethod = parsedFuncs.find(func =>
+    func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS') &&
+    func.rhs.includes('.filter(')
+)?.left?.split('.')[1] || parsedFuncs.find(func =>
+    func.rhs.includes('TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS')
+)?.left?.split('.')[1];
+
+assert.strictEqual(resolvedSettingMethod, 'Ba', 'settingActionGroup must resolve to Ba (filter method), NOT Ma (menu renderer)');
+
+// Test wrapper logic
+const mockPipCommand = { type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP' };
+function wrapSettingAction(orig) {
+    return function() {
+        const res = orig.apply(this, arguments);
+        if (!Array.isArray(res)) return res;
+        if (!res.some(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP')) {
+            const idx = res.findIndex(item => item.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS');
+            if (idx !== -1) {
+                res.splice(idx, 0, mockPipCommand);
+            } else {
+                res.push(mockPipCommand);
+            }
+        }
+        return res;
+    };
+}
+
+// 1. Guard against non-array returns (e.g. undefined from unexpected caller)
+const nonArrayFn = wrapSettingAction(() => undefined);
+assert.strictEqual(nonArrayFn(), undefined, 'Wrapper must return undefined without throwing TypeError');
+
+// 2. Normal array with PLAYBACK_SETTINGS -> inserts PIP right before it
+const buttonsList = [
+    { type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_LIKE' },
+    { type: 'TRANSPORT_CONTROLS_BUTTON_TYPE_PLAYBACK_SETTINGS' }
+];
+const arrayFn = wrapSettingAction(() => buttonsList);
+const resultButtons = arrayFn();
+assert.strictEqual(resultButtons.length, 3, 'Buttons list should contain 3 buttons after PiP insertion');
+assert.strictEqual(resultButtons[1].type, 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP', 'PiP button should be adjacent to PLAYBACK_SETTINGS');
+
+// 3. Re-running wrapper does not duplicate PiP
+const duplicateCheck = arrayFn();
+assert.strictEqual(duplicateCheck.filter(b => b.type === 'TRANSPORT_CONTROLS_BUTTON_TYPE_PIP').length, 1, 'PiP button must not be duplicated on repeated calls');
+
+console.log('   ✓ settingActionGroup correctly resolves Ba and safely splices PiP button without errors');
+
+console.log('\n=== All 15 Efficiency and Regression Tests PASSED Successfully! ===');
 process.exit(0);
