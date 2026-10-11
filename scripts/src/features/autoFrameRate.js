@@ -3,6 +3,8 @@ import { configRead, configChangeEmitter } from "../config.js";
 let attachedPlayer = null;
 let frameRatePollAttempts = 0;
 const FRAME_RATE_MAX_ATTEMPTS = 20;
+let frameRatePollTimeout = null;
+let pauseResumeTimeout = null;
 
 function attachToVideoPlayer() {
     if (!configRead('autoFrameRate')) return;
@@ -11,10 +13,13 @@ function attachToVideoPlayer() {
     const video = document.querySelector('video');
     if (!player || !video) {
         if (++frameRatePollAttempts < FRAME_RATE_MAX_ATTEMPTS) {
-            setTimeout(attachToVideoPlayer, 1000);
+            clearTimeout(frameRatePollTimeout);
+            frameRatePollTimeout = setTimeout(attachToVideoPlayer, 1000);
         }
         return;
     }
+    clearTimeout(frameRatePollTimeout);
+    frameRatePollTimeout = null;
 
     if (attachedPlayer === player && attachedPlayer.isConnected) return;
     attachedPlayer = player;
@@ -36,7 +41,8 @@ function attachToVideoPlayer() {
                     }
                     if (pauseFor > 0) {
                         video.pause();
-                        setTimeout(() => {
+                        clearTimeout(pauseResumeTimeout);
+                        pauseResumeTimeout = setTimeout(() => {
                             video.play();
                         }, pauseFor);
                     }
@@ -50,6 +56,10 @@ function attachToVideoPlayer() {
 }
 
 const resetFrameRate = () => {
+    clearTimeout(frameRatePollTimeout);
+    frameRatePollTimeout = null;
+    clearTimeout(pauseResumeTimeout);
+    pauseResumeTimeout = null;
     if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
         window.h5vcc.fasttube.SetFrameRate(0);
     }

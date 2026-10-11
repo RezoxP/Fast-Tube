@@ -39,17 +39,32 @@ Object.defineProperty(window, 'isPipPlaying', {
 
 let pipLoadAttempts = 0;
 const PIP_LOAD_MAX_ATTEMPTS = 60;
+let pipLoadTimeout = null;
 
 function pipLoad() {
     if (!window._yttv) {
-        if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+        if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) {
+            clearTimeout(pipLoadTimeout);
+            pipLoadTimeout = setTimeout(pipLoad, 250);
+        }
         return;
     }
-    const mappings = Object.values(window._yttv).find(a => a && a.mappings);
+    let mappings = null;
+    for (const key in window._yttv) {
+        if (window._yttv[key]?.mappings) {
+            mappings = window._yttv[key].mappings;
+            break;
+        }
+    }
     if (!mappings) {
-        if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+        if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) {
+            clearTimeout(pipLoadTimeout);
+            pipLoadTimeout = setTimeout(pipLoad, 250);
+        }
         return;
     }
+    clearTimeout(pipLoadTimeout);
+    pipLoadTimeout = null;
     PlayerService = mappings.get('PlayerService');
     const PlaybackPreviewService = mappings.get('PlaybackPreviewService');
     if (!PlayerService || !PlaybackPreviewService) return;

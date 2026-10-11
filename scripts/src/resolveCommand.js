@@ -240,13 +240,11 @@ function customAction(action, parameters) {
             optionShow(parameters, parameters.update);
             break;
         case 'SKIP':
-            const kE = document.createEvent('Event');
-            kE.initEvent('keydown', true, true);
-            kE.keyCode = 27;
-            kE.which = 27;
-            document.dispatchEvent(kE);
-
-            document.querySelector('video').currentTime = parameters.time;
+            document.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+            const videoToSkip = document.querySelector('video');
+            if (videoToSkip && typeof parameters?.time === 'number') {
+                videoToSkip.currentTime = parameters.time;
+            }
             break;
         case 'TT_SETTINGS_SHOW':
             modernUI();
@@ -263,7 +261,10 @@ function customAction(action, parameters) {
             break;
         case 'SET_PLAYER_SPEED':
             const speed = Number(parameters);
-            document.querySelector('video').playbackRate = speed;
+            const videoToSpeed = document.querySelector('video');
+            if (videoToSpeed && !isNaN(speed)) {
+                videoToSpeed.playbackRate = speed;
+            }
             break;
         case 'ENTER_MP':
             enablePip();

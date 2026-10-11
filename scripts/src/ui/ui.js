@@ -107,27 +107,29 @@ function execute_once_dom_loaded() {
         } else if (evt.keyCode === 13 || evt.keyCode === 32) {
           // "OK" button
           const focusedElement = document.querySelector(':focus');
-          if (focusedElement.type === 'checkbox') {
+          if (focusedElement && focusedElement.type === 'checkbox') {
             focusedElement.checked = !focusedElement.checked;
             focusedElement.dispatchEvent(new Event('change'));
           }
           evt.preventDefault();
           evt.stopPropagation();
           return;
-        } else if (evt.keyCode === 27 && document.querySelector(':focus').type !== 'text') {
+        } else if (evt.keyCode === 27) {
           // Back button
-          uiContainer.style.display = 'none';
-          uiContainer.blur();
-        } else if (document.querySelector(':focus').type === 'text' && evt.keyCode === 27) {
           const focusedElement = document.querySelector(':focus');
-          focusedElement.value = focusedElement.value.slice(0, -1);
+          if (focusedElement && focusedElement.type === 'text') {
+            focusedElement.value = focusedElement.value.slice(0, -1);
+          } else {
+            uiContainer.style.display = 'none';
+            uiContainer.blur();
+          }
         }
-
 
         if (evt.key === 'Enter' || evt.Uc?.key === 'Enter') {
           // If the focused element is a text input, emit a change event.
-          if (document.querySelector(':focus').type === 'text') {
-            document.querySelector(':focus').dispatchEvent(new Event('change'));
+          const focusedElement = document.querySelector(':focus');
+          if (focusedElement && focusedElement.type === 'text') {
+            focusedElement.dispatchEvent(new Event('change'));
           }
         }
       }

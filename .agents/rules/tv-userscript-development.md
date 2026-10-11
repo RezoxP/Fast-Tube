@@ -20,5 +20,5 @@ description: Guardrails for developing, optimizing, and testing userscripts on Y
 - **Preserve Monkey-Patch Flags**: When wrapping runtime methods (e.g. `resolveCommand`), preserve existing wrapper flags (e.g. `__ftPatched`) to prevent circular re-wrapping or stripping.
 
 ## 3. Testing & Workspace Cleanliness
-- **Temporary Screenshots**: Always write temporary visual verification screenshots to `/tmp/` rather than the workspace root.
+- **Temporary Screenshots**: Always write temporary visual verification screenshots to the agent scratch directory or Windows `$env:TEMP` rather than the workspace root, and clean them up after inspection.
 - **Repository Hygiene**: Ensure build artifacts, temporary patches, and transient directories are excluded from version control.

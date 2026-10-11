@@ -3575,17 +3575,32 @@
 
     let pipLoadAttempts = 0;
     const PIP_LOAD_MAX_ATTEMPTS = 60;
+    let pipLoadTimeout = null;
 
     function pipLoad() {
         if (!window._yttv) {
-            if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+            if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) {
+                clearTimeout(pipLoadTimeout);
+                pipLoadTimeout = setTimeout(pipLoad, 250);
+            }
             return;
         }
-        const mappings = Object.values(window._yttv).find(a => a && a.mappings);
+        let mappings = null;
+        for (const key in window._yttv) {
+            if (window._yttv[key]?.mappings) {
+                mappings = window._yttv[key].mappings;
+                break;
+            }
+        }
         if (!mappings) {
-            if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) setTimeout(pipLoad, 250);
+            if (++pipLoadAttempts < PIP_LOAD_MAX_ATTEMPTS) {
+                clearTimeout(pipLoadTimeout);
+                pipLoadTimeout = setTimeout(pipLoad, 250);
+            }
             return;
         }
+        clearTimeout(pipLoadTimeout);
+        pipLoadTimeout = null;
         PlayerService = mappings.get('PlayerService');
         const PlaybackPreviewService = mappings.get('PlaybackPreviewService');
         if (!PlayerService || !PlaybackPreviewService) return;
@@ -7018,12 +7033,14 @@
         // Always patch if possible - settings will be checked dynamically
         if (!window._yttv) return;
 
-        const yttvInstance = Object.values(window._yttv).find(
-            (obj) =>
-                obj &&
-                obj.instance &&
-                typeof obj.instance.resolveCommand === "function"
-        );
+        let yttvInstance = null;
+        for (const key in window._yttv) {
+            const obj = window._yttv[key];
+            if (obj && obj.instance && typeof obj.instance.resolveCommand === "function") {
+                yttvInstance = obj;
+                break;
+            }
+        }
 
         if (
             !yttvInstance ||
@@ -7179,7 +7196,7 @@
 
     // Wait for the YouTube TV app to be ready
     const interval$2 = setInterval(() => {
-        if (window._yttv && Object.keys(window._yttv).length > 0) {
+        if (window._yttv) {
             patchSubtitleMenu();
             if (isPatched || subtitlePatchAttempts >= SUBTITLE_MAX_ATTEMPTS) {
                 clearInterval(interval$2);
@@ -8702,13 +8719,11 @@
                 optionShow(parameters, parameters.update);
                 break;
             case 'SKIP':
-                const kE = document.createEvent('Event');
-                kE.initEvent('keydown', true, true);
-                kE.keyCode = 27;
-                kE.which = 27;
-                document.dispatchEvent(kE);
-
-                document.querySelector('video').currentTime = parameters.time;
+                document.dispatchEvent(new KeyboardEvent('keydown', { keyCode: 27, which: 27, bubbles: true, cancelable: true }));
+                const videoToSkip = document.querySelector('video');
+                if (videoToSkip && typeof parameters?.time === 'number') {
+                    videoToSkip.currentTime = parameters.time;
+                }
                 break;
             case 'TT_SETTINGS_SHOW':
                 modernUI();
@@ -8725,7 +8740,10 @@
                 break;
             case 'SET_PLAYER_SPEED':
                 const speed = Number(parameters);
-                document.querySelector('video').playbackRate = speed;
+                const videoToSpeed = document.querySelector('video');
+                if (videoToSpeed && !isNaN(speed)) {
+                    videoToSpeed.playbackRate = speed;
+                }
                 break;
             case 'ENTER_MP':
                 enablePip();
@@ -11797,7 +11815,7 @@
       });
     })();
 
-    var css = ".ytaf-ui-container {\n  position: absolute;\n  top: 10%;\n  left: 10%;\n  right: 10%;\n  bottom: 10%;\n\n  background: rgba(0, 0, 0, 0.8);\n  color: white;\n  border-radius: 20px;\n  padding: 20px;\n  font-size: 1.5rem;\n  z-index: 1000;\n}\n\n.ytaf-ui-container :focus {\n  outline: 4px red solid;\n}\n\n.ytaf-ui-container h1 {\n  margin: 0;\n  margin-bottom: 0.5em;\n  text-align: center;\n}\n\n.ytaf-ui-container input[type='checkbox'] {\n  width: 1.4rem;\n  height: 1.4rem;\n}\n\n.ytaf-ui-container input[type='radio'] {\n  width: 1.4rem;\n  height: 1.4rem;\n}\n\n.ytaf-ui-container label {\n  display: block;\n  font-size: 1.4rem;\n}\n\n.ytaf-notification-container {\n  position: absolute;\n  right: 10px;\n  bottom: 10px;\n  font-size: 16pt;\n  z-index: 1200;\n}\n\n.ytaf-notification-container .message {\n  background: rgba(0, 0, 0, 0.7);\n  color: white;\n  padding: 1em;\n  margin: 0.5em;\n  transition: all 0.3s ease-in-out;\n  opacity: 1;\n  line-height: 1;\n  border-right: 10px solid rgba(50, 255, 50, 0.3);\n  display: inline-block;\n  float: right;\n}\n\n.ytaf-notification-container .message-hidden {\n  opacity: 0;\n  margin: 0 0.5em;\n  padding: 0 1em;\n  line-height: 0;\n}\n\n/* Fixes transparency effect for the video player */\n\n.ytLrWatchDefaultShadow,\ndiv[idomkey=\"shadow\"] {\n  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0.8) 90%) !important;\n  background-color: rgba(0, 0, 0, 0.3) !important;\n  display: block !important;\n  height: 100% !important;\n  pointer-events: none !important;\n  position: absolute !important;\n  width: 100% !important;\n}\n\n/* https://github.com/webosbrew/youtube-webos/commit/4fbe38a18df31ddd62b6cf15f141dd58e1d1a71d */\n.ytLrWatchDefault2025Shadow {\n  background-color: rgba(11, 11, 11, 0.5) !important;\n}\n\n/* Fixes shorts having a black background */\n\n.ytLrTileHeaderRendererShorts {\n  background-image: none !important;\n}\n\n/* Multiline support for strings in the UI */\n\n.ytLrOverlayPanelHeaderRendererSubtitle {\n  white-space: pre-wrap !important;\n}\n\n/* Fixes SponsorBlock segments overlapping with the playhead */\n\n.ytLrProgressBarPlayhead {\n  z-index: 1 !important;\n}\n\n.ytLrProgressBarPlayed {\n  z-index: 1 !important;\n}\n\n.ytLrSearchBarSearchVoice {\n    display: block;\n    position: absolute;\n    left: 0;\n    top: 0;\n    pointer-events: auto\n}\n\n.ytLrSearchVoiceHost {\n    font-size: 3rem;\n}\n\n.ytLrSearchVoiceMicButtonHost {\n    color: rgba(255, 255, 255, 0.7);\n}\n\n.ytLrSearchVoiceMicButtonHost {\n    background-color: rgba(255, 255, 255, 0.1);\n    border-radius: 50%;\n    color: #f1f1f1;\n    display: block;\n    text-align: center;\n    width: 1em;\n    height: 1em;\n}\n\n.ytLrSearchVoiceMicButtonIcon {\n    display: inline-block;\n    font-size: .5em;\n    height: .5em;\n    width: .5em;\n    height: 1em;\n    width: 1em;\n    margin-top: .5em;\n    vertical-align: top !important;\n}\n\n.ytContribIconHost {\n    display: inline-block;\n    vertical-align: middle;\n}\n\n.ytContribIconTvArrowLeft::before {\n    content: \"\\e822\";\n}\n\n.ytContribIconHost::before {\n    font-family: \"YouTube Icons Outlined\";\n}";
+    var css = ".ytaf-ui-container {\r\n  position: absolute;\r\n  top: 10%;\r\n  left: 10%;\r\n  right: 10%;\r\n  bottom: 10%;\r\n\r\n  background: rgba(0, 0, 0, 0.8);\r\n  color: white;\r\n  border-radius: 20px;\r\n  padding: 20px;\r\n  font-size: 1.5rem;\r\n  z-index: 1000;\r\n}\r\n\r\n.ytaf-ui-container :focus {\r\n  outline: 4px red solid;\r\n}\r\n\r\n.ytaf-ui-container h1 {\r\n  margin: 0;\r\n  margin-bottom: 0.5em;\r\n  text-align: center;\r\n}\r\n\r\n.ytaf-ui-container input[type='checkbox'] {\r\n  width: 1.4rem;\r\n  height: 1.4rem;\r\n}\r\n\r\n.ytaf-ui-container input[type='radio'] {\r\n  width: 1.4rem;\r\n  height: 1.4rem;\r\n}\r\n\r\n.ytaf-ui-container label {\r\n  display: block;\r\n  font-size: 1.4rem;\r\n}\r\n\r\n.ytaf-notification-container {\r\n  position: absolute;\r\n  right: 10px;\r\n  bottom: 10px;\r\n  font-size: 16pt;\r\n  z-index: 1200;\r\n}\r\n\r\n.ytaf-notification-container .message {\r\n  background: rgba(0, 0, 0, 0.7);\r\n  color: white;\r\n  padding: 1em;\r\n  margin: 0.5em;\r\n  transition: all 0.3s ease-in-out;\r\n  opacity: 1;\r\n  line-height: 1;\r\n  border-right: 10px solid rgba(50, 255, 50, 0.3);\r\n  display: inline-block;\r\n  float: right;\r\n}\r\n\r\n.ytaf-notification-container .message-hidden {\r\n  opacity: 0;\r\n  margin: 0 0.5em;\r\n  padding: 0 1em;\r\n  line-height: 0;\r\n}\r\n\r\n/* Fixes transparency effect for the video player */\r\n\r\n.ytLrWatchDefaultShadow,\r\ndiv[idomkey=\"shadow\"] {\r\n  background-image: linear-gradient(to bottom, rgba(0, 0, 0, 0) 0, rgba(0, 0, 0, 0.8) 90%) !important;\r\n  background-color: rgba(0, 0, 0, 0.3) !important;\r\n  display: block !important;\r\n  height: 100% !important;\r\n  pointer-events: none !important;\r\n  position: absolute !important;\r\n  width: 100% !important;\r\n}\r\n\r\n/* https://github.com/webosbrew/youtube-webos/commit/4fbe38a18df31ddd62b6cf15f141dd58e1d1a71d */\r\n.ytLrWatchDefault2025Shadow {\r\n  background-color: rgba(11, 11, 11, 0.5) !important;\r\n}\r\n\r\n/* Fixes shorts having a black background */\r\n\r\n.ytLrTileHeaderRendererShorts {\r\n  background-image: none !important;\r\n}\r\n\r\n/* Multiline support for strings in the UI */\r\n\r\n.ytLrOverlayPanelHeaderRendererSubtitle {\r\n  white-space: pre-wrap !important;\r\n}\r\n\r\n/* Fixes SponsorBlock segments overlapping with the playhead */\r\n\r\n.ytLrProgressBarPlayhead {\r\n  z-index: 1 !important;\r\n}\r\n\r\n.ytLrProgressBarPlayed {\r\n  z-index: 1 !important;\r\n}\r\n\r\n.ytLrSearchBarSearchVoice {\r\n    display: block;\r\n    position: absolute;\r\n    left: 0;\r\n    top: 0;\r\n    pointer-events: auto\r\n}\r\n\r\n.ytLrSearchVoiceHost {\r\n    font-size: 3rem;\r\n}\r\n\r\n.ytLrSearchVoiceMicButtonHost {\r\n    color: rgba(255, 255, 255, 0.7);\r\n}\r\n\r\n.ytLrSearchVoiceMicButtonHost {\r\n    background-color: rgba(255, 255, 255, 0.1);\r\n    border-radius: 50%;\r\n    color: #f1f1f1;\r\n    display: block;\r\n    text-align: center;\r\n    width: 1em;\r\n    height: 1em;\r\n}\r\n\r\n.ytLrSearchVoiceMicButtonIcon {\r\n    display: inline-block;\r\n    font-size: .5em;\r\n    height: .5em;\r\n    width: .5em;\r\n    height: 1em;\r\n    width: 1em;\r\n    margin-top: .5em;\r\n    vertical-align: top !important;\r\n}\r\n\r\n.ytContribIconHost {\r\n    display: inline-block;\r\n    vertical-align: middle;\r\n}\r\n\r\n.ytContribIconTvArrowLeft::before {\r\n    content: \"\\e822\";\r\n}\r\n\r\n.ytContribIconHost::before {\r\n    font-family: \"YouTube Icons Outlined\";\r\n}";
 
     let style = null;
 
@@ -11983,27 +12001,29 @@
             } else if (evt.keyCode === 13 || evt.keyCode === 32) {
               // "OK" button
               const focusedElement = document.querySelector(':focus');
-              if (focusedElement.type === 'checkbox') {
+              if (focusedElement && focusedElement.type === 'checkbox') {
                 focusedElement.checked = !focusedElement.checked;
                 focusedElement.dispatchEvent(new Event('change'));
               }
               evt.preventDefault();
               evt.stopPropagation();
               return;
-            } else if (evt.keyCode === 27 && document.querySelector(':focus').type !== 'text') {
+            } else if (evt.keyCode === 27) {
               // Back button
-              uiContainer.style.display = 'none';
-              uiContainer.blur();
-            } else if (document.querySelector(':focus').type === 'text' && evt.keyCode === 27) {
               const focusedElement = document.querySelector(':focus');
-              focusedElement.value = focusedElement.value.slice(0, -1);
+              if (focusedElement && focusedElement.type === 'text') {
+                focusedElement.value = focusedElement.value.slice(0, -1);
+              } else {
+                uiContainer.style.display = 'none';
+                uiContainer.blur();
+              }
             }
-
 
             if (evt.key === 'Enter' || evt.Uc?.key === 'Enter') {
               // If the focused element is a text input, emit a change event.
-              if (document.querySelector(':focus').type === 'text') {
-                document.querySelector(':focus').dispatchEvent(new Event('change'));
+              const focusedElement = document.querySelector(':focus');
+              if (focusedElement && focusedElement.type === 'text') {
+                focusedElement.dispatchEvent(new Event('change'));
               }
             }
           }
@@ -20390,6 +20410,8 @@
     let attachedPlayer = null;
     let frameRatePollAttempts = 0;
     const FRAME_RATE_MAX_ATTEMPTS = 20;
+    let frameRatePollTimeout = null;
+    let pauseResumeTimeout = null;
 
     function attachToVideoPlayer() {
         if (!configRead('autoFrameRate')) return;
@@ -20398,10 +20420,13 @@
         const video = document.querySelector('video');
         if (!player || !video) {
             if (++frameRatePollAttempts < FRAME_RATE_MAX_ATTEMPTS) {
-                setTimeout(attachToVideoPlayer, 1000);
+                clearTimeout(frameRatePollTimeout);
+                frameRatePollTimeout = setTimeout(attachToVideoPlayer, 1000);
             }
             return;
         }
+        clearTimeout(frameRatePollTimeout);
+        frameRatePollTimeout = null;
 
         if (attachedPlayer === player && attachedPlayer.isConnected) return;
         attachedPlayer = player;
@@ -20423,7 +20448,8 @@
                         }
                         if (pauseFor > 0) {
                             video.pause();
-                            setTimeout(() => {
+                            clearTimeout(pauseResumeTimeout);
+                            pauseResumeTimeout = setTimeout(() => {
                                 video.play();
                             }, pauseFor);
                         }
@@ -20437,6 +20463,10 @@
     }
 
     const resetFrameRate = () => {
+        clearTimeout(frameRatePollTimeout);
+        frameRatePollTimeout = null;
+        clearTimeout(pauseResumeTimeout);
+        pauseResumeTimeout = null;
         if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
             window.h5vcc.fasttube.SetFrameRate(0);
         }

@@ -198,12 +198,14 @@ function patchSubtitleMenu() {
     // Always patch if possible - settings will be checked dynamically
     if (!window._yttv) return;
 
-    const yttvInstance = Object.values(window._yttv).find(
-        (obj) =>
-            obj &&
-            obj.instance &&
-            typeof obj.instance.resolveCommand === "function"
-    );
+    let yttvInstance = null;
+    for (const key in window._yttv) {
+        const obj = window._yttv[key];
+        if (obj && obj.instance && typeof obj.instance.resolveCommand === "function") {
+            yttvInstance = obj;
+            break;
+        }
+    }
 
     if (
         !yttvInstance ||
@@ -359,7 +361,7 @@ function patchSubtitleMenu() {
 
 // Wait for the YouTube TV app to be ready
 const interval = setInterval(() => {
-    if (window._yttv && Object.keys(window._yttv).length > 0) {
+    if (window._yttv) {
         patchSubtitleMenu();
         if (isPatched || subtitlePatchAttempts >= SUBTITLE_MAX_ATTEMPTS) {
             clearInterval(interval);

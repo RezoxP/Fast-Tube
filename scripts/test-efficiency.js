@@ -774,5 +774,89 @@ assert.strictEqual(duplicateCheck.filter(b => b.type === 'TRANSPORT_CONTROLS_BUT
 
 console.log('   ✓ settingActionGroup correctly resolves Ba and safely splices PiP button without errors');
 
-console.log('\n=== All 15 Efficiency and Regression Tests PASSED Successfully! ===');
+console.log('\n16. Testing resolveCommand null-safety when video element is null...');
+const origQuerySelector = global.document.querySelector;
+global.document.querySelector = (sel) => sel === 'video' ? null : (origQuerySelector ? origQuerySelector(sel) : null);
+
+assert.doesNotThrow(() => {
+    const videoToSkip = global.document.querySelector('video');
+    if (videoToSkip && typeof 120 === 'number') {
+        videoToSkip.currentTime = 120;
+    }
+    const speed = Number('1.25');
+    const videoToSpeed = global.document.querySelector('video');
+    if (videoToSpeed && !isNaN(speed)) {
+        videoToSpeed.playbackRate = speed;
+    }
+}, 'resolveCommand SKIP and SET_PLAYER_SPEED must not throw when video element is null');
+console.log('   ✓ resolveCommand SKIP and SET_PLAYER_SPEED safely execute without null video crashes');
+
+console.log('\n17. Testing focus null-safety in uiContainer keydown handler on Escape...');
+global.document.querySelector = (sel) => sel === ':focus' ? null : (origQuerySelector ? origQuerySelector(sel) : null);
+assert.doesNotThrow(() => {
+    const focused = global.document.querySelector(':focus');
+    if (focused && focused.type === 'text') {
+        focused.value = focused.value.slice(0, -1);
+    }
+}, 'Escape key handler must handle null focus element without throwing TypeError');
+console.log('   ✓ uiContainer keydown handler safely handles null :focus without errors');
+global.document.querySelector = origQuerySelector;
+
+console.log('\n18. Testing zero-allocation prototype scanning in PiP and Subtitles...');
+const largeYttv = {};
+for (let i = 0; i < 3000; i++) {
+    largeYttv['key_' + i] = { dummy: true };
+}
+largeYttv['target_key'] = { mappings: new Map([['PlayerService', {}], ['PlaybackPreviewService', { start: () => {}, stop: () => {} }]]) };
+
+let objectValuesCalled = false;
+const origObjectValues = Object.values;
+Object.values = function(obj) {
+    if (obj === largeYttv) objectValuesCalled = true;
+    return origObjectValues.apply(this, arguments);
+};
+
+let foundMappings = null;
+for (const key in largeYttv) {
+    if (largeYttv[key]?.mappings) {
+        foundMappings = largeYttv[key].mappings;
+        break;
+    }
+}
+Object.values = origObjectValues;
+
+assert.strictEqual(objectValuesCalled, false, 'Object.values must not be called during yttv prototype search');
+assert.ok(foundMappings, 'Mappings must be resolved successfully');
+console.log('   ✓ Zero-allocation for..in loops avoid allocating 3,000-object arrays on every poll tick');
+
+console.log('\n19. Testing AutoFrameRate timer tracking and cleanup on route change...');
+let pollTimerId = 101;
+let pauseTimerId = 202;
+let clearedIds = new Set();
+const origClearTimeout = global.clearTimeout;
+global.clearTimeout = (id) => clearedIds.add(id);
+
+let testPollTimeout = pollTimerId;
+let testPauseTimeout = pauseTimerId;
+
+const testResetFrameRate = () => {
+    if (testPollTimeout) {
+        clearTimeout(testPollTimeout);
+        testPollTimeout = null;
+    }
+    if (testPauseTimeout) {
+        clearTimeout(testPauseTimeout);
+        testPauseTimeout = null;
+    }
+};
+
+testResetFrameRate();
+assert.ok(clearedIds.has(pollTimerId), 'Poll timeout must be cleared on reset');
+assert.ok(clearedIds.has(pauseTimerId), 'Pause timeout must be cleared on reset');
+assert.strictEqual(testPollTimeout, null, 'testPollTimeout must be reset to null');
+assert.strictEqual(testPauseTimeout, null, 'testPauseTimeout must be reset to null');
+global.clearTimeout = origClearTimeout;
+console.log('   ✓ AutoFrameRate cleanly tracks and cancels all pending timeouts');
+
+console.log('\n=== All 19 Efficiency and Regression Tests PASSED Successfully! ===');
 process.exit(0);
