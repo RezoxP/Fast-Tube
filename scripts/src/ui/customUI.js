@@ -4,6 +4,7 @@ import { extractAssignedFunctions } from "../utils/ASTParser.js";
 import { configRead } from "../config.js";
 import { ButtonRenderer } from "./ytUI.js";
 import { t } from "i18next";
+import { onRoute } from "../utils/routeObserver.js";
 
 // PERF: the AST extraction below used to run inside the constructor on EVERY
 // instantiation of the player actions container (i.e. on every navigation to
@@ -307,8 +308,8 @@ function applyPatches() {
 
 applyPatches();
 
-window.addEventListener('hashchange', () => {
-    if (!isPlayerPatched && location.hash.includes('watch')) {
+onRoute((url) => {
+    if (!isPlayerPatched && url.includes('watch')) {
         applyPatchAttempts = 0;
         applyPatches();
     }

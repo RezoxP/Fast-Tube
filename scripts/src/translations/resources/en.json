@@ -8,157 +8,205 @@
                 "title": "Social Media Links",
                 "qrCodeScanMessage": "You can visit the {{name}} page by scanning the QR code below."
             },
-            "adBlock": "Ad Block",
+            "adBlock": "Ad Blocker",
+            "adBlockSubtitle": "Block pre-roll, mid-roll, and home feed ads automatically",
             "sponsorblock": {
-                "title": "SponsorBlock Settings",
+                "title": "SponsorBlock",
+                "subtitle": "Automatically skip sponsored segments, intros, and self-promos",
                 "options": {
                     "enableSB": "Enable SponsorBlock",
-                    "manualSkip": "Manual SponsorBlock Segment Skip",
-                    "segments": "Segments",
+                    "enableSBSubtitle": "Automatically skip community-tagged segments during playback",
+                    "manualSkip": "Manual Segment Skip",
+                    "manualSkipSubtitle": "Show an on-screen skip button instead of auto-skipping",
+                    "segments": "Segment Categories",
+                    "segmentsSubtitle": "Choose which types of segments to skip or keep",
                     "categories": {
-                        "sponsor": "Skip Sponsor Segments",
-                        "intro": "Skip Intro Segments",
-                        "outro": "Skip Outro Segments",
-                        "interaction": "Skip Interaction Reminder Segments",
-                        "selfpromo": "Skip Self-Promotion Segments",
-                        "preview": "Skip Preview/Recap Segments",
-                        "filler": "Skip Tangents/Jokes Segments",
-                        "music_offtopic": "Skip Off-Topic Music Segments",
-                        "highlights": "Enable Highlights"
+                        "sponsor": "Sponsor Segments",
+                        "intro": "Intro / Animation",
+                        "outro": "Outro / End Credits",
+                        "interaction": "Interaction Reminders (Subscribe / Like)",
+                        "selfpromo": "Self-Promotion / Unpaid Subscriptions",
+                        "preview": "Preview / Recap",
+                        "filler": "Tangents / Jokes",
+                        "music_offtopic": "Off-Topic Music",
+                        "highlights": "Highlight Segments"
                     },
-                    "showSBToasts": "Show SponsorBlock Toasts"
+                    "showSBToasts": "Show Skip Notifications",
+                    "showSBToastsSubtitle": "Display on-screen notification when a segment is skipped"
                 }
             },
             "dearrow": {
-                "title": "DeArrow Settings",
+                "title": "DeArrow (Anti-Clickbait)",
+                "subtitle": "Crowdsourced titles and thumbnails to reduce clickbait",
                 "options": {
-                    "enableDA": "Enable DeArrow",
-                    "enableDAThumbnails": "Enable DeArrow Thumbnails"
-                }
-            },
-            "misc": {
-                "title": "Miscellaneous Settings",
-                "options": {
-                    "endScreenCards": "Hide End Screen Cards",
-                    "youThereRenderer": "Enable 'Are you still watching?' Renderer",
-                    "paidPromoOverlay": "Enable 'Includes paid promotion' Overlay",
-                    "whosWatching": {
-                        "title": "Who's Watching Menu",
-                        "options": {
-                            "enableWW": "Enable Who's Watching Menu",
-                            "permaEnableWW": "Permanently Enable Who's Watching Menu",
-                            "enableWWOnExit": "Enable Who's Watching Menu on App Exit"
-                        }
-                    },
-                    "fixUI": "Fix UI",
-                    "hqThumbnails": "Enable High Quality Thumbnails",
-                    "longPress": "Enable Long Press Actions",
-                    "shorts": "Enable Shorts",
-                    "videoPreviews": "Enable Video Previews",
-                    "ttWelcomeMsg": "Show TT Welcome Message",
-                    "guestSignInReminder": "Show Guest Sign In Reminder",
-                    "reloadHomeOnStartup": "Reload Home on Startup"
+                    "enableDA": "Replace Video Titles",
+                    "enableDASubtitle": "Show community-verified accurate video titles",
+                    "enableDAThumbnails": "Replace Video Thumbnails",
+                    "enableDAThumbnailsSubtitle": "Use snapshot video frames instead of misleading thumbnails"
                 }
             },
             "subtitles": {
-                "title": "Subtitle Settings",
+                "title": "Subtitles & Captions",
+                "subtitle": "Auto-enable subtitles and unlock additional translations",
                 "options": {
-                    "showLocalSubtitle": "Show Local Subtitle",
-                    "showHiddenSubtitles": "Show Hidden Subtitles"
+                    "showLocalSubtitle": "Auto-Enable Local Subtitles",
+                    "showLocalSubtitleSubtitle": "Turn on captions in your language when video starts",
+                    "showHiddenSubtitles": "Unlock More Languages",
+                    "showHiddenSubtitlesSubtitle": "Display all available community and auto-translated tracks"
                 }
             },
             "videoPlayer": {
-                "title": "Video Player Settings",
-                "subtitle": "Customize video player features",
+                "title": "Video Player & Quality",
+                "subtitle": "Resolution, frame rate matching, playback speed, and player controls",
                 "options": {
                     "patching": {
-                        "title": "Patch Video Player UI",
+                        "title": "Player Bar Controls",
+                        "subtitle": "Customize buttons shown on the video player bar",
                         "options": {
-                            "enableVPUIPatching": "Enable Video Player UI Patching",
-                            "previousNextBtns": "Enable Previous and Next Buttons",
-                            "showSuperThxBtn": "Show Super Thanks Button",
-                            "showAIAskBtn": "Show Ask Button",
-                            "showSpeedCtrlBtn": "Show Speed Controls Button",
-                            "addMPBtn": "Show Mini Player Button",
-                            "swapMPWithPIP": "Swap Mini Player Button with PiP Button"
+                            "enableVPUIPatching": "Enable Player Bar Customization",
+                            "enableVPUIPatchingSubtitle": "Allow custom buttons on the video player bar",
+                            "previousNextBtns": "Previous & Next Buttons",
+                            "previousNextBtnsSubtitle": "Show skip previous and skip next buttons on player bar",
+                            "showSuperThxBtn": "Super Thanks Button",
+                            "showSuperThxBtnSubtitle": "Show or hide the Super Thanks button",
+                            "showAIAskBtn": "Ask / AI Button",
+                            "showAIAskBtnSubtitle": "Show or hide the YouTube Ask button",
+                            "showSpeedCtrlBtn": "Speed Controls Button",
+                            "showSpeedCtrlBtnSubtitle": "Add quick playback speed button to player bar",
+                            "addMPBtn": "Mini Player Button",
+                            "addMPBtnSubtitle": "Add button to shrink video into mini player window",
+                            "swapMPWithPIP": "Swap Mini Player with PiP",
+                            "swapMPWithPIPSubtitle": "Use Picture-in-Picture window instead of mini player"
                         }
                     },
                     "preferredVideoQuality": {
                         "title": "Preferred Video Quality",
-                        "subtitle": "Choose the preferred or next best video quality applied when playback starts"
+                        "subtitle": "Choose default playback resolution (e.g. 4K, 1080p, Auto)"
                     },
                     "speedSettings": {
-                        "title": "Speed Settings Increments",
-                        "subtitle": "Set the speed increments for video playback speed adjustments"
+                        "title": "Playback Speed Steps",
+                        "subtitle": "Set increment step size when adjusting playback speed"
                     },
                     "preferredVideoCodec": {
                         "title": "Preferred Video Codec",
-                        "subtitle": "Choose the preferred video codec for playback"
+                        "subtitle": "Select video decoding format (VP9, AV1, or AVC/H.264)"
                     },
-                    "afr": "Auto Frame Rate",
+                    "afr": "Auto Frame Rate (AFR)",
+                    "afrSubtitle": "Match TV refresh rate to video fps (24Hz, 50Hz, 60Hz) for smooth judder-free motion",
                     "afrPauseDuration": {
-                        "title": "Auto Frame Rate Pause Duration",
-                        "subtitle": "Set the duration (in seconds) to pause video playback when adjusting frame rate"
+                        "title": "AFR HDMI Switch Pause",
+                        "subtitle": "Brief pause while your TV switches display refresh rate"
                     }
                 }
             },
             "uiSettings": {
-                "title": "User Interface Settings",
-                "subtitle": "Customize the UI to your liking",
+                "title": "Interface & TV Display",
+                "subtitle": "On-screen clock, OLED screen dimming, and sidebar customization",
                 "options": {
+                    "clock": {
+                        "title": "On-Screen Clock",
+                        "subtitle": "Display digital clock overlay in the corner during navigation and playback",
+                        "options": {
+                            "enableClock": "Enable On-Screen Clock",
+                            "enableClockSubtitle": "Show digital clock overlay in the top-right corner",
+                            "isClock12HourFormat": "12-Hour Format (AM/PM)",
+                            "isClock12HourFormatSubtitle": "Use 12-hour format with AM/PM instead of 24-hour",
+                            "clockShowSeconds": "Show Seconds",
+                            "clockShowSecondsSubtitle": "Display seconds counter alongside hours and minutes"
+                        }
+                    },
+                    "screenDimming": {
+                        "title": "OLED Screen Dimming",
+                        "subtitle": "Dim display during inactivity to prevent burn-in and save power",
+                        "options": {
+                            "enableScreenDimming": "Enable Screen Dimming",
+                            "enableScreenDimmingSubtitle": "Dim TV display after a period of inactivity",
+                            "dimmingTimeout": {
+                                "title": "Inactivity Timeout",
+                                "subtitle": "Seconds of inactivity before display dims"
+                            },
+                            "dimmingOpacity": {
+                                "title": "Dimming Level",
+                                "subtitle": "Darkness level applied when screen is dimmed"
+                            }
+                        }
+                    },
+                    "launchToOnStartup": {
+                        "title": "Startup Screen",
+                        "subtitle": "Choose which screen (Home, Subscriptions, Search) opens on app start"
+                    },
                     "hideWatchedVideos": {
                         "title": "Hide Watched Videos",
+                        "subtitle": "Filter out already-watched videos from recommendations",
                         "options": {
                             "enableHideWatchedVideos": "Enable Hide Watched Videos",
+                            "enableHideWatchedVideosSubtitle": "Hide videos that have reached watched threshold",
                             "watchedVideosThreshold": {
-                                "title": "Watched Videos Threshold",
-                                "subtitle": "Set the percentage threshold for hiding watched videos"
+                                "title": "Watched Percentage Threshold",
+                                "subtitle": "Percentage of video watched before it is considered completed"
                             },
                             "setPagesToHideWatchedVideos": "Set Pages to Hide Watched Videos"
                         }
                     },
-                    "screenDimming": {
-                        "title": "Screen Dimming",
-                        "options": {
-                            "enableScreenDimming": "Enable Screen Dimming",
-                            "dimmingTimeout": {
-                                "title": "Dimming Timeout",
-                                "subtitle": "Set the inactivity timeout (in seconds) before the screen dims"
-                            },
-                            "dimmingOpacity": {
-                                "title": "Dimming Opacity",
-                                "subtitle": "Set the opacity level for screen dimming"
-                            }
-                        }
-                    },
+                    "sortSubscriptionsByAlphabet": "Sort Subscriptions A-Z",
+                    "sortSubscriptionsByAlphabetSubtitle": "Alphabetically organize your subscribed channel list",
+                    "disableChannelsOnSidebar": "Hide Channel Avatars on Sidebar",
+                    "disableChannelsOnSidebarSubtitle": "Keep the left sidebar compact and uncluttered",
                     "disableSidebarContents": {
-                        "title": "Disable Sidebar Contents",
+                        "title": "Customize Sidebar Tabs",
                         "subtitle": "Select sidebar contents to disable"
-                    },
-                    "launchToOnStartup": {
-                        "title": "Launch To on Startup",
-                        "subtitle": "Choose the default page Fast-Tube opens to on startup"
-                    },
-                    "sortSubscriptionsByAlphabet": "Sort Subscriptions Alphabetically",
-                    "disableChannelsOnSidebar": "Disable Channels on Sidebar",
-                    "clock": {
-                        "title": "Clock",
-                        "subtitle": "Display a clock on the screen",
-                        "options": {
-                            "enableClock": "Enable Clock",
-                            "isClock12HourFormat": "Use 12-Hour Format for Clock",
-                            "clockShowSeconds": "Show Seconds on Clock"
-                        }
                     }
                 }
             },
+            "misc": {
+                "title": "Behavior & Playback Tweaks",
+                "subtitle": "Shorts, previews, end screens, and long-press shortcuts",
+                "options": {
+                    "shorts": "YouTube Shorts Shelf",
+                    "shortsSubtitle": "Show or hide Shorts video rows from home feed",
+                    "videoPreviews": "Animated Video Previews",
+                    "videoPreviewsSubtitle": "Play silent video previews when focusing video tiles",
+                    "longPress": "Long-Press Quick Actions",
+                    "longPressSubtitle": "Hold Enter on a video tile to add to queue or view options",
+                    "endScreenCards": "Hide End Screen Cards",
+                    "endScreenCardsSubtitle": "Remove overlay cards that appear in the last seconds of videos",
+                    "paidPromoOverlay": "Hide 'Paid Promotion' Banner",
+                    "paidPromoOverlaySubtitle": "Suppress the paid promotion notification popup on videos",
+                    "youThereRenderer": "Bypass 'Still Watching?' Prompt",
+                    "youThereRendererSubtitle": "Prevent video playback from pausing due to inactivity",
+                    "whosWatching": {
+                        "title": "Who's Watching Profile Picker",
+                        "subtitle": "Configure profile selection screen on app launch and exit",
+                        "options": {
+                            "enableWW": "Enable Who's Watching Menu",
+                            "enableWWSubtitle": "Show profile selection when starting the app",
+                            "permaEnableWW": "Always Show on Launch",
+                            "permaEnableWWSubtitle": "Always prompt for profile on every launch",
+                            "enableWWOnExit": "Show on App Exit",
+                            "enableWWOnExitSubtitle": "Prompt to switch profiles when exiting the app"
+                        }
+                    },
+                    "ttWelcomeMsg": "Show Welcome Toast on Launch",
+                    "ttWelcomeMsgSubtitle": "Display Fast-Tube status message when app launches",
+                    "guestSignInReminder": "Hide Sign-In Reminders",
+                    "guestSignInReminderSubtitle": "Suppress repeated sign-in prompts when watching as guest",
+                    "reloadHomeOnStartup": "Refresh Home Feed on Startup",
+                    "reloadHomeOnStartupSubtitle": "Always fetch the freshest recommendations on startup",
+                    "hqThumbnails": "High Quality Thumbnails",
+                    "hqThumbnailsSubtitle": "Request maximum resolution thumbnail images",
+                    "fixUI": "TV Layout Optimization",
+                    "fixUISubtitle": "Optimize layout spacing and sizing for TV screens"
+                }
+            },
             "updater": {
-                "title": "Fast-Tube Cobalt Updater",
+                "title": "Fast-Tube Cobalt Updates",
                 "menuSubtitle": "Manage Fast-Tube Cobalt updates",
-                "versionSubtitle": "Current version: {{version}}",
+                "versionSubtitle": "Current version: {{version}} • Native Cobalt Engine",
                 "options": {
                     "checkForUpdates": "Check for updates",
-                    "checkForUpdatesOnStartup": "Check for updates on startup"
+                    "checkForUpdatesSubtitle": "Scan for new Fast-Tube releases on GitHub",
+                    "checkForUpdatesOnStartup": "Check for updates on startup",
+                    "checkForUpdatesOnStartupSubtitle": "Notify when a new version is available"
                 }
             }
         },

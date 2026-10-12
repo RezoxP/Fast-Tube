@@ -27,18 +27,21 @@ JSON.parse = function () {
       
     }
 
-    if (r.adPlacements && adBlockEnabled) {
-      r.adPlacements = [];
-    }
+    if (adBlockEnabled) {
+      if (r.adPlacements) r.adPlacements = [];
+      if (r.playerAds) r.playerAds = false;
+      if (r.adSlots) r.adSlots = [];
+      if (r.adBreakHeartbeatParams) delete r.adBreakHeartbeatParams;
+      if (r.adBreakParams) delete r.adBreakParams;
 
-    // Also set playerAds to false, just incase.
-    if (r.playerAds && adBlockEnabled) {
-      r.playerAds = false;
-    }
-
-    // Also set adSlots to an empty array, emptying only the adPlacements won't work.
-    if (r.adSlots && adBlockEnabled) {
-      r.adSlots = [];
+      if (r.playerResponse && typeof r.playerResponse === 'object') {
+        const pr = r.playerResponse;
+        if (pr.adPlacements) pr.adPlacements = [];
+        if (pr.playerAds) pr.playerAds = false;
+        if (pr.adSlots) pr.adSlots = [];
+        if (pr.adBreakHeartbeatParams) delete pr.adBreakHeartbeatParams;
+        if (pr.adBreakParams) delete pr.adBreakParams;
+      }
     }
 
     if (r.paidContentOverlay && !configRead('enablePaidPromotionOverlay')) {
@@ -336,8 +339,13 @@ for (const key in window._yttv) {
 
 
 function processShelves(shelves, shouldAddPreviews = true) {
+  const adBlockEnabled = configRead('enableAdBlock');
   for (let s = shelves.length - 1; s >= 0; s--) {
     const shelve = shelves[s];
+    if (adBlockEnabled && shelve.adSlotRenderer) {
+      shelves.splice(s, 1);
+      continue;
+    }
     if (shelve.shelfRenderer) {
       // Thumbnail sizing options (ported from upstream TizenTube)
       if (!shelve.shelfRenderer.tvhtml5Style) shelve.shelfRenderer.tvhtml5Style = {};
@@ -345,6 +353,14 @@ function processShelves(shelves, shouldAddPreviews = true) {
       if (configRead('disableEnlargingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.enlarge = false;
       if (configRead('enableShrinkingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.shrink = true;
       if (!shelve.shelfRenderer.content?.horizontalListRenderer?.items) continue;
+      if (adBlockEnabled) {
+        const items = shelve.shelfRenderer.content.horizontalListRenderer.items;
+        for (let i = items.length - 1; i >= 0; i--) {
+          if (items[i].adSlotRenderer) {
+            items.splice(i, 1);
+          }
+        }
+      }
       deArrowify(shelve.shelfRenderer.content.horizontalListRenderer.items);
       hqify(shelve.shelfRenderer.content.horizontalListRenderer.items);
       addLongPress(shelve.shelfRenderer.content.horizontalListRenderer.items);

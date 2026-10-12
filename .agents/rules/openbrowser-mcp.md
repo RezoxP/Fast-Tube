@@ -20,9 +20,8 @@ description: Guardrails and operational protocols for browser automation, CDP em
   await cdp.cdp_client.send_raw('Network.setUserAgentOverride', {'userAgent': ua}, session_id=cdp.session_id)
   await cdp.cdp_client.send_raw('Emulation.setUserAgentOverride', {'userAgent': ua}, session_id=cdp.session_id)
   ```
-- For YouTube TV Leanback mode, use the PS4 Leanback User Agent and append startup query parameters:
+- For YouTube TV Leanback mode, use the PS4 Leanback User Agent:
   - UA: `Mozilla/5.0 (PS4; Leanback Shell) Gecko/20100101 Firefox/65.0 LeanbackShell/01.00.01.75 Sony PS4/ (PS4, , no, CH)`
-  - URL: `https://www.youtube.com/tv#/?env_forceFullAnimation=true&env_isLimitedMemory=false&env_disableStartupDialog=true`
 
 ## 4. Lifecycle Management
 - Always explicitly stop the browser session upon task completion using:

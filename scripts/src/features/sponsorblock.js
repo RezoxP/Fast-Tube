@@ -2,6 +2,7 @@ import sha256 from '../tiny-sha256.js';
 import { configRead } from '../config.js';
 import { showToast } from '../ui/ytUI.js';
 import { t } from 'i18next';
+import { onRoute } from '../utils/routeObserver.js';
 
 // Copied from https://github.com/ajayyy/SponsorBlock/blob/da1a535de784540ee10166a75a3eb8537073838c/src/config.ts#L113-L134
 const barTypes = {
@@ -485,12 +486,9 @@ function sbExtractVideoID() {
 }
 
 // Because the app can switch routes without firing hashchange (replaceState)
-// and the player state appears slightly after the route, a lightweight
-// watchdog keeps the handler in sync with the actually-playing video.
-//
+// the routeObserver and a lightweight watchdog keep the handler in sync.
 function sbEnsureHandler() {
-  const hash = location.hash;
-  const onWatchRoute = hash.indexOf('#/watch') === 0;
+  const onWatchRoute = window.location.href.indexOf('watch') !== -1;
   const videoID = onWatchRoute ? sbExtractVideoID() : null;
 
   if (!videoID) {
@@ -525,7 +523,7 @@ function sbEnsureHandler() {
   }
 }
 
-window.addEventListener('hashchange', sbEnsureHandler, false);
+onRoute(sbEnsureHandler);
 sbEnsureHandler();
 let sbWatchdogInterval = setInterval(sbEnsureHandler, 1000);
 document.addEventListener('visibilitychange', () => {

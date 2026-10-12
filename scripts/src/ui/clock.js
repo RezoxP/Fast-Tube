@@ -58,16 +58,33 @@ function updateClock() {
     actualClock.textContent = `${hours}:${minutes}${secondsEnabled ? `:${seconds}` : ''}${is12HourFormat ? (now.getHours() >= 12 ? ' PM' : ' AM') : ''}`;
 }
 
-function startClockTimer() {
-    if (clockInterval) clearInterval(clockInterval);
-    clockInterval = null;
-    if (!document.hidden && actualClock && configRead('enableClock')) {
-        clockInterval = setInterval(updateClock, 1000);
+function scheduleNextClockTick() {
+    if (clockInterval) {
+        clearTimeout(clockInterval);
+        clearInterval(clockInterval);
+        clockInterval = null;
     }
+    if (document.hidden || !actualClock || !configRead('enableClock')) return;
+
+    updateClock();
+
+    const secondsEnabled = configRead('clockShowSeconds');
+    if (secondsEnabled) {
+        clockInterval = setTimeout(scheduleNextClockTick, 1000);
+    } else {
+        const now = new Date();
+        const msUntilNextMinute = ((60 - now.getSeconds()) * 1000) - now.getMilliseconds() + 50;
+        clockInterval = setTimeout(scheduleNextClockTick, Math.max(500, msUntilNextMinute));
+    }
+}
+
+function startClockTimer() {
+    scheduleNextClockTick();
 }
 
 function stopClockTimer() {
     if (clockInterval) {
+        clearTimeout(clockInterval);
         clearInterval(clockInterval);
         clockInterval = null;
     }

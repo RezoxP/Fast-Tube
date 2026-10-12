@@ -3092,157 +3092,205 @@
     			title: "Social Media Links",
     			qrCodeScanMessage: "You can visit the {{name}} page by scanning the QR code below."
     		},
-    		adBlock: "Ad Block",
+    		adBlock: "Ad Blocker",
+    		adBlockSubtitle: "Block pre-roll, mid-roll, and home feed ads automatically",
     		sponsorblock: {
-    			title: "SponsorBlock Settings",
+    			title: "SponsorBlock",
+    			subtitle: "Automatically skip sponsored segments, intros, and self-promos",
     			options: {
     				enableSB: "Enable SponsorBlock",
-    				manualSkip: "Manual SponsorBlock Segment Skip",
-    				segments: "Segments",
+    				enableSBSubtitle: "Automatically skip community-tagged segments during playback",
+    				manualSkip: "Manual Segment Skip",
+    				manualSkipSubtitle: "Show an on-screen skip button instead of auto-skipping",
+    				segments: "Segment Categories",
+    				segmentsSubtitle: "Choose which types of segments to skip or keep",
     				categories: {
-    					sponsor: "Skip Sponsor Segments",
-    					intro: "Skip Intro Segments",
-    					outro: "Skip Outro Segments",
-    					interaction: "Skip Interaction Reminder Segments",
-    					selfpromo: "Skip Self-Promotion Segments",
-    					preview: "Skip Preview/Recap Segments",
-    					filler: "Skip Tangents/Jokes Segments",
-    					music_offtopic: "Skip Off-Topic Music Segments",
-    					highlights: "Enable Highlights"
+    					sponsor: "Sponsor Segments",
+    					intro: "Intro / Animation",
+    					outro: "Outro / End Credits",
+    					interaction: "Interaction Reminders (Subscribe / Like)",
+    					selfpromo: "Self-Promotion / Unpaid Subscriptions",
+    					preview: "Preview / Recap",
+    					filler: "Tangents / Jokes",
+    					music_offtopic: "Off-Topic Music",
+    					highlights: "Highlight Segments"
     				},
-    				showSBToasts: "Show SponsorBlock Toasts"
+    				showSBToasts: "Show Skip Notifications",
+    				showSBToastsSubtitle: "Display on-screen notification when a segment is skipped"
     			}
     		},
     		dearrow: {
-    			title: "DeArrow Settings",
+    			title: "DeArrow (Anti-Clickbait)",
+    			subtitle: "Crowdsourced titles and thumbnails to reduce clickbait",
     			options: {
-    				enableDA: "Enable DeArrow",
-    				enableDAThumbnails: "Enable DeArrow Thumbnails"
-    			}
-    		},
-    		misc: {
-    			title: "Miscellaneous Settings",
-    			options: {
-    				endScreenCards: "Hide End Screen Cards",
-    				youThereRenderer: "Enable 'Are you still watching?' Renderer",
-    				paidPromoOverlay: "Enable 'Includes paid promotion' Overlay",
-    				whosWatching: {
-    					title: "Who's Watching Menu",
-    					options: {
-    						enableWW: "Enable Who's Watching Menu",
-    						permaEnableWW: "Permanently Enable Who's Watching Menu",
-    						enableWWOnExit: "Enable Who's Watching Menu on App Exit"
-    					}
-    				},
-    				fixUI: "Fix UI",
-    				hqThumbnails: "Enable High Quality Thumbnails",
-    				longPress: "Enable Long Press Actions",
-    				shorts: "Enable Shorts",
-    				videoPreviews: "Enable Video Previews",
-    				ttWelcomeMsg: "Show TT Welcome Message",
-    				guestSignInReminder: "Show Guest Sign In Reminder",
-    				reloadHomeOnStartup: "Reload Home on Startup"
+    				enableDA: "Replace Video Titles",
+    				enableDASubtitle: "Show community-verified accurate video titles",
+    				enableDAThumbnails: "Replace Video Thumbnails",
+    				enableDAThumbnailsSubtitle: "Use snapshot video frames instead of misleading thumbnails"
     			}
     		},
     		subtitles: {
-    			title: "Subtitle Settings",
+    			title: "Subtitles & Captions",
+    			subtitle: "Auto-enable subtitles and unlock additional translations",
     			options: {
-    				showLocalSubtitle: "Show Local Subtitle",
-    				showHiddenSubtitles: "Show Hidden Subtitles"
+    				showLocalSubtitle: "Auto-Enable Local Subtitles",
+    				showLocalSubtitleSubtitle: "Turn on captions in your language when video starts",
+    				showHiddenSubtitles: "Unlock More Languages",
+    				showHiddenSubtitlesSubtitle: "Display all available community and auto-translated tracks"
     			}
     		},
     		videoPlayer: {
-    			title: "Video Player Settings",
-    			subtitle: "Customize video player features",
+    			title: "Video Player & Quality",
+    			subtitle: "Resolution, frame rate matching, playback speed, and player controls",
     			options: {
     				patching: {
-    					title: "Patch Video Player UI",
+    					title: "Player Bar Controls",
+    					subtitle: "Customize buttons shown on the video player bar",
     					options: {
-    						enableVPUIPatching: "Enable Video Player UI Patching",
-    						previousNextBtns: "Enable Previous and Next Buttons",
-    						showSuperThxBtn: "Show Super Thanks Button",
-    						showAIAskBtn: "Show Ask Button",
-    						showSpeedCtrlBtn: "Show Speed Controls Button",
-    						addMPBtn: "Show Mini Player Button",
-    						swapMPWithPIP: "Swap Mini Player Button with PiP Button"
+    						enableVPUIPatching: "Enable Player Bar Customization",
+    						enableVPUIPatchingSubtitle: "Allow custom buttons on the video player bar",
+    						previousNextBtns: "Previous & Next Buttons",
+    						previousNextBtnsSubtitle: "Show skip previous and skip next buttons on player bar",
+    						showSuperThxBtn: "Super Thanks Button",
+    						showSuperThxBtnSubtitle: "Show or hide the Super Thanks button",
+    						showAIAskBtn: "Ask / AI Button",
+    						showAIAskBtnSubtitle: "Show or hide the YouTube Ask button",
+    						showSpeedCtrlBtn: "Speed Controls Button",
+    						showSpeedCtrlBtnSubtitle: "Add quick playback speed button to player bar",
+    						addMPBtn: "Mini Player Button",
+    						addMPBtnSubtitle: "Add button to shrink video into mini player window",
+    						swapMPWithPIP: "Swap Mini Player with PiP",
+    						swapMPWithPIPSubtitle: "Use Picture-in-Picture window instead of mini player"
     					}
     				},
     				preferredVideoQuality: {
     					title: "Preferred Video Quality",
-    					subtitle: "Choose the preferred or next best video quality applied when playback starts"
+    					subtitle: "Choose default playback resolution (e.g. 4K, 1080p, Auto)"
     				},
     				speedSettings: {
-    					title: "Speed Settings Increments",
-    					subtitle: "Set the speed increments for video playback speed adjustments"
+    					title: "Playback Speed Steps",
+    					subtitle: "Set increment step size when adjusting playback speed"
     				},
     				preferredVideoCodec: {
     					title: "Preferred Video Codec",
-    					subtitle: "Choose the preferred video codec for playback"
+    					subtitle: "Select video decoding format (VP9, AV1, or AVC/H.264)"
     				},
-    				afr: "Auto Frame Rate",
+    				afr: "Auto Frame Rate (AFR)",
+    				afrSubtitle: "Match TV refresh rate to video fps (24Hz, 50Hz, 60Hz) for smooth judder-free motion",
     				afrPauseDuration: {
-    					title: "Auto Frame Rate Pause Duration",
-    					subtitle: "Set the duration (in seconds) to pause video playback when adjusting frame rate"
+    					title: "AFR HDMI Switch Pause",
+    					subtitle: "Brief pause while your TV switches display refresh rate"
     				}
     			}
     		},
     		uiSettings: {
-    			title: "User Interface Settings",
-    			subtitle: "Customize the UI to your liking",
+    			title: "Interface & TV Display",
+    			subtitle: "On-screen clock, OLED screen dimming, and sidebar customization",
     			options: {
+    				clock: {
+    					title: "On-Screen Clock",
+    					subtitle: "Display digital clock overlay in the corner during navigation and playback",
+    					options: {
+    						enableClock: "Enable On-Screen Clock",
+    						enableClockSubtitle: "Show digital clock overlay in the top-right corner",
+    						isClock12HourFormat: "12-Hour Format (AM/PM)",
+    						isClock12HourFormatSubtitle: "Use 12-hour format with AM/PM instead of 24-hour",
+    						clockShowSeconds: "Show Seconds",
+    						clockShowSecondsSubtitle: "Display seconds counter alongside hours and minutes"
+    					}
+    				},
+    				screenDimming: {
+    					title: "OLED Screen Dimming",
+    					subtitle: "Dim display during inactivity to prevent burn-in and save power",
+    					options: {
+    						enableScreenDimming: "Enable Screen Dimming",
+    						enableScreenDimmingSubtitle: "Dim TV display after a period of inactivity",
+    						dimmingTimeout: {
+    							title: "Inactivity Timeout",
+    							subtitle: "Seconds of inactivity before display dims"
+    						},
+    						dimmingOpacity: {
+    							title: "Dimming Level",
+    							subtitle: "Darkness level applied when screen is dimmed"
+    						}
+    					}
+    				},
+    				launchToOnStartup: {
+    					title: "Startup Screen",
+    					subtitle: "Choose which screen (Home, Subscriptions, Search) opens on app start"
+    				},
     				hideWatchedVideos: {
     					title: "Hide Watched Videos",
+    					subtitle: "Filter out already-watched videos from recommendations",
     					options: {
     						enableHideWatchedVideos: "Enable Hide Watched Videos",
+    						enableHideWatchedVideosSubtitle: "Hide videos that have reached watched threshold",
     						watchedVideosThreshold: {
-    							title: "Watched Videos Threshold",
-    							subtitle: "Set the percentage threshold for hiding watched videos"
+    							title: "Watched Percentage Threshold",
+    							subtitle: "Percentage of video watched before it is considered completed"
     						},
     						setPagesToHideWatchedVideos: "Set Pages to Hide Watched Videos"
     					}
     				},
-    				screenDimming: {
-    					title: "Screen Dimming",
-    					options: {
-    						enableScreenDimming: "Enable Screen Dimming",
-    						dimmingTimeout: {
-    							title: "Dimming Timeout",
-    							subtitle: "Set the inactivity timeout (in seconds) before the screen dims"
-    						},
-    						dimmingOpacity: {
-    							title: "Dimming Opacity",
-    							subtitle: "Set the opacity level for screen dimming"
-    						}
-    					}
-    				},
+    				sortSubscriptionsByAlphabet: "Sort Subscriptions A-Z",
+    				sortSubscriptionsByAlphabetSubtitle: "Alphabetically organize your subscribed channel list",
+    				disableChannelsOnSidebar: "Hide Channel Avatars on Sidebar",
+    				disableChannelsOnSidebarSubtitle: "Keep the left sidebar compact and uncluttered",
     				disableSidebarContents: {
-    					title: "Disable Sidebar Contents",
+    					title: "Customize Sidebar Tabs",
     					subtitle: "Select sidebar contents to disable"
-    				},
-    				launchToOnStartup: {
-    					title: "Launch To on Startup",
-    					subtitle: "Choose the default page Fast-Tube opens to on startup"
-    				},
-    				sortSubscriptionsByAlphabet: "Sort Subscriptions Alphabetically",
-    				disableChannelsOnSidebar: "Disable Channels on Sidebar",
-    				clock: {
-    					title: "Clock",
-    					subtitle: "Display a clock on the screen",
-    					options: {
-    						enableClock: "Enable Clock",
-    						isClock12HourFormat: "Use 12-Hour Format for Clock",
-    						clockShowSeconds: "Show Seconds on Clock"
-    					}
     				}
     			}
     		},
+    		misc: {
+    			title: "Behavior & Playback Tweaks",
+    			subtitle: "Shorts, previews, end screens, and long-press shortcuts",
+    			options: {
+    				shorts: "YouTube Shorts Shelf",
+    				shortsSubtitle: "Show or hide Shorts video rows from home feed",
+    				videoPreviews: "Animated Video Previews",
+    				videoPreviewsSubtitle: "Play silent video previews when focusing video tiles",
+    				longPress: "Long-Press Quick Actions",
+    				longPressSubtitle: "Hold Enter on a video tile to add to queue or view options",
+    				endScreenCards: "Hide End Screen Cards",
+    				endScreenCardsSubtitle: "Remove overlay cards that appear in the last seconds of videos",
+    				paidPromoOverlay: "Hide 'Paid Promotion' Banner",
+    				paidPromoOverlaySubtitle: "Suppress the paid promotion notification popup on videos",
+    				youThereRenderer: "Bypass 'Still Watching?' Prompt",
+    				youThereRendererSubtitle: "Prevent video playback from pausing due to inactivity",
+    				whosWatching: {
+    					title: "Who's Watching Profile Picker",
+    					subtitle: "Configure profile selection screen on app launch and exit",
+    					options: {
+    						enableWW: "Enable Who's Watching Menu",
+    						enableWWSubtitle: "Show profile selection when starting the app",
+    						permaEnableWW: "Always Show on Launch",
+    						permaEnableWWSubtitle: "Always prompt for profile on every launch",
+    						enableWWOnExit: "Show on App Exit",
+    						enableWWOnExitSubtitle: "Prompt to switch profiles when exiting the app"
+    					}
+    				},
+    				ttWelcomeMsg: "Show Welcome Toast on Launch",
+    				ttWelcomeMsgSubtitle: "Display Fast-Tube status message when app launches",
+    				guestSignInReminder: "Hide Sign-In Reminders",
+    				guestSignInReminderSubtitle: "Suppress repeated sign-in prompts when watching as guest",
+    				reloadHomeOnStartup: "Refresh Home Feed on Startup",
+    				reloadHomeOnStartupSubtitle: "Always fetch the freshest recommendations on startup",
+    				hqThumbnails: "High Quality Thumbnails",
+    				hqThumbnailsSubtitle: "Request maximum resolution thumbnail images",
+    				fixUI: "TV Layout Optimization",
+    				fixUISubtitle: "Optimize layout spacing and sizing for TV screens"
+    			}
+    		},
     		updater: {
-    			title: "Fast-Tube Cobalt Updater",
+    			title: "Fast-Tube Cobalt Updates",
     			menuSubtitle: "Manage Fast-Tube Cobalt updates",
-    			versionSubtitle: "Current version: {{version}}",
+    			versionSubtitle: "Current version: {{version}} • Native Cobalt Engine",
     			options: {
     				checkForUpdates: "Check for updates",
-    				checkForUpdatesOnStartup: "Check for updates on startup"
+    				checkForUpdatesSubtitle: "Scan for new Fast-Tube releases on GitHub",
+    				checkForUpdatesOnStartup: "Check for updates on startup",
+    				checkForUpdatesOnStartupSubtitle: "Notify when a new version is available"
     			}
     		}
     	},
@@ -7221,26 +7269,30 @@
         const settings = [
             {
                 name: t('settings.options.adBlock'),
+                subtitle: t('settings.options.adBlockSubtitle'),
                 icon: 'DOLLAR_SIGN',
                 value: 'enableAdBlock'
             },
             {
                 name: t('settings.options.sponsorblock.title'),
+                subtitle: t('settings.options.sponsorblock.subtitle'),
                 icon: 'MONEY_HAND',
                 value: null,
                 menuId: 'tt-sponsorblock-settings',
                 menuHeader: {
                     title: t('settings.options.sponsorblock.title'),
-                    subtitle: 'https://sponsor.ajay.app/'
+                    subtitle: t('settings.options.sponsorblock.subtitle')
                 },
                 options: [
                     {
                         name: t('settings.options.sponsorblock.options.enableSB'),
+                        subtitle: t('settings.options.sponsorblock.options.enableSBSubtitle'),
                         icon: 'MONEY_HAND',
                         value: 'enableSponsorBlock'
                     },
                     {
                         name: t('settings.options.sponsorblock.options.manualSkip'),
+                        subtitle: t('settings.options.sponsorblock.options.manualSkipSubtitle'),
                         icon: 'DOLLAR_SIGN',
                         value: null,
                         arrayToEdit: 'sponsorBlockManualSkips',
@@ -7284,9 +7336,14 @@
                     },
                     {
                         name: t('settings.options.sponsorblock.options.segments'),
+                        subtitle: t('settings.options.sponsorblock.options.segmentsSubtitle'),
                         icon: 'SETTINGS',
                         value: null,
                         menuId: 'tt-sponsorblock-segments',
+                        menuHeader: {
+                            title: t('settings.options.sponsorblock.options.segments'),
+                            subtitle: t('settings.options.sponsorblock.options.segmentsSubtitle')
+                        },
                         options: [
                             {
                                 name: t('settings.options.sponsorblock.options.categories.sponsor'),
@@ -7331,27 +7388,30 @@
                     },
                     {
                         name: t('settings.options.sponsorblock.options.showSBToasts'),
+                        subtitle: t('settings.options.sponsorblock.options.showSBToastsSubtitle'),
                         value: 'enableSponsorBlockToasts'
                     }
                 ]
             },
             {
                 name: t('settings.options.dearrow.title'),
+                subtitle: t('settings.options.dearrow.subtitle'),
                 icon: 'VISIBILITY_OFF',
                 value: null,
                 menuHeader: {
                     title: t('settings.options.dearrow.title'),
-                    subtitle: 'https://dearrow.ajay.app/'
+                    subtitle: t('settings.options.dearrow.subtitle')
                 },
                 options: [
                     {
                         name: t('settings.options.dearrow.options.enableDA'),
-
+                        subtitle: t('settings.options.dearrow.options.enableDASubtitle'),
                         icon: 'VISIBILITY_OFF',
                         value: 'enableDeArrow'
                     },
                     {
                         name: t('settings.options.dearrow.options.enableDAThumbnails'),
+                        subtitle: t('settings.options.dearrow.options.enableDAThumbnailsSubtitle'),
                         icon: 'TV',
                         value: 'enableDeArrowThumbnails'
                     }
@@ -7359,104 +7419,129 @@
             },
             {
                 name: t('settings.options.misc.title'),
+                subtitle: t('settings.options.misc.subtitle'),
                 icon: 'SETTINGS',
                 value: null,
+                menuHeader: {
+                    title: t('settings.options.misc.title'),
+                    subtitle: t('settings.options.misc.subtitle')
+                },
                 options: [
                     {
-                        name: t('settings.options.misc.options.endScreenCards'),
-
-                        icon: 'VISIBILITY_OFF',
-                        value: 'enableHideEndScreenCards'
-                    },
-                    {
-                        name: t('settings.options.misc.options.youThereRenderer'),
-                        icon: 'HELP',
-                        value: 'enableYouThereRenderer'
-                    },
-                    {
-                        name: t('settings.options.misc.options.paidPromoOverlay'),
-                        icon: 'MONEY_HAND',
-                        value: 'enablePaidPromotionOverlay'
-                    },
-                    {
-                        name: t('settings.options.misc.options.whosWatching.title'),
-                        icon: 'ACCOUNT_CIRCLE',
-                        menuId: 'tt-whos-watching-menu-settings',
-                        value: null,
-                        options: [
-                            {
-                                name: t('settings.options.misc.options.whosWatching.options.enableWW'),
-                                value: 'enableWhoIsWatchingMenu'
-                            },
-                            {
-                                name: t('settings.options.misc.options.whosWatching.options.permaEnableWW'),
-                                value: 'permanentlyEnableWhoIsWatchingMenu'
-                            },
-                            {
-                                name: t('settings.options.misc.options.whosWatching.options.enableWWOnExit'),
-                                value: 'enableWhosWatchingMenuOnAppExit'
-                            }
-                        ]
-                    },
-                    {
-                        name: t('settings.options.misc.options.fixUI'),
-                        icon: 'STAR',
-                        value: 'enableFixedUI'
-                    },
-                    {
-                        name: t('settings.options.misc.options.hqThumbnails'),
-                        icon: 'VIDEO_QUALITY',
-                        value: 'enableHqThumbnails'
-                    },
-                    /*{
-                        name: 'Chapters',
-                        icon: 'BOOKMARK_BORDER',
-                        value: 'enableChapters'
-                    },*/
-                    {
-                        name: t('settings.options.misc.options.longPress'),
-                        value: 'enableLongPress'
-                    },
-                    {
                         name: t('settings.options.misc.options.shorts'),
+                        subtitle: t('settings.options.misc.options.shortsSubtitle'),
                         icon: 'YOUTUBE_SHORTS_FILL_24',
                         value: 'enableShorts'
                     },
                     {
                         name: t('settings.options.misc.options.videoPreviews'),
+                        subtitle: t('settings.options.misc.options.videoPreviewsSubtitle'),
                         value: 'enablePreviews'
                     },
                     {
+                        name: t('settings.options.misc.options.longPress'),
+                        subtitle: t('settings.options.misc.options.longPressSubtitle'),
+                        value: 'enableLongPress'
+                    },
+                    {
+                        name: t('settings.options.misc.options.endScreenCards'),
+                        subtitle: t('settings.options.misc.options.endScreenCardsSubtitle'),
+                        icon: 'VISIBILITY_OFF',
+                        value: 'enableHideEndScreenCards'
+                    },
+                    {
+                        name: t('settings.options.misc.options.paidPromoOverlay'),
+                        subtitle: t('settings.options.misc.options.paidPromoOverlaySubtitle'),
+                        icon: 'MONEY_HAND',
+                        value: 'enablePaidPromotionOverlay'
+                    },
+                    {
+                        name: t('settings.options.misc.options.youThereRenderer'),
+                        subtitle: t('settings.options.misc.options.youThereRendererSubtitle'),
+                        icon: 'HELP',
+                        value: 'enableYouThereRenderer'
+                    },
+                    {
+                        name: t('settings.options.misc.options.whosWatching.title'),
+                        subtitle: t('settings.options.misc.options.whosWatching.subtitle'),
+                        icon: 'ACCOUNT_CIRCLE',
+                        menuId: 'tt-whos-watching-menu-settings',
+                        menuHeader: {
+                            title: t('settings.options.misc.options.whosWatching.title'),
+                            subtitle: t('settings.options.misc.options.whosWatching.subtitle')
+                        },
+                        options: [
+                            {
+                                name: t('settings.options.misc.options.whosWatching.options.enableWW'),
+                                subtitle: t('settings.options.misc.options.whosWatching.options.enableWWSubtitle'),
+                                value: 'enableWhoIsWatchingMenu'
+                            },
+                            {
+                                name: t('settings.options.misc.options.whosWatching.options.permaEnableWW'),
+                                subtitle: t('settings.options.misc.options.whosWatching.options.permaEnableWWSubtitle'),
+                                value: 'permanentlyEnableWhoIsWatchingMenu'
+                            },
+                            {
+                                name: t('settings.options.misc.options.whosWatching.options.enableWWOnExit'),
+                                subtitle: t('settings.options.misc.options.whosWatching.options.enableWWOnExitSubtitle'),
+                                value: 'enableWhosWatchingMenuOnAppExit'
+                            }
+                        ]
+                    },
+                    {
                         name: t('settings.options.misc.options.ttWelcomeMsg'),
-                        value: 'showWelcomeToast',
+                        subtitle: t('settings.options.misc.options.ttWelcomeMsgSubtitle'),
+                        value: 'showWelcomeToast'
                     },
                     {
                         name: t('settings.options.misc.options.guestSignInReminder'),
+                        subtitle: t('settings.options.misc.options.guestSignInReminderSubtitle'),
                         value: 'enableSigninReminder'
                     },
                     {
                         name: t('settings.options.misc.options.reloadHomeOnStartup'),
+                        subtitle: t('settings.options.misc.options.reloadHomeOnStartupSubtitle'),
                         value: 'reloadHomeOnStartup'
+                    },
+                    {
+                        name: t('settings.options.misc.options.hqThumbnails'),
+                        subtitle: t('settings.options.misc.options.hqThumbnailsSubtitle'),
+                        icon: 'VIDEO_QUALITY',
+                        value: 'enableHqThumbnails'
+                    },
+                    {
+                        name: t('settings.options.misc.options.fixUI'),
+                        subtitle: t('settings.options.misc.options.fixUISubtitle'),
+                        icon: 'STAR',
+                        value: 'enableFixedUI'
                     }
                 ]
             },
             {
                 name: t('settings.options.subtitles.title'),
+                subtitle: t('settings.options.subtitles.subtitle'),
                 icon: 'TRANSLATE',
                 value: null,
+                menuHeader: {
+                    title: t('settings.options.subtitles.title'),
+                    subtitle: t('settings.options.subtitles.subtitle')
+                },
                 options: [
                     {
                         name: t('settings.options.subtitles.options.showLocalSubtitle'),
+                        subtitle: t('settings.options.subtitles.options.showLocalSubtitleSubtitle'),
                         value: 'enableShowUserLanguage'
                     },
                     {
                         name: t('settings.options.subtitles.options.showHiddenSubtitles'),
+                        subtitle: t('settings.options.subtitles.options.showHiddenSubtitlesSubtitle'),
                         value: 'enableShowOtherLanguages'
                     }
                 ]
             },
             {
                 name: t('settings.options.videoPlayer.title'),
+                subtitle: t('settings.options.videoPlayer.subtitle'),
                 icon: 'VIDEO_YOUTUBE',
                 value: null,
                 menuHeader: {
@@ -7464,51 +7549,33 @@
                     subtitle: t('settings.options.videoPlayer.subtitle')
                 },
                 options: [
-                    {
-                        name: t('settings.options.videoPlayer.options.patching.title'),
-                        icon: 'SETTINGS',
+                    window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
+                        name: t('settings.options.videoPlayer.options.afr'),
+                        subtitle: t('settings.options.videoPlayer.options.afrSubtitle'),
+                        icon: 'SLOW_MOTION_VIDEO',
+                        value: 'autoFrameRate'
+                    } : null,
+                    window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
+                        name: t('settings.options.videoPlayer.options.afrPauseDuration.title'),
+                        subtitle: t('settings.options.videoPlayer.options.afrPauseDuration.subtitle'),
+                        icon: 'TIMER',
                         value: null,
-                        menuId: 'tt-video-player-ui-patching',
-                        options: [
-                            {
-                                name: t('settings.options.videoPlayer.options.patching.options.enableVPUIPatching'),
-                                icon: 'SETTINGS',
-                                value: 'enablePatchingVideoPlayer'
-                            },
-                            {
-                                name: t('settings.options.videoPlayer.options.patching.options.previousNextBtns'),
-                                icon: 'SKIP_NEXT',
-                                value: 'enablePreviousNextButtons'
-                            },
-                            {
-                                name: t('settings.options.videoPlayer.options.patching.options.showSuperThxBtn'),
-                                icon: 'MONEY_HEART',
-                                value: 'enableSuperThanksButton'
-                            },
-                            {
-                                name: t('settings.options.videoPlayer.options.patching.options.showAIAskBtn'),
-                                icon: 'SPARK',
-                                value: 'enableAIAskButton'
-                            },
-                            {
-                                name: t('settings.options.videoPlayer.options.patching.options.showSpeedCtrlBtn'),
-                                icon: 'SLOW_MOTION_VIDEO',
-                                value: 'enableSpeedControlsButton'
-                            },
-                            {
-                                name: t('settings.options.videoPlayer.options.patching.options.addMPBtn'),
-                                icon: 'CLEAR_COOKIES',
-                                value: 'enableMPButton'
-                            },
-                            {
-                                name: t('settings.options.videoPlayer.options.patching.options.swapMPWithPIP'),
-                                icon: 'CLEAR_COOKIES',
-                                value: 'enableSwapMPWithPIP'
+                        menuId: 'tt-auto-frame-rate-pause-duration',
+                        menuHeader: {
+                            title: t('settings.options.videoPlayer.options.afrPauseDuration.title'),
+                            subtitle: t('settings.options.videoPlayer.options.afrPauseDuration.subtitle')
+                        },
+                        options: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((seconds) => {
+                            return {
+                                name: `${seconds} seconds`,
+                                key: 'autoFrameRatePauseVideoFor',
+                                value: seconds * 1000
                             }
-                        ]
-                    },
+                        })
+                    } : null,
                     {
                         name: t('settings.options.videoPlayer.options.preferredVideoQuality.title'),
+                        subtitle: t('settings.options.videoPlayer.options.preferredVideoQuality.subtitle'),
                         icon: 'VIDEO_QUALITY',
                         value: null,
                         menuId: 'tt-preferred-video-quality',
@@ -7524,10 +7591,28 @@
                                     value: quality.toLowerCase()
                                 }
                             })
-
+                    },
+                    {
+                        name: t('settings.options.videoPlayer.options.preferredVideoCodec.title'),
+                        subtitle: t('settings.options.videoPlayer.options.preferredVideoCodec.subtitle'),
+                        icon: 'VIDEO_QUALITY',
+                        value: null,
+                        menuId: 'tt-preferred-video-codec',
+                        menuHeader: {
+                            title: t('settings.options.videoPlayer.options.preferredVideoCodec.title'),
+                            subtitle: t('settings.options.videoPlayer.options.preferredVideoCodec.subtitle'),
+                        },
+                        options: ['any', 'vp9', 'av01', 'avc1'].map((codec) => {
+                            return {
+                                name: codec === 'any' ? 'Any' : codec.toUpperCase(),
+                                key: 'preferredVideoCodec',
+                                value: codec
+                            }
+                        })
                     },
                     {
                         name: t('settings.options.videoPlayer.options.speedSettings.title'),
+                        subtitle: t('settings.options.videoPlayer.options.speedSettings.subtitle'),
                         icon: 'SLOW_MOTION_VIDEO',
                         value: null,
                         menuId: 'tt-speed-settings-increments',
@@ -7544,44 +7629,60 @@
                         })
                     },
                     {
-                        name: t('settings.options.videoPlayer.options.preferredVideoCodec.title'),
-                        icon: 'VIDEO_QUALITY',
+                        name: t('settings.options.videoPlayer.options.patching.title'),
+                        subtitle: t('settings.options.videoPlayer.options.patching.subtitle'),
+                        icon: 'SETTINGS',
                         value: null,
-                        menuId: 'tt-preferred-video-codec',
+                        menuId: 'tt-video-player-ui-patching',
                         menuHeader: {
-                            title: t('settings.options.videoPlayer.options.preferredVideoCodec.title'),
-                            subtitle: t('settings.options.videoPlayer.options.preferredVideoCodec.subtitle'),
+                            title: t('settings.options.videoPlayer.options.patching.title'),
+                            subtitle: t('settings.options.videoPlayer.options.patching.subtitle')
                         },
-                        options: ['any', 'vp9', 'av01', 'avc1'].map((codec) => {
-                            return {
-                                name: codec === 'any' ? 'Any' : codec.toUpperCase(),
-                                key: 'preferredVideoCodec',
-                                value: codec
+                        options: [
+                            {
+                                name: t('settings.options.videoPlayer.options.patching.options.enableVPUIPatching'),
+                                subtitle: t('settings.options.videoPlayer.options.patching.options.enableVPUIPatchingSubtitle'),
+                                icon: 'SETTINGS',
+                                value: 'enablePatchingVideoPlayer'
+                            },
+                            {
+                                name: t('settings.options.videoPlayer.options.patching.options.previousNextBtns'),
+                                subtitle: t('settings.options.videoPlayer.options.patching.options.previousNextBtnsSubtitle'),
+                                icon: 'SKIP_NEXT',
+                                value: 'enablePreviousNextButtons'
+                            },
+                            {
+                                name: t('settings.options.videoPlayer.options.patching.options.showSpeedCtrlBtn'),
+                                subtitle: t('settings.options.videoPlayer.options.patching.options.showSpeedCtrlBtnSubtitle'),
+                                icon: 'SLOW_MOTION_VIDEO',
+                                value: 'enableSpeedControlsButton'
+                            },
+                            {
+                                name: t('settings.options.videoPlayer.options.patching.options.addMPBtn'),
+                                subtitle: t('settings.options.videoPlayer.options.patching.options.addMPBtnSubtitle'),
+                                icon: 'CLEAR_COOKIES',
+                                value: 'enableMPButton'
+                            },
+                            {
+                                name: t('settings.options.videoPlayer.options.patching.options.swapMPWithPIP'),
+                                subtitle: t('settings.options.videoPlayer.options.patching.options.swapMPWithPIPSubtitle'),
+                                icon: 'CLEAR_COOKIES',
+                                value: 'enableSwapMPWithPIP'
+                            },
+                            {
+                                name: t('settings.options.videoPlayer.options.patching.options.showSuperThxBtn'),
+                                subtitle: t('settings.options.videoPlayer.options.patching.options.showSuperThxBtnSubtitle'),
+                                icon: 'MONEY_HEART',
+                                value: 'enableSuperThanksButton'
+                            },
+                            {
+                                name: t('settings.options.videoPlayer.options.patching.options.showAIAskBtn'),
+                                subtitle: t('settings.options.videoPlayer.options.patching.options.showAIAskBtnSubtitle'),
+                                icon: 'SPARK',
+                                value: 'enableAIAskButton'
                             }
-                        })
-                    },
-                    window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
-                        name: t('settings.options.videoPlayer.options.afr'),
-                        icon: 'SLOW_MOTION_VIDEO',
-                        value: 'autoFrameRate'
-                    } : null,
-                    window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate ? {
-                        name: t('settings.options.videoPlayer.options.afrPauseDuration.title'),
-                        icon: 'TIMER',
-                        value: null,
-                        menuId: 'tt-auto-frame-rate-pause-duration',
-                        menuHeader: {
-                            title: t('settings.options.videoPlayer.options.afrPauseDuration.title'),
-                            subtitle: t('settings.options.videoPlayer.options.afrPauseDuration.subtitle')
-                        },
-                        options: [0, 0.5, 1, 1.5, 2, 2.5, 3, 3.5, 4, 4.5, 5].map((seconds) => {
-                            return {
-                                name: `${seconds} seconds`,
-                                key: 'autoFrameRatePauseVideoFor',
-                                value: seconds * 1000
-                            }
-                        })
-                    } : null
+                        ]
+                    }
                 ]
             },
             {
@@ -7894,15 +7995,18 @@
                     },
                     {
                         name: t('settings.options.uiSettings.options.sortSubscriptionsByAlphabet'),
+                        subtitle: t('settings.options.uiSettings.options.sortSubscriptionsByAlphabetSubtitle'),
                         icon: 'SUBSCRIPTIONS',
                         value: 'sortSubscriptionsByAlphabet'
                     },
                     {
                         name: t('settings.options.uiSettings.options.disableChannelsOnSidebar'),
+                        subtitle: t('settings.options.uiSettings.options.disableChannelsOnSidebarSubtitle'),
                         value: 'disableChannelsOnSidebar'
                     },
                     {
                         name: t('settings.options.uiSettings.options.clock.title'),
+                        subtitle: t('settings.options.uiSettings.options.clock.subtitle'),
                         value: null,
                         icon: 'TIMER',
                         menuId: 'tt-clock-settings',
@@ -7913,21 +8017,25 @@
                         options: [
                             {
                                 name: t('settings.options.uiSettings.options.clock.options.enableClock'),
+                                subtitle: t('settings.options.uiSettings.options.clock.options.enableClockSubtitle'),
                                 icon: 'TIMER',
                                 value: 'enableClock'
                             },
                             {
                                 name: t('settings.options.uiSettings.options.clock.options.isClock12HourFormat'),
+                                subtitle: t('settings.options.uiSettings.options.clock.options.isClock12HourFormatSubtitle'),
                                 icon: 'TIMER',
                                 value: 'isClock12HourFormat'
                             },
                             {
                                 name: t('settings.options.uiSettings.options.clock.options.clockShowSeconds'),
+                                subtitle: t('settings.options.uiSettings.options.clock.options.clockShowSecondsSubtitle'),
                                 icon: 'TIMER',
                                 value: 'clockShowSeconds'
                             },
                             {
                                 name: 'Hide Clock While Video is Playing',
+                                subtitle: 'Hide on-screen clock during active video playback',
                                 icon: 'EYE_OFF',
                                 value: 'clockHideWhenVideoPlaying'
                             }
@@ -7935,11 +8043,13 @@
                     },
                     {
                         name: 'Disable Enlarged Thumbnails',
+                        subtitle: 'Prevent home screen video tiles from expanding on focus',
                         value: 'disableEnlargingThumbnails',
                         icon: null,
                     },
                     {
                         name: 'Enable Shrinked Thumbnails',
+                        subtitle: 'Display smaller video thumbnails to fit more on screen',
                         value: 'enableShrinkingThumbnails',
                         icon: null,
                     }
@@ -7957,7 +8067,7 @@
                     subtitle:  t('settings.options.updater.versionSubtitle', { version: window.h5vcc.fasttube.GetVersion() }),
                     options: [
                         buttonItem(
-                            { title: t('settings.options.updater.options.checkForUpdates') },
+                            { title: t('settings.options.updater.options.checkForUpdates'), subtitle: t('settings.options.updater.options.checkForUpdatesSubtitle') },
                             { icon: 'SYSTEM_UPDATE' },
                             [
                                 {
@@ -7969,6 +8079,7 @@
                         ),
                         {
                             name: t('settings.options.updater.options.checkForUpdatesOnStartup'),
+                            subtitle: t('settings.options.updater.options.checkForUpdatesOnStartupSubtitle'),
                             icon: 'SYSTEM_UPDATE',
                             value: 'enableUpdater'
                         }
@@ -8888,18 +8999,21 @@
           
         }
 
-        if (r.adPlacements && adBlockEnabled) {
-          r.adPlacements = [];
-        }
+        if (adBlockEnabled) {
+          if (r.adPlacements) r.adPlacements = [];
+          if (r.playerAds) r.playerAds = false;
+          if (r.adSlots) r.adSlots = [];
+          if (r.adBreakHeartbeatParams) delete r.adBreakHeartbeatParams;
+          if (r.adBreakParams) delete r.adBreakParams;
 
-        // Also set playerAds to false, just incase.
-        if (r.playerAds && adBlockEnabled) {
-          r.playerAds = false;
-        }
-
-        // Also set adSlots to an empty array, emptying only the adPlacements won't work.
-        if (r.adSlots && adBlockEnabled) {
-          r.adSlots = [];
+          if (r.playerResponse && typeof r.playerResponse === 'object') {
+            const pr = r.playerResponse;
+            if (pr.adPlacements) pr.adPlacements = [];
+            if (pr.playerAds) pr.playerAds = false;
+            if (pr.adSlots) pr.adSlots = [];
+            if (pr.adBreakHeartbeatParams) delete pr.adBreakHeartbeatParams;
+            if (pr.adBreakParams) delete pr.adBreakParams;
+          }
         }
 
         if (r.paidContentOverlay && !configRead('enablePaidPromotionOverlay')) {
@@ -9197,8 +9311,13 @@
 
 
     function processShelves(shelves, shouldAddPreviews = true) {
+      const adBlockEnabled = configRead('enableAdBlock');
       for (let s = shelves.length - 1; s >= 0; s--) {
         const shelve = shelves[s];
+        if (adBlockEnabled && shelve.adSlotRenderer) {
+          shelves.splice(s, 1);
+          continue;
+        }
         if (shelve.shelfRenderer) {
           // Thumbnail sizing options (ported from upstream TizenTube)
           if (!shelve.shelfRenderer.tvhtml5Style) shelve.shelfRenderer.tvhtml5Style = {};
@@ -9206,6 +9325,14 @@
           if (configRead('disableEnlargingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.enlarge = false;
           if (configRead('enableShrinkingThumbnails')) shelve.shelfRenderer.tvhtml5Style.effects.shrink = true;
           if (!shelve.shelfRenderer.content?.horizontalListRenderer?.items) continue;
+          if (adBlockEnabled) {
+            const items = shelve.shelfRenderer.content.horizontalListRenderer.items;
+            for (let i = items.length - 1; i >= 0; i--) {
+              if (items[i].adSlotRenderer) {
+                items.splice(i, 1);
+              }
+            }
+          }
           deArrowify(shelve.shelfRenderer.content.horizontalListRenderer.items);
           hqify(shelve.shelfRenderer.content.horizontalListRenderer.items);
           addLongPress(shelve.shelfRenderer.content.horizontalListRenderer.items);
@@ -9503,6 +9630,54 @@
     	}
     	return result;
     };
+
+    // Fast-Tube Unified SPA Route Observer
+    // Intercepts history.pushState, history.replaceState, hashchange, and popstate
+    // Provides zero-latency route change events without background polling loops.
+
+    const listeners = new Set();
+    let currentUrl = typeof window !== 'undefined' && window.location ? (window.location.href || '') : '';
+
+    function onRoute(callback) {
+        listeners.add(callback);
+        return () => listeners.delete(callback);
+    }
+
+    function notifyRoute(force = false) {
+        if (typeof window === 'undefined') return;
+        const newUrl = window.location ? (window.location.href || '') : '';
+        if (!force && newUrl === currentUrl) return;
+        currentUrl = newUrl;
+        for (const cb of listeners) {
+            try {
+                cb(newUrl);
+            } catch (e) {
+                console.error('[Fast-Tube] Route observer callback error:', e);
+            }
+        }
+    }
+
+    if (typeof window !== 'undefined') {
+        const wrap = (target, method) => {
+            if (!target) return;
+            const orig = target[method];
+            if (typeof orig !== 'function') return;
+            target[method] = function () {
+                const res = orig.apply(this, arguments);
+                notifyRoute();
+                return res;
+            };
+        };
+
+        if (window.history) {
+            wrap(window.history, 'pushState');
+            wrap(window.history, 'replaceState');
+        }
+        if (typeof window.addEventListener === 'function') {
+            window.addEventListener('hashchange', () => notifyRoute(true));
+            window.addEventListener('popstate', () => notifyRoute(true));
+        }
+    }
 
     // Copied from https://github.com/ajayyy/SponsorBlock/blob/da1a535de784540ee10166a75a3eb8537073838c/src/config.ts#L113-L134
     const barTypes = {
@@ -9986,12 +10161,9 @@
     }
 
     // Because the app can switch routes without firing hashchange (replaceState)
-    // and the player state appears slightly after the route, a lightweight
-    // watchdog keeps the handler in sync with the actually-playing video.
-    //
+    // the routeObserver and a lightweight watchdog keep the handler in sync.
     function sbEnsureHandler() {
-      const hash = location.hash;
-      const onWatchRoute = hash.indexOf('#/watch') === 0;
+      const onWatchRoute = window.location.href.indexOf('watch') !== -1;
       const videoID = onWatchRoute ? sbExtractVideoID() : null;
 
       if (!videoID) {
@@ -10026,7 +10198,7 @@
       }
     }
 
-    window.addEventListener('hashchange', sbEnsureHandler, false);
+    onRoute(sbEnsureHandler);
     sbEnsureHandler();
     let sbWatchdogInterval = setInterval(sbEnsureHandler, 1000);
     document.addEventListener('visibilitychange', () => {
@@ -12291,8 +12463,8 @@
         }
 
         #setupRouteListener() {
-            window.addEventListener('hashchange', () => {
-                if (location.hash.includes('watch')) {
+            onRoute((url) => {
+                if (url.includes('watch')) {
                     this.#pollAttempts = 0;
                     this.#pollForPlayer();
                 }
@@ -12460,8 +12632,8 @@
         });
     }
 
-    window.addEventListener('hashchange', () => {
-        if (location.hash.includes('watch')) {
+    onRoute((url) => {
+        if (url.includes('watch')) {
             queuePollAttempts = 0;
             addListener();
         }
@@ -20362,8 +20534,8 @@
 
     applyPatches();
 
-    window.addEventListener('hashchange', () => {
-        if (!isPlayerPatched && location.hash.includes('watch')) {
+    onRoute((url) => {
+        if (!isPlayerPatched && url.includes('watch')) {
             applyPatchAttempts = 0;
             applyPatches();
         }
@@ -20412,6 +20584,7 @@
     const FRAME_RATE_MAX_ATTEMPTS = 20;
     let frameRatePollTimeout = null;
     let pauseResumeTimeout = null;
+    let lastAppliedFps = null;
 
     function attachToVideoPlayer() {
         if (!configRead('autoFrameRate')) return;
@@ -20430,17 +20603,25 @@
 
         if (attachedPlayer === player && attachedPlayer.isConnected) return;
         attachedPlayer = player;
-        player.addEventListener('onPlaybackStartExternal', () => {
+
+        const handlePlaybackStart = () => {
             try {
                 if (window.location.href.indexOf('watch') === -1) return;
                 const statsForNerds = player.getStatsForNerds ? player.getStatsForNerds() : null;
-                if (!statsForNerds || !statsForNerds.resolution) return;
+                if (!statsForNerds || !statsForNerds.resolution) {
+                    // If stats are not yet populated on initial play event, retry once after short delay
+                    setTimeout(handlePlaybackStart, 500);
+                    return;
+                }
 
                 const resolutionMatch = statsForNerds.resolution.match(/(\d+)x(\d+)@([\d.]+)/);
                 const pauseFor = configRead('autoFrameRatePauseVideoFor');
 
                 if (resolutionMatch) {
-                    const fps = resolutionMatch[3];
+                    const fps = parseFloat(resolutionMatch[3]);
+                    if (fps === lastAppliedFps) return;
+                    lastAppliedFps = fps;
+
                     if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
                         if (!configRead('autoFrameRate')) {
                             window.h5vcc.fasttube.SetFrameRate(0);
@@ -20453,13 +20634,16 @@
                                 video.play();
                             }, pauseFor);
                         }
-                        window.h5vcc.fasttube.SetFrameRate(parseFloat(fps));
+                        window.h5vcc.fasttube.SetFrameRate(fps);
                     }
                 }
             } catch (e) {
                 console.error('Error in auto frame rate handling:', e);
             }
-        });
+        };
+
+        player.addEventListener('onPlaybackStartExternal', handlePlaybackStart);
+        video.addEventListener('playing', handlePlaybackStart);
     }
 
     const resetFrameRate = () => {
@@ -20467,13 +20651,14 @@
         frameRatePollTimeout = null;
         clearTimeout(pauseResumeTimeout);
         pauseResumeTimeout = null;
+        lastAppliedFps = null;
         if (window.h5vcc && window.h5vcc.fasttube && window.h5vcc.fasttube.SetFrameRate) {
             window.h5vcc.fasttube.SetFrameRate(0);
         }
     };
 
-    window.addEventListener('hashchange', () => {
-        if (window.location.href.indexOf('watch') === -1) {
+    onRoute((url) => {
+        if (url.indexOf('watch') === -1) {
             resetFrameRate();
         } else if (configRead('autoFrameRate')) {
             frameRatePollAttempts = 0;
@@ -20552,16 +20737,33 @@
         actualClock.textContent = `${hours}:${minutes}${secondsEnabled ? `:${seconds}` : ''}${is12HourFormat ? (now.getHours() >= 12 ? ' PM' : ' AM') : ''}`;
     }
 
-    function startClockTimer() {
-        if (clockInterval) clearInterval(clockInterval);
-        clockInterval = null;
-        if (!document.hidden && actualClock && configRead('enableClock')) {
-            clockInterval = setInterval(updateClock, 1000);
+    function scheduleNextClockTick() {
+        if (clockInterval) {
+            clearTimeout(clockInterval);
+            clearInterval(clockInterval);
+            clockInterval = null;
         }
+        if (document.hidden || !actualClock || !configRead('enableClock')) return;
+
+        updateClock();
+
+        const secondsEnabled = configRead('clockShowSeconds');
+        if (secondsEnabled) {
+            clockInterval = setTimeout(scheduleNextClockTick, 1000);
+        } else {
+            const now = new Date();
+            const msUntilNextMinute = ((60 - now.getSeconds()) * 1000) - now.getMilliseconds() + 50;
+            clockInterval = setTimeout(scheduleNextClockTick, Math.max(500, msUntilNextMinute));
+        }
+    }
+
+    function startClockTimer() {
+        scheduleNextClockTick();
     }
 
     function stopClockTimer() {
         if (clockInterval) {
+            clearTimeout(clockInterval);
             clearInterval(clockInterval);
             clockInterval = null;
         }

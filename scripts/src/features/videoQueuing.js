@@ -4,6 +4,7 @@ window.queuedVideos = {
 };
 
 import resolveCommand from '../resolveCommand.js';
+import { onRoute } from '../utils/routeObserver.js';
 
 let attachedQueuePlayer = null;
 let queuePollAttempts = 0;
@@ -71,8 +72,8 @@ function addListener() {
     });
 }
 
-window.addEventListener('hashchange', () => {
-    if (location.hash.includes('watch')) {
+onRoute((url) => {
+    if (url.includes('watch')) {
         queuePollAttempts = 0;
         addListener();
     }

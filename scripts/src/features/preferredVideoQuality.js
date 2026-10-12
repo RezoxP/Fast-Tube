@@ -1,4 +1,5 @@
 import { configRead, configChangeEmitter } from "../config.js";
+import { onRoute } from "../utils/routeObserver.js";
 
 const SELECTORS = {
     PLAYER: '.html5-video-player',
@@ -32,8 +33,8 @@ class PreferredQualityHandler {
     }
 
     #setupRouteListener() {
-        window.addEventListener('hashchange', () => {
-            if (location.hash.includes('watch')) {
+        onRoute((url) => {
+            if (url.includes('watch')) {
                 this.#pollAttempts = 0;
                 this.#pollForPlayer();
             }
