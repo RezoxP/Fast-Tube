@@ -326,15 +326,49 @@ window.JSON.stringify = JSON.stringify;
 // Patch JSON.parse and JSON.stringify to use the custom ones
 window.JSON.parse = JSON.parse;
 JSON.parse.__ftAdblock = true; // test marker
-for (const key in window._yttv) {
-  if (window._yttv[key] && window._yttv[key].JSON) {
-    if (window._yttv[key].JSON.parse) {
-      window._yttv[key].JSON.parse = JSON.parse;
+
+function patchYttvModule(mod) {
+  if (mod && mod.JSON) {
+    if (mod.JSON.parse && mod.JSON.parse !== JSON.parse) {
+      mod.JSON.parse = JSON.parse;
     }
-    if (window._yttv[key].JSON.stringify) {
-      window._yttv[key].JSON.stringify = JSON.stringify;
+    if (mod.JSON.stringify && mod.JSON.stringify !== JSON.stringify) {
+      mod.JSON.stringify = JSON.stringify;
     }
   }
+}
+
+let _yttvTarget = window._yttv || {};
+for (const key in _yttvTarget) {
+  patchYttvModule(_yttvTarget[key]);
+}
+
+const yttvProxy = new Proxy(_yttvTarget, {
+  set(target, prop, value) {
+    patchYttvModule(value);
+    target[prop] = value;
+    return true;
+  }
+});
+
+try {
+  Object.defineProperty(window, '_yttv', {
+    configurable: true,
+    enumerable: true,
+    get() {
+      return yttvProxy;
+    },
+    set(val) {
+      if (val && typeof val === 'object') {
+        for (const k in val) {
+          patchYttvModule(val[k]);
+          _yttvTarget[k] = val[k];
+        }
+      }
+    }
+  });
+} catch (e) {
+  window._yttv = yttvProxy;
 }
 
 

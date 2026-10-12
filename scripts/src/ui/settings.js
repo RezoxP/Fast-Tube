@@ -776,7 +776,7 @@ export default function modernUI(update, parameters) {
                         },
                         {
                             name: 'Hide Clock While Video is Playing',
-                            subtitle: 'Hide on-screen clock during active video playback',
+                            subtitle: 'Hide clock during video playback',
                             icon: 'EYE_OFF',
                             value: 'clockHideWhenVideoPlaying'
                         }
@@ -784,13 +784,13 @@ export default function modernUI(update, parameters) {
                 },
                 {
                     name: 'Disable Enlarged Thumbnails',
-                    subtitle: 'Prevent home screen video tiles from expanding on focus',
+                    subtitle: 'Keep thumbnails fixed size',
                     value: 'disableEnlargingThumbnails',
                     icon: null,
                 },
                 {
                     name: 'Enable Shrinked Thumbnails',
-                    subtitle: 'Display smaller video thumbnails to fit more on screen',
+                    subtitle: 'Fit more thumbnails on screen',
                     value: 'enableShrinkingThumbnails',
                     icon: null,
                 }
